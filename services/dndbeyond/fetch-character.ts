@@ -1,9 +1,10 @@
 import type { DdbApiResponse, RawCharacter } from './api-types';
+import { getAuthToken } from './auth';
 
 const CHARACTER_SERVICE_BASE =
   'https://character-service.dndbeyond.com/character/v5/character';
 
-/** Build the public character-service URL for a given character id. */
+/** Build the character-service URL for a given character id. */
 export function characterServiceUrl(id: number | string): string {
   return `${CHARACTER_SERVICE_BASE}/${id}`;
 }
@@ -19,13 +20,32 @@ export class CharacterFetchError extends Error {
   }
 }
 
+/** HTTP statuses returned when a character is private and requires authentication. */
+const AUTH_REQUIRED_STATUSES = new Set([401, 403]);
+
 /**
- * Fetch a character's raw data by id from D&D Beyond's public character-service
- * endpoint. The character must be set to public. Intended to run in the
- * background script, which holds the host permission for the service.
+ * Fetch a character's raw data by id from D&D Beyond.
+ *
+ * Public characters load directly. Private characters return 401/403 and are
+ * retried with the signed-in user's bearer token. The session cookie is included
+ * on every request (`credentials: 'include'`) so cookie-based auth works too.
+ * Runs from an extension context (the sheet page) that holds host permission for
+ * the service.
  */
 export async function fetchCharacter(id: number | string): Promise<RawCharacter> {
-  const response = await fetch(characterServiceUrl(id));
+  const url = characterServiceUrl(id);
+
+  let response = await fetch(url, { credentials: 'include' });
+
+  if (AUTH_REQUIRED_STATUSES.has(response.status)) {
+    const token = await getAuthToken();
+    if (token) {
+      response = await fetch(url, {
+        credentials: 'include',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+  }
 
   if (!response.ok) {
     throw new CharacterFetchError(

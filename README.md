@@ -12,7 +12,7 @@ Early development. Working now:
 
 - Project scaffold (WXT + Vue 3 + TypeScript).
 - Unit and integration test harness (Vitest).
-- Character data layer: fetch a public character by id and normalize it into an internal model with per-section metadata.
+- Character data layer: fetch a character by id (public, or private via the signed-in user's session) and normalize it into an internal model with per-section metadata.
 - Activation: a toolbar icon and a right-click menu on a D&D Beyond character page open the enhanced sheet in a new tab, carrying the character id.
 - Enhanced-sheet tab: loads the character and renders the list of sheet sections with entry counts (loading and error states handled).
 
@@ -30,7 +30,7 @@ End-to-end and visual tests are planned for a later phase.
 
 1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
 2. Activate the extension from the toolbar icon or the page context menu.
-3. The extension opens a new tab and loads the character by ID from D&D Beyond's public character endpoint (`https://character-service.dndbeyond.com/character/v5/character/<id>`). The character must be set to public.
+3. The extension opens a new tab and loads the character by ID from D&D Beyond's character endpoint (`https://character-service.dndbeyond.com/character/v5/character/<id>`). Public characters load directly; private characters load using your signed-in D&D Beyond session (the browser's `CobaltSession` cookie, exchanged for a bearer token).
 4. Sheet sections are shown in a drag-and-drop layout. Default order depends on the character's class, empty sections are hidden, and hidden sections are placed at the end.
 5. Adjust the layout and print.
 
