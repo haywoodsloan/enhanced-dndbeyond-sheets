@@ -69,6 +69,7 @@ modules/          Local WXT modules
 lib/              Framework-agnostic domain logic (D&D Beyond data layer)
 assets/           Assets processed by the bundler
 public/           Static files copied as-is (icons)
+tests/            Unit and integration tests (mirrors source layout)
 wxt.config.ts     WXT configuration
 vitest.config.ts  Test configuration
 ```
@@ -77,4 +78,4 @@ Generated and not committed: `.wxt/`, `.output/`, `node_modules/`.
 
 ## Testing
 
-Tests use Vitest with WXT's testing plugin and `@vue/test-utils`. Test files are co-located with source files as `*.test.ts`.
+Tests use Vitest with WXT's testing plugin and `@vue/test-utils`. Test files live in `tests/`, mirroring the source layout, and are named `*.test.ts`.

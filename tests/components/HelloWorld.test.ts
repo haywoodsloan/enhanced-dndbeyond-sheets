@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import HelloWorld from './HelloWorld.vue';
+import HelloWorld from '@/components/HelloWorld.vue';
 
 // Phase 0 smoke test: proves the harness (Vitest + WxtVitest + happy-dom +
 // Vue Test Utils) can mount and interact with a Vue component.

@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import type { RawCharacter } from './api-types';
-import { normalizeCharacter } from './normalize';
+import type { RawCharacter } from '@/lib/dndbeyond/api-types';
+import { normalizeCharacter } from '@/lib/dndbeyond/normalize';
 
 // Load the fixture from disk (not a JSON import) to keep type-checking fast and
 // avoid inferring a giant literal type from the ~550 KB file. Vitest runs with
 // the project root as the working directory.
 const raw = JSON.parse(
-  readFileSync('lib/dndbeyond/fixtures/noct.json', 'utf-8'),
+  readFileSync('tests/fixtures/noct.json', 'utf-8'),
 ) as RawCharacter;
 
 describe('normalizeCharacter', () => {
