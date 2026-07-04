@@ -12,7 +12,8 @@ export default defineConfig({
     // Beyond's own request so private characters load), `storage` (hold that
     // header in storage.session).
     permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage'],
-    // The sheet fetches characters directly from the character service.
+    // The extension only talks to the character service: the background reads the
+    // Authorization header off its requests, and the sheet fetches from it.
     host_permissions: ['https://character-service.dndbeyond.com/*'],
     // Firefox MV3 requires an extension id; `data_collection_permissions`
     // declares that the extension collects no data (required by Firefox for new

@@ -4,6 +4,9 @@ import { CHARACTER_ID_PARAM, SHEET_PAGE } from '@/services/dndbeyond/sheet-url';
 
 const CONTEXT_MENU_ID = 'open-enhanced-sheet';
 
+/** Last captured `Authorization` value, used to skip redundant storage writes. */
+let lastCapturedAuthorization: string | null = null;
+
 export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(() => {
     browser.contextMenus.create({
@@ -14,18 +17,20 @@ export default defineBackground(() => {
     });
   });
 
-  // Capture the user's `Authorization` header from D&D Beyond's own
-  // character-service requests. Holding it lets the sheet load private
-  // characters with the same credentials the page itself uses.
+  // Capture the user's `Authorization` header from D&D Beyond's own character
+  // requests so the sheet can load private characters with the same credentials
+  // the page uses. The header is identical across character-service calls, so we
+  // watch only the character document endpoint and dedupe repeat values.
   browser.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
       const authorization = extractAuthorization(details.requestHeaders);
-      if (authorization) {
+      if (authorization && authorization !== lastCapturedAuthorization) {
+        lastCapturedAuthorization = authorization;
         void setAuthToken(authorization);
       }
       return undefined;
     },
-    { urls: ['https://character-service.dndbeyond.com/*'] },
+    { urls: ['https://character-service.dndbeyond.com/character/v5/character/*'] },
     ['requestHeaders'],
   );
 
