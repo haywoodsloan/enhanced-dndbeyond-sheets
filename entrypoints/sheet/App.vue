@@ -1,11 +1,68 @@
 <script lang="ts" setup>
-defineProps<{ characterId: number | null }>();
+import { computed, onMounted, ref } from 'vue';
+import type { Character } from '@/services/dndbeyond/model';
+import { loadCharacter } from '@/services/dndbeyond/load-character';
+
+const props = defineProps<{ characterId: number | null }>();
+
+type Status = 'idle' | 'loading' | 'loaded' | 'error';
+
+const status = ref<Status>('idle');
+const character = ref<Character | null>(null);
+const errorMessage = ref('');
+
+const subtitle = computed(() => {
+  const loaded = character.value;
+  if (!loaded) return '';
+  const classes = loaded.classes
+    .map((cls) =>
+      cls.subclass ? `${cls.name} ${cls.level} (${cls.subclass})` : `${cls.name} ${cls.level}`,
+    )
+    .join(' / ');
+  return [loaded.race, classes].filter(Boolean).join(' · ');
+});
+
+onMounted(async () => {
+  if (props.characterId == null) return;
+  status.value = 'loading';
+  try {
+    character.value = await loadCharacter(props.characterId);
+    status.value = 'loaded';
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : 'Failed to load character.';
+    status.value = 'error';
+  }
+});
 </script>
 
 <template>
   <main class="sheet">
-    <h1>Enhanced Character Sheet</h1>
-    <p v-if="characterId != null">Character ID: {{ characterId }}</p>
-    <p v-else>No character selected. Open this from a D&amp;D Beyond character page.</p>
+    <p v-if="characterId == null">
+      No character selected. Open this from a D&amp;D Beyond character page.
+    </p>
+
+    <p v-else-if="status === 'idle' || status === 'loading'">Loading character…</p>
+
+    <p v-else-if="status === 'error'" role="alert">
+      Could not load character: {{ errorMessage }}
+    </p>
+
+    <template v-else-if="character">
+      <header>
+        <h1>{{ character.name }}</h1>
+        <p>{{ subtitle }}</p>
+      </header>
+
+      <ul>
+        <li
+          v-for="section in character.sections"
+          :key="section.key"
+          :data-section-key="section.key"
+        >
+          {{ section.title }}: {{ section.count }}
+        </li>
+      </ul>
+    </template>
   </main>
 </template>

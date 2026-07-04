@@ -14,15 +14,15 @@ Early development. Working now:
 - Unit and integration test harness (Vitest).
 - Character data layer: fetch a public character by id and normalize it into an internal model with per-section metadata.
 - Activation: a toolbar icon and a right-click menu on a D&D Beyond character page open the enhanced sheet in a new tab, carrying the character id.
+- Enhanced-sheet tab: loads the character and renders the list of sheet sections with entry counts (loading and error states handled).
 
 Not yet implemented, in planned order:
 
-1. Enhanced-sheet tab (render sections).
-2. Class-aware default ordering and auto-hide of empty sections.
-3. Drag-and-drop customization with saved layouts.
-4. Section content (attributes, inventory, spells, attacks, features).
-5. Print layout.
-6. Polish and customization.
+1. Class-aware default ordering and auto-hide of empty sections.
+2. Drag-and-drop customization with saved layouts.
+3. Section content (attributes, inventory, spells, attacks, features).
+4. Print layout.
+5. Polish and customization.
 
 End-to-end and visual tests are planned for a later phase.
 
