@@ -13,16 +13,16 @@ Early development. Working now:
 - Project scaffold (WXT + Vue 3 + TypeScript).
 - Unit and integration test harness (Vitest).
 - Character data layer: fetch a public character by id and normalize it into an internal model with per-section metadata.
+- Activation: a toolbar icon and a right-click menu on a D&D Beyond character page open the enhanced sheet in a new tab, carrying the character id.
 
 Not yet implemented, in planned order:
 
-1. Activation from a character page (toolbar icon and context menu).
-2. Enhanced-sheet tab (render sections).
-3. Class-aware default ordering and auto-hide of empty sections.
-4. Drag-and-drop customization with saved layouts.
-5. Section content (attributes, inventory, spells, attacks, features).
-6. Print layout.
-7. Polish and customization.
+1. Enhanced-sheet tab (render sections).
+2. Class-aware default ordering and auto-hide of empty sections.
+3. Drag-and-drop customization with saved layouts.
+4. Section content (attributes, inventory, spells, attacks, features).
+5. Print layout.
+6. Polish and customization.
 
 End-to-end and visual tests are planned for a later phase.
 
@@ -61,7 +61,7 @@ npm install
 ## Project structure
 
 ```
-entrypoints/      Extension entrypoints (background, content script, popup)
+entrypoints/      Extension entrypoints (background, sheet page)
 components/       Vue components (auto-imported)
 composables/      Vue composables (auto-imported)
 utils/            Generic utilities (auto-imported)
