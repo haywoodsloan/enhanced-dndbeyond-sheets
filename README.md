@@ -1,7 +1,79 @@
-# WXT + Vue 3
+# Enhanced D&D Beyond Sheets
 
-This template should help get you started developing with Vue 3 in WXT.
+A browser extension that produces a customizable, print-friendly layout of a D&D Beyond character sheet.
 
-## Recommended IDE Setup
+D&D Beyond's on-screen character sheet is fine, but its default print output is cramped in some areas and wastes space in others. This extension opens a character in a separate view where sheet sections can be reordered, hidden, and printed, with a better default layout than the site provides.
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar).
+Built with WXT and Vue 3.
+
+## Status
+
+Early development. Working now:
+
+- Project scaffold (WXT + Vue 3 + TypeScript).
+- Unit and integration test harness (Vitest).
+
+Not yet implemented, in planned order:
+
+1. Character data layer (fetch and normalize character JSON).
+2. Activation from a character page (toolbar icon and context menu).
+3. Enhanced-sheet tab (render sections).
+4. Class-aware default ordering and auto-hide of empty sections.
+5. Drag-and-drop customization with saved layouts.
+6. Section content (attributes, inventory, spells, attacks, features).
+7. Print layout.
+8. Polish and customization.
+
+End-to-end and visual tests are planned for a later phase.
+
+## How it works (planned)
+
+1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
+2. Activate the extension from the toolbar icon or the page context menu.
+3. The extension opens a new tab and loads the character by ID from D&D Beyond's public character endpoint (`https://character-service.dndbeyond.com/character/v5/character/<id>`). The character must be set to public.
+4. Sheet sections are shown in a drag-and-drop layout. Default order depends on the character's class, empty sections are hidden, and hidden sections are placed at the end.
+5. Adjust the layout and print.
+
+## Requirements
+
+- Node.js 20.12 or newer.
+- npm.
+
+## Setup
+
+```sh
+npm install
+```
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Run in development mode (Chrome) with hot reload. |
+| `npm run dev:firefox` | Run in development mode (Firefox). |
+| `npm run build` | Production build (Chrome) to `.output/`. |
+| `npm run build:firefox` | Production build (Firefox). |
+| `npm run zip` | Package the build as a zip for store submission. |
+| `npm test` | Run the test suite once. |
+| `npm run test:watch` | Run tests in watch mode. |
+| `npm run compile` | Type-check with `vue-tsc`. |
+
+## Project structure
+
+```
+entrypoints/      Extension entrypoints (background, content script, popup)
+components/       Vue components (auto-imported)
+composables/      Vue composables (auto-imported)
+utils/            Generic utilities (auto-imported)
+modules/          Local WXT modules
+assets/           Assets processed by the bundler
+public/           Static files copied as-is (icons)
+wxt.config.ts     WXT configuration
+vitest.config.ts  Test configuration
+```
+
+Generated and not committed: `.wxt/`, `.output/`, `node_modules/`.
+
+## Testing
+
+Tests use Vitest with WXT's testing plugin and `@vue/test-utils`. Test files are co-located with source files as `*.test.ts`.
