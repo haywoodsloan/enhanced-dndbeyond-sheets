@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "wxt: build (dev)",
+      "detail": "Build the extension in development mode (with source maps) for debugging.",
+      "type": "shell",
+      "command": "npm run build:dev",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      }
+    }
+  ]
+}
