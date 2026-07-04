@@ -3,7 +3,7 @@ import {
   CharacterFetchError,
   characterServiceUrl,
   fetchCharacter,
-} from '@/lib/dndbeyond/fetch-character';
+} from '@/services/dndbeyond/fetch-character';
 
 function jsonResponse(
   body: unknown,

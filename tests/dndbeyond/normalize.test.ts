@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import type { RawCharacter } from '@/lib/dndbeyond/api-types';
-import { normalizeCharacter } from '@/lib/dndbeyond/normalize';
+import type { RawCharacter } from '@/services/dndbeyond/api-types';
+import { normalizeCharacter } from '@/services/dndbeyond/normalize';
 
 // Load the fixture from disk (not a JSON import) to keep type-checking fast and
 // avoid inferring a giant literal type from the ~550 KB file. Vitest runs with

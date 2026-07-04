@@ -66,7 +66,7 @@ components/       Vue components (auto-imported)
 composables/      Vue composables (auto-imported)
 utils/            Generic utilities (auto-imported)
 modules/          Local WXT modules
-lib/              Framework-agnostic domain logic (D&D Beyond data layer)
+services/         Framework-agnostic domain logic (D&D Beyond data layer)
 assets/           Assets processed by the bundler
 public/           Static files copied as-is (icons)
 tests/            Unit and integration tests (mirrors source layout)
