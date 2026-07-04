@@ -13,10 +13,15 @@ export default defineConfig({
     permissions: ['contextMenus', 'activeTab', 'scripting', 'storage'],
     // Used by the sheet's fallback direct fetch of public characters.
     host_permissions: ['https://character-service.dndbeyond.com/*'],
-    // Firefox MV3 requires an explicit extension id.
+    // Firefox MV3 requires an extension id; `data_collection_permissions`
+    // declares that the extension collects no data (required by Firefox for new
+    // extensions from 2025-11-03).
     browser_specific_settings: {
       gecko: {
         id: 'enhanced-dndbeyond-sheets@haywoodsloan',
+        data_collection_permissions: {
+          required: ['none'],
+        },
       },
     },
   },
