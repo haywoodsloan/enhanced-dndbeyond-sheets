@@ -7,13 +7,6 @@
       "request": "launch",
       "command": "npm run dev",
       "cwd": "${workspaceFolder}"
-    },
-    {
-      "name": "Preview: Build production",
-      "type": "node-terminal",
-      "request": "launch",
-      "command": "npm run build",
-      "cwd": "${workspaceFolder}"
     }
   ]
 }

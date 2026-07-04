@@ -60,16 +60,13 @@ npm install
 
 ## Debugging
 
-VS Code launch configurations are provided in the Run and Debug panel:
-
-- **Debug: WXT dev (Chrome)** — runs the dev server (`npm run dev`) with hot reload; WXT launches a browser with the extension loaded. Debug the running extension with the browser's DevTools.
-- **Preview: Build production** — runs a production build into `.output/chrome-mv3`.
+For active development, use the **Debug: WXT dev (Chrome)** launch configuration (Run and Debug panel): it runs the dev server (`npm run dev`) with hot reload, and WXT launches a browser with the extension loaded. Debug the running extension with the browser's DevTools.
 
 ### Loading the production build
 
 Recent Chrome no longer loads unpacked extensions from the command line, so load it manually once:
 
-1. Run **Preview: Build production** (or `npm run build`).
+1. Build it: run the **Build production** task (Run Build Task, `Ctrl+Shift+B`) or `npm run build`.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `.output/chrome-mv3`.
 3. After each rebuild, click the extension's **reload** button on that page.
 

@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build production",
+      "detail": "Build the extension into .output/chrome-mv3 (load it via chrome://extensions \u2192 Load unpacked).",
+      "type": "shell",
+      "command": "npm run build",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}
