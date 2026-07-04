@@ -3,6 +3,8 @@ import { defineConfig } from 'wxt';
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-vue'],
+  // Build Manifest V3 for all browsers (including Firefox).
+  manifestVersion: 3,
   manifest: {
     action: { default_title: 'Open enhanced character sheet' },
     // `contextMenus` for the right-click entry; `activeTab` + `scripting` let the
@@ -11,5 +13,11 @@ export default defineConfig({
     permissions: ['contextMenus', 'activeTab', 'scripting', 'storage'],
     // Used by the sheet's fallback direct fetch of public characters.
     host_permissions: ['https://character-service.dndbeyond.com/*'],
+    // Firefox MV3 requires an explicit extension id.
+    browser_specific_settings: {
+      gecko: {
+        id: 'enhanced-dndbeyond-sheets@haywoodsloan',
+      },
+    },
   },
 });

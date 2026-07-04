@@ -18,7 +18,7 @@
     },
     {
       "label": "Build production (Firefox)",
-      "detail": "Build the extension into .output/firefox-mv2 (load via about:debugging → Load Temporary Add-on).",
+      "detail": "Build the extension into .output/firefox-mv3 (load via about:debugging → Load Temporary Add-on).",
       "type": "shell",
       "command": "npm run build:firefox",
       "problemMatcher": [],

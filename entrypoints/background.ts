@@ -17,9 +17,7 @@ export default defineBackground(() => {
     });
   });
 
-  // MV3 exposes `browser.action`; Firefox MV2 uses `browser.browserAction`.
-  const action = browser.action ?? browser.browserAction;
-  action.onClicked.addListener((tab) => {
+  browser.action.onClicked.addListener((tab) => {
     void activate(tab);
   });
 

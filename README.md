@@ -75,7 +75,7 @@ Recent Chrome no longer loads unpacked extensions from the command line, so load
 **Firefox**
 
 1. Run the **Build production (Firefox)** task or `npm run build:firefox`.
-2. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `.output/firefox-mv2/manifest.json`.
+2. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `.output/firefox-mv3/manifest.json`.
 
 ## Project structure
 
