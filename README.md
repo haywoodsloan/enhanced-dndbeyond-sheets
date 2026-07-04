@@ -60,15 +60,22 @@ npm install
 
 ## Debugging
 
-For active development, use the **Debug: WXT dev (Chrome)** launch configuration (Run and Debug panel): it runs the dev server (`npm run dev`) with hot reload, and WXT launches a browser with the extension loaded. Debug the running extension with the browser's DevTools.
+For active development, use the **Debug: WXT dev (Chrome)** or **Debug: WXT dev (Firefox)** launch configuration (Run and Debug panel): it runs the dev server with hot reload, and WXT launches the browser with the extension loaded. Debug the running extension with the browser's DevTools.
 
-### Loading the production build
+### Loading a production build
 
-Recent Chrome no longer loads unpacked extensions from the command line, so load it manually once:
+Recent Chrome no longer loads unpacked extensions from the command line, so load the build manually.
 
-1. Build it: run the **Build production** task (Run Build Task, `Ctrl+Shift+B`) or `npm run build`.
+**Chrome**
+
+1. Run the **Build production (Chrome)** task (Run Build Task, `Ctrl+Shift+B`) or `npm run build`.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `.output/chrome-mv3`.
-3. After each rebuild, click the extension's **reload** button on that page.
+3. After each rebuild, click the extension's **reload** button.
+
+**Firefox**
+
+1. Run the **Build production (Firefox)** task or `npm run build:firefox`.
+2. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `.output/firefox-mv2/manifest.json`.
 
 ## Project structure
 

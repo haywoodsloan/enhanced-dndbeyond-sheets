@@ -2,8 +2,8 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build production",
-      "detail": "Build the extension into .output/chrome-mv3 (load it via chrome://extensions \u2192 Load unpacked).",
+      "label": "Build production (Chrome)",
+      "detail": "Build the extension into .output/chrome-mv3 (load via chrome://extensions → Load unpacked).",
       "type": "shell",
       "command": "npm run build",
       "problemMatcher": [],
@@ -11,6 +11,18 @@
         "kind": "build",
         "isDefault": true
       },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build production (Firefox)",
+      "detail": "Build the extension into .output/firefox-mv2 (load via about:debugging → Load Temporary Add-on).",
+      "type": "shell",
+      "command": "npm run build:firefox",
+      "problemMatcher": [],
+      "group": "build",
       "presentation": {
         "reveal": "always",
         "panel": "shared"

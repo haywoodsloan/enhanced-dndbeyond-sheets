@@ -7,6 +7,13 @@
       "request": "launch",
       "command": "npm run dev",
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Debug: WXT dev (Firefox)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev:firefox",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
