@@ -9,17 +9,11 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "Preview: Production build (Chrome)",
-      "type": "chrome",
+      "name": "Preview: Build production",
+      "type": "node-terminal",
       "request": "launch",
-      "url": "https://www.dndbeyond.com/characters/166869100",
-      "runtimeArgs": [
-        "--disable-extensions-except=${workspaceFolder}/.output/chrome-mv3",
-        "--load-extension=${workspaceFolder}/.output/chrome-mv3",
-        "--disable-features=DisableLoadExtensionCommandLineSwitch"
-      ],
-      "preLaunchTask": "wxt: build",
-      "skipFiles": ["<node_internals>/**"]
+      "command": "npm run build",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

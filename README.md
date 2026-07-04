@@ -62,8 +62,16 @@ npm install
 
 VS Code launch configurations are provided in the Run and Debug panel:
 
-- **Debug: WXT dev (Chrome)** — runs the dev server (`npm run dev`) with hot reload and an auto-launched browser; debug the running extension with the browser's DevTools.
-- **Preview: Production build (Chrome)** — runs a production build and launches Chrome with the built extension loaded, opening the example character page.
+- **Debug: WXT dev (Chrome)** — runs the dev server (`npm run dev`) with hot reload; WXT launches a browser with the extension loaded. Debug the running extension with the browser's DevTools.
+- **Preview: Build production** — runs a production build into `.output/chrome-mv3`.
+
+### Loading the production build
+
+Recent Chrome no longer loads unpacked extensions from the command line, so load it manually once:
+
+1. Run **Preview: Build production** (or `npm run build`).
+2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `.output/chrome-mv3`.
+3. After each rebuild, click the extension's **reload** button on that page.
 
 ## Project structure
 
