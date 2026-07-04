@@ -14,7 +14,9 @@ export default defineBackground(() => {
   });
 
   // Clicking the toolbar icon activates the extension for the current tab.
-  browser.action.onClicked.addListener((tab) => {
+  // MV3 exposes `browser.action`; Firefox MV2 uses `browser.browserAction`.
+  const action = browser.action ?? browser.browserAction;
+  action.onClicked.addListener((tab) => {
     void openEnhancedSheet(tab.url);
   });
 
