@@ -30,7 +30,7 @@ End-to-end and visual tests are planned for a later phase.
 
 1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
 2. Activate the extension from the toolbar icon or the page context menu.
-3. The extension opens a new tab and loads the character by ID from D&D Beyond's character endpoint (`https://character-service.dndbeyond.com/character/v5/character/<id>`). Public characters load directly; private characters load using your signed-in D&D Beyond session (the browser's `CobaltSession` cookie, exchanged for a bearer token).
+3. The extension opens a new tab and loads the character by ID from D&D Beyond's character endpoint (`https://character-service.dndbeyond.com/character/v5/character/<id>`). Public characters load directly; private characters load using your signed-in D&D Beyond session, which the browser sends automatically as a cookie (the extension never handles any token).
 4. Sheet sections are shown in a drag-and-drop layout. Default order depends on the character's class, empty sections are hidden, and hidden sections are placed at the end.
 5. Adjust the layout and print.
 
