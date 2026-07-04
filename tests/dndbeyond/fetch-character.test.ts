@@ -29,7 +29,7 @@ describe('fetchCharacter', () => {
     vi.unstubAllGlobals();
   });
 
-  it('sends the session cookie and returns the data payload', async () => {
+  it('sends credentials and no auth header for a public character', async () => {
     const data = { id: 42, name: 'Test', stats: [], classes: [] };
     const fetchMock = vi
       .fn()
@@ -38,11 +38,24 @@ describe('fetchCharacter', () => {
 
     const result = await fetchCharacter(42);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      characterServiceUrl(42),
-      expect.objectContaining({ credentials: 'include' }),
-    );
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(characterServiceUrl(42));
+    expect(init.credentials).toBe('include');
+    expect(init.headers).toEqual({});
     expect(result).toEqual(data);
+  });
+
+  it('includes the Authorization header when provided', async () => {
+    const data = { id: 7, name: 'Secret', stats: [], classes: [] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ id: 7, success: true, message: null, data }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchCharacter(7, { authorization: 'Bearer tok' });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers).toEqual({ Authorization: 'Bearer tok' });
   });
 
   it('throws with the HTTP status when the response is not ok', async () => {

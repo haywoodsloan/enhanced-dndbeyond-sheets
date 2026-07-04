@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
+import { setAuthToken } from '@/services/dndbeyond/auth-token';
 
 const noctData = JSON.parse(readFileSync('tests/fixtures/noct.json', 'utf-8'));
 
@@ -25,24 +26,12 @@ describe('loadCharacter', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses cached character data when present, without fetching', async () => {
-    await browser.storage.session.set({ 'character:166869100': noctData });
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    const character = await loadCharacter(166869100);
-
-    expect(character.name).toBe('Noct');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('fetches and normalizes when there is no cache', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse({ id: noctData.id, success: true, message: null, data: noctData }),
-      ),
+  it('fetches with the captured authorization token and normalizes', async () => {
+    await setAuthToken('Bearer tok');
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: noctData.id, success: true, message: null, data: noctData }),
     );
+    vi.stubGlobal('fetch', fetchMock);
 
     const character = await loadCharacter(166869100);
 
@@ -57,9 +46,24 @@ describe('loadCharacter', () => {
       'inventory',
       'features',
     ]);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers).toEqual({ Authorization: 'Bearer tok' });
   });
 
-  it('propagates fetch failures when there is no cache', async () => {
+  it('fetches without an auth header when no token is captured', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: noctData.id, success: true, message: null, data: noctData }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const character = await loadCharacter(166869100);
+
+    expect(character.name).toBe('Noct');
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers).toEqual({});
+  });
+
+  it('propagates fetch failures', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse(null, { ok: false, status: 403 })),

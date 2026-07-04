@@ -19,17 +19,35 @@ export class CharacterFetchError extends Error {
   }
 }
 
+export interface FetchCharacterOptions {
+  /**
+   * `Authorization` header value (e.g. "Bearer …") captured from the user's own
+   * D&D Beyond session. Required for private characters; omit for public ones.
+   */
+  authorization?: string | null;
+}
+
 /**
  * Fetch a character's raw data by id from D&D Beyond.
  *
- * `credentials: 'include'` sends the user's existing browser session so both
- * public characters and private characters visible to the signed-in user can be
- * read. The session cookie is HttpOnly and managed entirely by the browser — the
- * extension never reads, stores, or handles any token. Runs from an extension
- * context (the sheet page) that holds host permission for the service.
+ * Public characters load without auth. Private characters require the user's
+ * `Authorization` header — captured from the page's own request — passed via
+ * `options.authorization`. `credentials: 'include'` additionally sends the
+ * browser session cookie.
  */
-export async function fetchCharacter(id: number | string): Promise<RawCharacter> {
-  const response = await fetch(characterServiceUrl(id), { credentials: 'include' });
+export async function fetchCharacter(
+  id: number | string,
+  options: FetchCharacterOptions = {},
+): Promise<RawCharacter> {
+  const headers: Record<string, string> = {};
+  if (options.authorization) {
+    headers.Authorization = options.authorization;
+  }
+
+  const response = await fetch(characterServiceUrl(id), {
+    credentials: 'include',
+    headers,
+  });
 
   if (!response.ok) {
     throw new CharacterFetchError(

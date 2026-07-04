@@ -30,7 +30,7 @@ End-to-end and visual tests are planned for a later phase.
 
 1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
 2. Activate the extension from the toolbar icon or the page context menu.
-3. On activation, the extension fetches the character from **within the D&D Beyond tab** (via `scripting.executeScript`), so the request uses your logged-in session and **private characters load**. It caches the result and opens a new tab with the enhanced sheet. If that isn't possible (e.g. the sheet is opened directly), the sheet falls back to a direct fetch, which only works for public characters.
+3. While you use D&D Beyond, the extension captures the `Authorization` header from the site's own character-service requests and holds it in memory (`storage.session`, cleared when the browser closes, never written to disk). On activation it opens a new tab with the enhanced sheet, which fetches your character using that captured header — so **private characters load** and the sheet always reflects the character's latest state. Without a captured header only public characters load.
 4. Sheet sections are shown in a drag-and-drop layout. Default order depends on the character's class, empty sections are hidden, and hidden sections are placed at the end.
 5. Adjust the layout and print.
 

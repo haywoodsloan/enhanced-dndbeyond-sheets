@@ -7,11 +7,12 @@ export default defineConfig({
   manifestVersion: 3,
   manifest: {
     action: { default_title: 'Open enhanced character sheet' },
-    // `contextMenus` for the right-click entry; `activeTab` + `scripting` let the
-    // extension fetch the character from within the D&D Beyond tab on activation
-    // (so private characters load); `storage` caches the result for the sheet.
-    permissions: ['contextMenus', 'activeTab', 'scripting', 'storage'],
-    // Used by the sheet's fallback direct fetch of public characters.
+    // `contextMenus` (right-click entry), `activeTab` (read the current tab's URL
+    // on click), `webRequest` (capture the user's Authorization header from D&D
+    // Beyond's own request so private characters load), `storage` (hold that
+    // header in storage.session).
+    permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage'],
+    // The sheet fetches characters directly from the character service.
     host_permissions: ['https://character-service.dndbeyond.com/*'],
     // Firefox MV3 requires an extension id; `data_collection_permissions`
     // declares that the extension collects no data (required by Firefox for new
