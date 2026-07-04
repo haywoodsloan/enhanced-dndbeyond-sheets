@@ -2,7 +2,7 @@
 
 A browser extension that produces a customizable, print-friendly layout of a D&D Beyond character sheet.
 
-D&D Beyond's on-screen character sheet is fine, but its default print output is cramped in some areas and wastes space in others. This extension opens a character in a separate view where sheet sections can be reordered, hidden, and printed, with a better default layout than the site provides.
+D&D Beyond's on-screen character sheet is not bad, but its default print output is cramped in some areas and wastes space in others. This extension opens a character in a separate view where sheet sections can be reordered, hidden, and printed, with a better default layouts.
 
 Built with WXT and Vue 3.
 
@@ -12,17 +12,17 @@ Early development. Working now:
 
 - Project scaffold (WXT + Vue 3 + TypeScript).
 - Unit and integration test harness (Vitest).
+- Character data layer: fetch a public character by id and normalize it into an internal model with per-section metadata.
 
 Not yet implemented, in planned order:
 
-1. Character data layer (fetch and normalize character JSON).
-2. Activation from a character page (toolbar icon and context menu).
-3. Enhanced-sheet tab (render sections).
-4. Class-aware default ordering and auto-hide of empty sections.
-5. Drag-and-drop customization with saved layouts.
-6. Section content (attributes, inventory, spells, attacks, features).
-7. Print layout.
-8. Polish and customization.
+1. Activation from a character page (toolbar icon and context menu).
+2. Enhanced-sheet tab (render sections).
+3. Class-aware default ordering and auto-hide of empty sections.
+4. Drag-and-drop customization with saved layouts.
+5. Section content (attributes, inventory, spells, attacks, features).
+6. Print layout.
+7. Polish and customization.
 
 End-to-end and visual tests are planned for a later phase.
 
@@ -66,6 +66,7 @@ components/       Vue components (auto-imported)
 composables/      Vue composables (auto-imported)
 utils/            Generic utilities (auto-imported)
 modules/          Local WXT modules
+lib/              Framework-agnostic domain logic (D&D Beyond data layer)
 assets/           Assets processed by the bundler
 public/           Static files copied as-is (icons)
 wxt.config.ts     WXT configuration
