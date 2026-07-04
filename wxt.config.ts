@@ -12,11 +12,4 @@ export default defineConfig({
     // restrictions.
     host_permissions: ['https://character-service.dndbeyond.com/*'],
   },
-  // Emit source maps for development-mode builds (`wxt build --mode development`)
-  // so VS Code can map breakpoints back to the TypeScript sources.
-  vite: (env) => ({
-    build: {
-      sourcemap: env.mode === 'development',
-    },
-  }),
 });

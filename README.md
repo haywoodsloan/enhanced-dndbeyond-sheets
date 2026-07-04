@@ -53,7 +53,6 @@ npm install
 | `npm run dev:firefox` | Run in development mode (Firefox). |
 | `npm run build` | Production build (Chrome) to `.output/`. |
 | `npm run build:firefox` | Production build (Firefox). |
-| `npm run build:dev` | Development build with source maps to `.output/chrome-mv3-dev` (used by the debugger). |
 | `npm run zip` | Package the build as a zip for store submission. |
 | `npm test` | Run the test suite once. |
 | `npm run test:watch` | Run tests in watch mode. |
@@ -63,8 +62,8 @@ npm install
 
 VS Code launch configurations are provided in the Run and Debug panel:
 
-- **Preview: WXT dev (Chrome)** — runs the dev server with hot reload and an auto-launched browser.
-- **Debug: Extension in Chrome** — builds the extension in development mode (with source maps), launches Chrome with it loaded, and opens the example character page. Breakpoints in the extension's TypeScript are supported.
+- **Debug: WXT dev (Chrome)** — runs the dev server (`npm run dev`) with hot reload and an auto-launched browser; debug the running extension with the browser's DevTools.
+- **Preview: Production build (Chrome)** — runs a production build and launches Chrome with the built extension loaded, opening the example character page.
 
 ## Project structure
 

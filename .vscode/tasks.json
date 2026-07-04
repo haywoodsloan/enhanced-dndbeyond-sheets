@@ -2,10 +2,10 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "wxt: build (dev)",
-      "detail": "Build the extension in development mode (with source maps) for debugging.",
+      "label": "wxt: build",
+      "detail": "Production build of the extension into .output/chrome-mv3.",
       "type": "shell",
-      "command": "npm run build:dev",
+      "command": "npm run build",
       "problemMatcher": [],
       "presentation": {
         "reveal": "silent",

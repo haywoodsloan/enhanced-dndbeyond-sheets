@@ -2,22 +2,22 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Preview: WXT dev (Chrome)",
+      "name": "Debug: WXT dev (Chrome)",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run dev",
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "Debug: Extension in Chrome",
+      "name": "Preview: Production build (Chrome)",
       "type": "chrome",
       "request": "launch",
       "url": "https://www.dndbeyond.com/characters/166869100",
       "runtimeArgs": [
-        "--disable-extensions-except=${workspaceFolder}/.output/chrome-mv3-dev",
-        "--load-extension=${workspaceFolder}/.output/chrome-mv3-dev"
+        "--disable-extensions-except=${workspaceFolder}/.output/chrome-mv3",
+        "--load-extension=${workspaceFolder}/.output/chrome-mv3"
       ],
-      "preLaunchTask": "wxt: build (dev)",
+      "preLaunchTask": "wxt: build",
       "skipFiles": ["<node_internals>/**"]
     }
   ]
