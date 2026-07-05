@@ -1,5 +1,12 @@
-import type { RawCharacter, RawModifier, RawSourceMap } from './api-types';
+import { ABILITIES, abilityModifier } from '@/utils/dnd5e';
 import type {
+  RawCharacter,
+  RawModifier,
+  RawSourceMap,
+  RawStat,
+} from './api-types';
+import type {
+  AbilityScore,
   Character,
   CharacterClassSummary,
   CharacterSection,
@@ -75,6 +82,49 @@ function hasWealth(raw: RawCharacter): boolean {
   );
 }
 
+/** Look up a stat's value by its DDB id (1..6), or null when unset. */
+function statValue(stats: RawStat[] | undefined, id: number): number | null {
+  const entry = asArray(stats).find((stat) => stat.id === id);
+  return entry?.value ?? null;
+}
+
+/** Sum ability-score bonus modifiers for one ability (e.g. "strength-score"). */
+function abilityScoreBonus(raw: RawCharacter, abilityName: string): number {
+  const subType = `${abilityName.toLowerCase()}-score`;
+  if (!raw.modifiers) return 0;
+  return Object.values(raw.modifiers).reduce<number>(
+    (total, mods) =>
+      total +
+      asArray<RawModifier>(mods)
+        .filter((mod) => mod.type === 'bonus' && mod.subType === subType)
+        .reduce((sum, mod) => sum + (mod.value ?? mod.fixedValue ?? 0), 0),
+    0,
+  );
+}
+
+/**
+ * Resolve the six final ability scores: base stat + manual bonus + granted
+ * ability-score bonuses, unless an explicit override is set. The modifier is
+ * derived from the resolved score.
+ */
+function resolveAbilities(raw: RawCharacter): AbilityScore[] {
+  return ABILITIES.map((meta) => {
+    const override = statValue(raw.overrideStats, meta.id);
+    const score =
+      override != null
+        ? override
+        : (statValue(raw.stats, meta.id) ?? 10) +
+          (statValue(raw.bonusStats, meta.id) ?? 0) +
+          abilityScoreBonus(raw, meta.name);
+    return {
+      key: meta.key,
+      name: meta.name,
+      score,
+      modifier: abilityModifier(score),
+    };
+  });
+}
+
 function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
   return asArray(raw.classes).map((cls) => {
     const summary: CharacterClassSummary = {
@@ -130,6 +180,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     name: raw.name,
     classes,
     level,
+    abilities: resolveAbilities(raw),
     sections,
   };
 

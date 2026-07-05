@@ -3,7 +3,7 @@
  * decoupled from D&D Beyond's raw API shape (see `api-types.ts`) so the rest of
  * the app depends on a stable structure.
  */
-
+import type { AbilityKey } from '@/utils/dnd5e';
 /** The character-sheet sections this extension knows how to lay out. */
 export const SECTION_KEYS = [
   'basics',
@@ -35,6 +35,17 @@ export interface CharacterClassSummary {
   subclass?: string;
 }
 
+/** A single ability score with its derived modifier. */
+export interface AbilityScore {
+  key: AbilityKey;
+  /** Full ability name, e.g. "Strength". */
+  name: string;
+  /** Final score after bonuses and overrides. */
+  score: number;
+  /** Modifier derived from `score` via the 5e formula. */
+  modifier: number;
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -43,5 +54,7 @@ export interface Character {
   classes: CharacterClassSummary[];
   /** Sum of all class levels. */
   level: number;
+  /** The six ability scores in canonical order (STR … CHA). */
+  abilities: AbilityScore[];
   sections: CharacterSection[];
 }

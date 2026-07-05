@@ -49,6 +49,7 @@ const orderedSections = computed(() =>
           :key="section.key"
           :section="section"
           :size="sectionSize(section.key)"
+          :character="character"
         />
       </div>
     </template>

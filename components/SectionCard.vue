@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
-import type { CharacterSection } from '@/services/dndbeyond/model';
+import AbilityScores from '@/components/AbilityScores.vue';
+import type { Character, CharacterSection } from '@/services/dndbeyond/model';
 import type { CardSize } from '@/utils/section-layout';
 
 // `size` controls the card width (grid span). A future `expanded` prop will
@@ -9,6 +10,7 @@ import type { CardSize } from '@/utils/section-layout';
 defineProps<{
   section: CharacterSection;
   size: CardSize;
+  character?: Character | null;
 }>();
 </script>
 
@@ -31,7 +33,11 @@ defineProps<{
       </div>
     </template>
     <template #content>
-      <p v-if="section.isEmpty" class="card__note">Nothing here yet.</p>
+      <AbilityScores
+        v-if="section.key === 'attributes' && character"
+        :abilities="character.abilities"
+      />
+      <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
       <p v-else class="card__note">Details coming soon.</p>
     </template>
   </Card>

@@ -1,0 +1,60 @@
+<script lang="ts" setup>
+import type { AbilityScore } from '@/services/dndbeyond/model';
+import { formatModifier } from '@/utils/dnd5e';
+
+defineProps<{ abilities: AbilityScore[] }>();
+</script>
+
+<template>
+  <ul class="abilities">
+    <li
+      v-for="ability in abilities"
+      :key="ability.key"
+      class="ability"
+      :data-ability="ability.key"
+    >
+      <span class="ability__abbr">{{ ability.key.toUpperCase() }}</span>
+      <span class="ability__mod">{{ formatModifier(ability.modifier) }}</span>
+      <span class="ability__score">{{ ability.score }}</span>
+    </li>
+  </ul>
+</template>
+
+<style scoped>
+.abilities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--p-content-border-color, #e5e5e5);
+  border-radius: 8px;
+}
+
+.ability__abbr {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--p-text-muted-color, #888);
+}
+
+.ability__mod {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ability__score {
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+}
+</style>

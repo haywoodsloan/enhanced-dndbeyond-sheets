@@ -17,6 +17,14 @@ const sampleCharacter: Character = {
   background: 'Spirit Medium',
   level: 4,
   classes: [{ name: 'Cleric', level: 4, subclass: 'Grave Domain' }],
+  abilities: [
+    { key: 'str', name: 'Strength', score: 15, modifier: 2 },
+    { key: 'dex', name: 'Dexterity', score: 10, modifier: 0 },
+    { key: 'con', name: 'Constitution', score: 14, modifier: 2 },
+    { key: 'int', name: 'Intelligence', score: 12, modifier: 1 },
+    { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
+    { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
+  ],
   sections: [
     { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },

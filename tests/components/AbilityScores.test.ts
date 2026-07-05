@@ -1,0 +1,39 @@
+import { describe, expect, it } from 'vitest';
+import { mount } from '@vue/test-utils';
+import AbilityScores from '@/components/AbilityScores.vue';
+import type { AbilityScore } from '@/services/dndbeyond/model';
+
+const abilities: AbilityScore[] = [
+  { key: 'str', name: 'Strength', score: 15, modifier: 2 },
+  { key: 'dex', name: 'Dexterity', score: 10, modifier: 0 },
+  { key: 'con', name: 'Constitution', score: 14, modifier: 2 },
+  { key: 'int', name: 'Intelligence', score: 12, modifier: 1 },
+  { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
+  { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
+];
+
+describe('AbilityScores', () => {
+  it('renders each ability with its abbreviation, modifier, and score', () => {
+    const wrapper = mount(AbilityScores, { props: { abilities } });
+
+    const tiles = wrapper.findAll('[data-ability]');
+    expect(tiles).toHaveLength(6);
+    expect(tiles.map((tile) => tile.attributes('data-ability'))).toEqual([
+      'str',
+      'dex',
+      'con',
+      'int',
+      'wis',
+      'cha',
+    ]);
+
+    const wis = wrapper.get('[data-ability="wis"]');
+    expect(wis.text()).toContain('WIS');
+    expect(wis.text()).toContain('+4');
+    expect(wis.text()).toContain('18');
+
+    const cha = wrapper.get('[data-ability="cha"]');
+    expect(cha.text()).toContain('-1');
+    expect(cha.text()).toContain('8');
+  });
+});

@@ -91,6 +91,8 @@ export interface RawCurrencies {
 export interface RawModifier {
   type?: string;
   subType?: string;
+  value?: number | null;
+  fixedValue?: number | null;
 }
 
 export interface RawCharacter {

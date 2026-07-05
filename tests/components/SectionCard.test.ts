@@ -28,4 +28,37 @@ describe('SectionCard', () => {
     expect(wrapper.text()).toContain('Nothing here yet');
     expect(wrapper.classes()).toContain('card--small');
   });
+
+  it('renders ability scores for the attributes section', () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: {
+          key: 'attributes',
+          title: 'Attributes',
+          count: 6,
+          isEmpty: false,
+        },
+        size: 'medium',
+        character: {
+          id: 1,
+          name: 'Test',
+          classes: [],
+          level: 1,
+          abilities: [
+            { key: 'str', name: 'Strength', score: 15, modifier: 2 },
+            { key: 'dex', name: 'Dexterity', score: 10, modifier: 0 },
+            { key: 'con', name: 'Constitution', score: 14, modifier: 2 },
+            { key: 'int', name: 'Intelligence', score: 12, modifier: 1 },
+            { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
+            { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
+          ],
+          sections: [],
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-ability="wis"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('+4');
+    expect(wrapper.text()).not.toContain('Details coming soon');
+  });
 });

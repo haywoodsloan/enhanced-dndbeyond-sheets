@@ -27,6 +27,28 @@ describe('normalizeCharacter', () => {
     expect(character.level).toBe(4);
   });
 
+  it('resolves ability scores with granted bonuses', () => {
+    const character = normalizeCharacter(raw);
+    expect(character.abilities.map((ability) => ability.key)).toEqual([
+      'str',
+      'dex',
+      'con',
+      'int',
+      'wis',
+      'cha',
+    ]);
+    const byKey = Object.fromEntries(
+      character.abilities.map((ability) => [ability.key, ability]),
+    );
+    // Base 14/10/13/12/15/8 plus feat bonuses STR+1, CON+1, WIS+3.
+    expect(byKey.str).toMatchObject({ score: 15, modifier: 2 });
+    expect(byKey.dex).toMatchObject({ score: 10, modifier: 0 });
+    expect(byKey.con).toMatchObject({ score: 14, modifier: 2 });
+    expect(byKey.int).toMatchObject({ score: 12, modifier: 1 });
+    expect(byKey.wis).toMatchObject({ score: 18, modifier: 4 });
+    expect(byKey.cha).toMatchObject({ score: 8, modifier: -1 });
+  });
+
   it('produces all ten sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([

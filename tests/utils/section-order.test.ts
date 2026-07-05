@@ -21,6 +21,7 @@ function makeCharacter(
     name: 'Test',
     classes: classes.map((cls) => ({ name: cls.name, level: cls.level })),
     level: classes.reduce((sum, cls) => sum + cls.level, 0),
+    abilities: [],
     sections,
   };
 }

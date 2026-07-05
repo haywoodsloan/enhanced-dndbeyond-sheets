@@ -16,6 +16,7 @@ const sample: Character = {
   name: 'Noct',
   level: 4,
   classes: [{ name: 'Cleric', level: 4 }],
+  abilities: [],
   sections: [],
 };
 
