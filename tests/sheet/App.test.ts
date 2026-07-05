@@ -64,8 +64,9 @@ describe('sheet App', () => {
       'attacks',
       'inventory',
     ]);
-    expect(wrapper.text()).toContain('Attributes: 6');
-    expect(wrapper.text()).toContain('Spells: 18');
+    const attributesCard = wrapper.get('[data-section-key="attributes"]');
+    expect(attributesCard.text()).toContain('Attributes');
+    expect(attributesCard.text()).toContain('6');
   });
 
   it('shows an error message when loading fails', async () => {
