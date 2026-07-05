@@ -68,9 +68,23 @@ export default defineBackground(() => {
 async function openEnhancedSheet(pageUrl: string | undefined): Promise<void> {
   const characterId = parseCharacterId(pageUrl);
   debugLog('bg', 'openEnhancedSheet', { pageUrl, characterId });
-  if (characterId == null) return;
+  if (characterId == null) {
+    await notifyOpenCharacter();
+    return;
+  }
 
   const url = new URL(browser.runtime.getURL(`/${SHEET_PAGE}`));
   url.searchParams.set(CHARACTER_ID_PARAM, String(characterId));
   await browser.tabs.create({ url: url.toString() });
+}
+
+/** Prompt the user to open a D&D Beyond character page when none is active. */
+async function notifyOpenCharacter(): Promise<void> {
+  debugLog('bg', 'not a character page — prompting user');
+  await browser.notifications.create({
+    type: 'basic',
+    iconUrl: browser.runtime.getURL('/icon/128.png'),
+    title: 'Enhanced D&D Beyond Sheets',
+    message: 'Please open a D&D Beyond character and try again.',
+  });
 }

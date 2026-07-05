@@ -11,7 +11,7 @@ export default defineConfig({
     // on click), `webRequest` (capture the user's Authorization header from D&D
     // Beyond's own request so private characters load), `storage` (hold that
     // header in storage.session).
-    permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage'],
+    permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage', 'notifications'],
     // Minimal hosts: `www.dndbeyond.com` is the page that INITIATES the requests
     // (Firefox's webRequest won't surface them without access to the initiator),
     // and `character-service` is where the token rides and where the sheet
