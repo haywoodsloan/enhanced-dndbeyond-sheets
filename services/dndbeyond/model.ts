@@ -6,10 +6,15 @@
 
 /** The character-sheet sections this extension knows how to lay out. */
 export const SECTION_KEYS = [
+  'basics',
   'attributes',
-  'attacks',
+  'skills',
+  'savingThrows',
+  'proficiencies',
+  'actions',
   'spells',
   'inventory',
+  'wealth',
   'features',
 ] as const;
 

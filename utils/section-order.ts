@@ -21,9 +21,42 @@ const HALF_CASTER_CLASSES = new Set(['paladin', 'ranger', 'artificer']);
 
 /** Default section priority (best first) for each play style. */
 const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
-  caster: ['attributes', 'spells', 'features', 'attacks', 'inventory'],
-  half: ['attributes', 'attacks', 'spells', 'features', 'inventory'],
-  martial: ['attributes', 'attacks', 'features', 'inventory', 'spells'],
+  caster: [
+    'basics',
+    'attributes',
+    'spells',
+    'actions',
+    'savingThrows',
+    'skills',
+    'features',
+    'proficiencies',
+    'inventory',
+    'wealth',
+  ],
+  half: [
+    'basics',
+    'attributes',
+    'actions',
+    'spells',
+    'savingThrows',
+    'skills',
+    'features',
+    'inventory',
+    'proficiencies',
+    'wealth',
+  ],
+  martial: [
+    'basics',
+    'attributes',
+    'actions',
+    'savingThrows',
+    'skills',
+    'features',
+    'inventory',
+    'proficiencies',
+    'wealth',
+    'spells',
+  ],
 };
 
 /** Pick the layout style from the character's highest-level class. */

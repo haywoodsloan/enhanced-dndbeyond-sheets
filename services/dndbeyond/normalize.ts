@@ -1,10 +1,14 @@
-import type { RawAction, RawCharacter, RawSourceMap } from './api-types';
+import type { RawCharacter, RawModifier, RawSourceMap } from './api-types';
 import type {
   Character,
   CharacterClassSummary,
   CharacterSection,
   SectionKey,
 } from './model';
+
+/** Fixed counts: 6 saving throws and 18 skills in 5e. */
+const SAVE_COUNT = 6;
+const SKILL_COUNT = 18;
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -28,23 +32,12 @@ function countSpells(raw: RawCharacter): number {
   return classSpells + sumSourceMap(raw.spells);
 }
 
-/** Weapons flagged as attacks plus any action flagged `displayAsAttack`. */
-function countAttacks(raw: RawCharacter): number {
+/** Weapon attacks plus every action (reactions, bonus actions, limited-use…). */
+function countActions(raw: RawCharacter): number {
   const weaponAttacks = asArray(raw.inventory).filter(
     (item) => item.displayAsAttack === true,
   ).length;
-
-  const actionAttacks = raw.actions
-    ? Object.values(raw.actions).reduce<number>(
-        (total, entries) =>
-          total +
-          asArray<RawAction>(entries).filter((action) => action.displayAsAttack === true)
-            .length,
-        0,
-      )
-    : 0;
-
-  return weaponAttacks + actionAttacks;
+  return weaponAttacks + sumSourceMap(raw.actions);
 }
 
 /** Class features, racial traits, feats, and optional class features. */
@@ -57,6 +50,29 @@ function countFeatures(raw: RawCharacter): number {
   const feats = asArray(raw.feats).length;
   const optional = asArray(raw.optionalClassFeatures).length;
   return classFeatures + racialTraits + feats + optional;
+}
+
+/** Tool/weapon/armor/language proficiencies granted by modifiers. */
+function countProficiencies(raw: RawCharacter): number {
+  if (!raw.modifiers) return 0;
+  return Object.values(raw.modifiers).reduce<number>(
+    (total, mods) =>
+      total +
+      asArray<RawModifier>(mods).filter(
+        (mod) => mod.type === 'proficiency' || mod.type === 'language',
+      ).length,
+    0,
+  );
+}
+
+/** True when the character carries any coins. */
+function hasWealth(raw: RawCharacter): boolean {
+  const coins = raw.currencies;
+  if (!coins) return false;
+  return (
+    (coins.cp ?? 0) + (coins.sp ?? 0) + (coins.ep ?? 0) + (coins.gp ?? 0) + (coins.pp ?? 0) >
+    0
+  );
 }
 
 function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
@@ -72,25 +88,41 @@ function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
   });
 }
 
-function toSection(key: SectionKey, title: string, count: number): CharacterSection {
-  return { key, title, count, isEmpty: count === 0 };
+function toSection(
+  key: SectionKey,
+  title: string,
+  count: number,
+  options: { alwaysPresent?: boolean } = {},
+): CharacterSection {
+  return {
+    key,
+    title,
+    count,
+    isEmpty: options.alwaysPresent ? false : count === 0,
+  };
 }
 
 /**
  * Convert a raw D&D Beyond character payload into the internal `Character`
  * model. Section counts reflect presence of content; exact per-entry rendering
- * is handled in a later phase.
+ * is handled in a later phase. The core stat sections (basics, attributes,
+ * skills, saves) are always shown; the rest auto-hide when empty.
  */
 export function normalizeCharacter(raw: RawCharacter): Character {
   const classes = summarizeClasses(raw);
   const level = classes.reduce((total, cls) => total + cls.level, 0);
 
   const sections: CharacterSection[] = [
-    toSection('attributes', 'Attributes', asArray(raw.stats).length),
-    toSection('attacks', 'Attacks', countAttacks(raw)),
+    toSection('basics', 'Basics', asArray(raw.conditions).length, { alwaysPresent: true }),
+    toSection('attributes', 'Attributes', asArray(raw.stats).length, { alwaysPresent: true }),
+    toSection('skills', 'Skills', SKILL_COUNT, { alwaysPresent: true }),
+    toSection('savingThrows', 'Saves & Defences', SAVE_COUNT, { alwaysPresent: true }),
+    toSection('proficiencies', 'Proficiencies', countProficiencies(raw)),
+    toSection('actions', 'Actions', countActions(raw)),
     toSection('spells', 'Spells', countSpells(raw)),
     toSection('inventory', 'Inventory', asArray(raw.inventory).length),
-    toSection('features', 'Features', countFeatures(raw)),
+    toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
+    toSection('features', 'Features & Traits', countFeatures(raw)),
   ];
 
   const character: Character = {

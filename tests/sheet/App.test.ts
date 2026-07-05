@@ -18,11 +18,16 @@ const sampleCharacter: Character = {
   level: 4,
   classes: [{ name: 'Cleric', level: 4, subclass: 'Grave Domain' }],
   sections: [
+    { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },
-    { key: 'attacks', title: 'Attacks', count: 1, isEmpty: false },
+    { key: 'skills', title: 'Skills', count: 18, isEmpty: false },
+    { key: 'savingThrows', title: 'Saves & Defences', count: 6, isEmpty: false },
+    { key: 'proficiencies', title: 'Proficiencies', count: 12, isEmpty: false },
+    { key: 'actions', title: 'Actions', count: 3, isEmpty: false },
     { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
     { key: 'inventory', title: 'Inventory', count: 24, isEmpty: false },
-    { key: 'features', title: 'Features', count: 39, isEmpty: false },
+    { key: 'wealth', title: 'Wealth', count: 0, isEmpty: false },
+    { key: 'features', title: 'Features & Traits', count: 39, isEmpty: false },
   ],
 };
 
@@ -56,13 +61,18 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Noct');
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(10);
     expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
+      'basics',
       'attributes',
       'spells',
+      'actions',
+      'savingThrows',
+      'skills',
       'features',
-      'attacks',
+      'proficiencies',
       'inventory',
+      'wealth',
     ]);
     const attributesCard = wrapper.get('[data-section-key="attributes"]');
     expect(attributesCard.text()).toContain('Attributes');

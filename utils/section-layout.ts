@@ -8,10 +8,15 @@ export type CardSize = 'small' | 'medium' | 'large';
  * Content-heavy sections (spells, features) get larger cards.
  */
 const SECTION_SIZE: Record<SectionKey, CardSize> = {
+  basics: 'large',
   attributes: 'medium',
-  attacks: 'small',
+  skills: 'large',
+  savingThrows: 'medium',
+  proficiencies: 'medium',
+  actions: 'large',
   spells: 'large',
-  inventory: 'medium',
+  inventory: 'large',
+  wealth: 'small',
   features: 'large',
 };
 

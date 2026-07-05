@@ -31,39 +31,65 @@ const orderedKeys = (character: Character) =>
 describe('defaultSectionOrder', () => {
   it('leads with spells for a full caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Cleric', level: 4 }]))).toEqual([
+      'basics',
       'attributes',
       'spells',
+      'actions',
+      'savingThrows',
+      'skills',
       'features',
-      'attacks',
+      'proficiencies',
       'inventory',
+      'wealth',
     ]);
   });
 
-  it('leads with attacks for a martial class', () => {
+  it('leads with actions for a martial class', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Fighter', level: 5 }]))).toEqual([
+      'basics',
       'attributes',
-      'attacks',
+      'actions',
+      'savingThrows',
+      'skills',
       'features',
       'inventory',
+      'proficiencies',
+      'wealth',
       'spells',
     ]);
   });
 
-  it('interleaves attacks and spells for a half-caster', () => {
+  it('interleaves actions and spells for a half-caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Paladin', level: 6 }]))).toEqual([
+      'basics',
       'attributes',
-      'attacks',
+      'actions',
       'spells',
+      'savingThrows',
+      'skills',
       'features',
       'inventory',
+      'proficiencies',
+      'wealth',
     ]);
   });
 
   it('moves empty sections to the end', () => {
-    // A wizard with no weapon attacks: attacks drops past its usual slot.
+    // A wizard with no actions available: actions drops past its usual slot.
     expect(
-      orderedKeys(makeCharacter([{ name: 'Wizard', level: 3 }], ['attacks'])),
-    ).toEqual(['attributes', 'spells', 'features', 'inventory', 'attacks']);
+      orderedKeys(makeCharacter([{ name: 'Wizard', level: 3 }], ['actions'])),
+    ).toEqual([
+      'basics',
+      'attributes',
+      'spells',
+      'savingThrows',
+      'skills',
+      'features',
+      'proficiencies',
+      'inventory',
+      'wealth',
+      'actions',
+    ]);
   });
 
   it('uses the highest-level class to pick the style in a multiclass', () => {
@@ -74,6 +100,17 @@ describe('defaultSectionOrder', () => {
           { name: 'Fighter', level: 10 },
         ]),
       ),
-    ).toEqual(['attributes', 'attacks', 'features', 'inventory', 'spells']);
+    ).toEqual([
+      'basics',
+      'attributes',
+      'actions',
+      'savingThrows',
+      'skills',
+      'features',
+      'inventory',
+      'proficiencies',
+      'wealth',
+      'spells',
+    ]);
   });
 });

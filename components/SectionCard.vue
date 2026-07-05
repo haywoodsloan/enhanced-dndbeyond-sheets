@@ -22,12 +22,17 @@ defineProps<{
     <template #title>
       <div class="card__title">
         <span>{{ section.title }}</span>
-        <Tag :value="String(section.count)" severity="secondary" rounded />
+        <Tag
+          v-if="section.count > 0"
+          :value="String(section.count)"
+          severity="secondary"
+          rounded
+        />
       </div>
     </template>
     <template #content>
       <p v-if="section.isEmpty" class="card__note">Nothing here yet.</p>
-      <p v-else class="card__note">{{ section.count }} entries — details coming soon.</p>
+      <p v-else class="card__note">Details coming soon.</p>
     </template>
   </Card>
 </template>

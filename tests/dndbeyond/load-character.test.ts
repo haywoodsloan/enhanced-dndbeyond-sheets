@@ -40,10 +40,15 @@ describe('loadCharacter', () => {
       { name: 'Cleric', level: 4, subclass: 'Grave Domain' },
     ]);
     expect(character.sections.map((section) => section.key)).toEqual([
+      'basics',
       'attributes',
-      'attacks',
+      'skills',
+      'savingThrows',
+      'proficiencies',
+      'actions',
       'spells',
       'inventory',
+      'wealth',
       'features',
     ]);
     const [, init] = fetchMock.mock.calls[0];

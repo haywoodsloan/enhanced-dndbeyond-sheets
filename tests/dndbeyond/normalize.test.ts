@@ -27,13 +27,18 @@ describe('normalizeCharacter', () => {
     expect(character.level).toBe(4);
   });
 
-  it('produces all five sections in a stable order', () => {
+  it('produces all ten sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
+      'basics',
       'attributes',
-      'attacks',
+      'skills',
+      'savingThrows',
+      'proficiencies',
+      'actions',
       'spells',
       'inventory',
+      'wealth',
       'features',
     ]);
   });
@@ -43,19 +48,29 @@ describe('normalizeCharacter', () => {
     const counts = Object.fromEntries(
       character.sections.map((section) => [section.key, section.count]),
     );
-    expect(counts).toEqual({
-      attributes: 6,
-      attacks: 1,
-      spells: 18,
-      inventory: 24,
-      features: 39,
-    });
+    expect(counts.attributes).toBe(6);
+    expect(counts.skills).toBe(18);
+    expect(counts.savingThrows).toBe(6);
+    expect(counts.spells).toBe(18);
+    expect(counts.inventory).toBe(24);
+    expect(counts.features).toBe(39);
+    expect(counts.basics).toBe(0); // Noct has no active conditions
+    expect(counts.proficiencies).toBeGreaterThan(0);
+    expect(counts.actions).toBeGreaterThan(0);
   });
 
-  it('flags a section empty exactly when its count is zero', () => {
+  it('never flags an empty section that still has entries', () => {
     const character = normalizeCharacter(raw);
     for (const section of character.sections) {
-      expect(section.isEmpty).toBe(section.count === 0);
+      if (section.isEmpty) expect(section.count).toBe(0);
+    }
+  });
+
+  it('always shows the core stat sections', () => {
+    const character = normalizeCharacter(raw);
+    for (const key of ['basics', 'attributes', 'skills', 'savingThrows']) {
+      const section = character.sections.find((entry) => entry.key === key);
+      expect(section?.isEmpty).toBe(false);
     }
   });
 

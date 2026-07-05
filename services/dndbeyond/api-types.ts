@@ -78,6 +78,21 @@ export interface RawAction {
  */
 export type RawSourceMap<T> = Record<string, T[] | null | undefined>;
 
+/** Coin counts held by the character. */
+export interface RawCurrencies {
+  cp?: number;
+  sp?: number;
+  ep?: number;
+  gp?: number;
+  pp?: number;
+}
+
+/** A single entry from the source-grouped `modifiers` map. */
+export interface RawModifier {
+  type?: string;
+  subType?: string;
+}
+
 export interface RawCharacter {
   id: number;
   name: string;
@@ -93,4 +108,7 @@ export interface RawCharacter {
   actions?: RawSourceMap<RawAction> | null;
   feats?: unknown[];
   optionalClassFeatures?: unknown[];
+  conditions?: unknown[] | null;
+  currencies?: RawCurrencies | null;
+  modifiers?: RawSourceMap<RawModifier> | null;
 }
