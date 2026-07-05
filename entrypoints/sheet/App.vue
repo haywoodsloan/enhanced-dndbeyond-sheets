@@ -1,19 +1,13 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue';
-import type { Character } from '@/services/dndbeyond/model';
-import { loadCharacter } from '@/services/dndbeyond/load-character';
+import { computed, toRef } from 'vue';
+import { useCharacter } from '@/composables/useCharacter';
 import { defaultSectionOrder } from '@/utils/section-order';
 import { sectionSize } from '@/utils/section-layout';
-import { debugLog } from '@/utils/debug';
 import SectionCard from '@/components/SectionCard.vue';
 
 const props = defineProps<{ characterId: number | null }>();
 
-type Status = 'idle' | 'loading' | 'loaded' | 'error';
-
-const status = ref<Status>('idle');
-const character = ref<Character | null>(null);
-const errorMessage = ref('');
+const { character, status, error } = useCharacter(toRef(props, 'characterId'));
 
 const subtitle = computed(() => {
   const loaded = character.value;
@@ -29,27 +23,6 @@ const subtitle = computed(() => {
 const orderedSections = computed(() =>
   character.value ? defaultSectionOrder(character.value) : [],
 );
-
-onMounted(async () => {
-  if (props.characterId == null) {
-    debugLog('sheet', 'App mounted without a character id');
-    return;
-  }
-  status.value = 'loading';
-  try {
-    character.value = await loadCharacter(props.characterId);
-    status.value = 'loaded';
-    debugLog('sheet', 'App loaded character', { id: props.characterId });
-  } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : 'Failed to load character.';
-    status.value = 'error';
-    debugLog('sheet', 'App failed to load character', {
-      id: props.characterId,
-      error: errorMessage.value,
-    });
-  }
-});
 </script>
 
 <template>
@@ -61,7 +34,7 @@ onMounted(async () => {
     <p v-else-if="status === 'idle' || status === 'loading'">Loading character…</p>
 
     <p v-else-if="status === 'error'" role="alert">
-      Could not load character: {{ errorMessage }}
+      Could not load character: {{ error }}
     </p>
 
     <template v-else-if="character">

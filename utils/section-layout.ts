@@ -1,14 +1,7 @@
 import type { SectionKey } from '@/services/dndbeyond/model';
 
-/** How wide a section's card is on the 3-column grid. */
+/** How wide a section's card is on the 3-column grid (spans 1/2/3 columns). */
 export type CardSize = 'small' | 'medium' | 'large';
-
-/** Number of grid columns each size spans. */
-export const CARD_SPAN: Record<CardSize, number> = {
-  small: 1,
-  medium: 2,
-  large: 3,
-};
 
 /**
  * Default card size per section (small = 1 col, medium = 2, large = 3).
