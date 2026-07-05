@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import type { Character } from '@/services/dndbeyond/model';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
+import { defaultSectionOrder } from '@/utils/section-order';
 import { debugLog } from '@/utils/debug';
 
 const props = defineProps<{ characterId: number | null }>();
@@ -22,6 +23,10 @@ const subtitle = computed(() => {
     .join(' / ');
   return [loaded.race, classes].filter(Boolean).join(' · ');
 });
+
+const orderedSections = computed(() =>
+  character.value ? defaultSectionOrder(character.value) : [],
+);
 
 onMounted(async () => {
   if (props.characterId == null) {
@@ -65,7 +70,7 @@ onMounted(async () => {
 
       <ul>
         <li
-          v-for="section in character.sections"
+          v-for="section in orderedSections"
           :key="section.key"
           :data-section-key="section.key"
         >

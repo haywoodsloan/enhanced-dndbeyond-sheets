@@ -57,6 +57,13 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
     expect(items).toHaveLength(5);
+    expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
+      'attributes',
+      'spells',
+      'features',
+      'attacks',
+      'inventory',
+    ]);
     expect(wrapper.text()).toContain('Attributes: 6');
     expect(wrapper.text()).toContain('Spells: 18');
   });
