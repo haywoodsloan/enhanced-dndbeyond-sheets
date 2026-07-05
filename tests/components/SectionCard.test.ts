@@ -102,7 +102,9 @@ describe('SectionCard', () => {
     expect(wrapper.find('[data-stat="ac"]').text()).toContain('20');
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('4');
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
-    expect(wrapper.find('[data-stat="conditions"]').text()).toContain('None');
+    expect(
+      wrapper.findAll('[data-stat="conditions"] input[type="checkbox"]'),
+    ).toHaveLength(15);
     expect(wrapper.text()).not.toContain('Details coming soon');
   });
 });

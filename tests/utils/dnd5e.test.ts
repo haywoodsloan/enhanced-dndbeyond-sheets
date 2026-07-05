@@ -3,6 +3,7 @@ import {
   ABILITIES,
   abilityModifier,
   armorClass,
+  CONDITION_NAMES,
   conditionName,
   formatModifier,
   maxHitPoints,
@@ -104,5 +105,12 @@ describe('conditionName', () => {
     expect(conditionName(15)).toBe('Unconscious');
     expect(conditionName(99)).toBeUndefined();
     expect(conditionName(undefined)).toBeUndefined();
+  });
+
+  it('lists all conditions in canonical order', () => {
+    expect(CONDITION_NAMES).toHaveLength(15);
+    expect(CONDITION_NAMES[0]).toBe('Blinded');
+    expect(CONDITION_NAMES[CONDITION_NAMES.length - 1]).toBe('Unconscious');
+    expect(CONDITION_NAMES).toContain('Poisoned');
   });
 });

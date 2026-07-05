@@ -1,8 +1,13 @@
 <script lang="ts" setup>
+import { computed } from 'vue';
 import type { CharacterBasics } from '@/services/dndbeyond/model';
-import { formatModifier } from '@/utils/dnd5e';
+import { CONDITION_NAMES, formatModifier } from '@/utils/dnd5e';
 
-defineProps<{ basics: CharacterBasics }>();
+const props = defineProps<{ basics: CharacterBasics }>();
+
+// Every condition is listed with a checkbox so the printed sheet can be marked
+// by hand during play; conditions already active on the character are pre-checked.
+const activeConditions = computed(() => new Set(props.basics.conditions));
 </script>
 
 <template>
@@ -44,9 +49,14 @@ defineProps<{ basics: CharacterBasics }>();
 
     <div class="basics__conditions" data-stat="conditions">
       <span class="basics__label">Conditions</span>
-      <span class="basics__conditions-value">{{
-        basics.conditions.length ? basics.conditions.join(', ') : 'None'
-      }}</span>
+      <ul class="conditions">
+        <li v-for="name in CONDITION_NAMES" :key="name" class="conditions__item">
+          <label class="conditions__box">
+            <input type="checkbox" :checked="activeConditions.has(name)" />
+            <span>{{ name }}</span>
+          </label>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
@@ -94,14 +104,29 @@ defineProps<{ basics: CharacterBasics }>();
 .basics__conditions {
   grid-column: 1 / -1;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 4px;
   border-top: 1px solid var(--p-content-border-color, #e5e5e5);
 }
 
-.basics__conditions-value {
+.conditions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conditions__box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  font-weight: 600;
+}
+
+.conditions__box input {
+  margin: 0;
 }
 </style>

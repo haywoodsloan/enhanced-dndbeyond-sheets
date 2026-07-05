@@ -122,3 +122,9 @@ export const CONDITIONS: Readonly<Record<number, string>> = {
 export function conditionName(id: number | undefined): string | undefined {
   return id == null ? undefined : CONDITIONS[id];
 }
+
+/**
+ * All standard condition names in canonical order. Derived from `CONDITIONS`
+ * (integer keys iterate in ascending order) so it never drifts from the map.
+ */
+export const CONDITION_NAMES: readonly string[] = Object.values(CONDITIONS);

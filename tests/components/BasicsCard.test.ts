@@ -22,7 +22,15 @@ describe('BasicsCard', () => {
     expect(wrapper.find('[data-stat="initiative"]').text()).toContain('+0');
     expect(wrapper.find('[data-stat="speed"]').text()).toContain('30');
     expect(wrapper.find('[data-stat="proficiency"]').text()).toContain('+2');
-    expect(wrapper.find('[data-stat="conditions"]').text()).toContain('None');
+
+    const boxes = wrapper.findAll(
+      '[data-stat="conditions"] input[type="checkbox"]',
+    );
+    expect(boxes).toHaveLength(15);
+    expect(
+      boxes.every((box) => !(box.element as HTMLInputElement).checked),
+    ).toBe(true);
+    expect(wrapper.find('[data-stat="conditions"]').text()).toContain('Blinded');
   });
 
   it('shows temp HP and active conditions when present', () => {
@@ -38,8 +46,14 @@ describe('BasicsCard', () => {
 
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('temp');
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('5');
-    const conditions = wrapper.find('[data-stat="conditions"]').text();
-    expect(conditions).toContain('Poisoned');
-    expect(conditions).toContain('Prone');
+    const rows = wrapper.findAll('[data-stat="conditions"] .conditions__box');
+    const poisoned = rows.find((row) => row.text().includes('Poisoned'));
+    const blinded = rows.find((row) => row.text().includes('Blinded'));
+    expect((poisoned!.find('input').element as HTMLInputElement).checked).toBe(
+      true,
+    );
+    expect((blinded!.find('input').element as HTMLInputElement).checked).toBe(
+      false,
+    );
   });
 });
