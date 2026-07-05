@@ -57,17 +57,38 @@ const orderedSections = computed(() =>
 </template>
 
 <style>
+:root {
+  /* Paper geometry — the on-screen view mirrors the printed page. */
+  --page-width: 8.5in;
+  --page-height: 11in;
+  --page-margin: 0.5in;
+  --page-gap: 20px;
+  --desk: #dcdce1;
+  --paper: #ffffff;
+}
+
 body {
   margin: 0;
-  background: #f4f4f5;
+  padding: 24px 0;
+  background: var(--desk);
 }
 
 .sheet {
-  max-width: 1100px;
+  box-sizing: border-box;
+  width: var(--page-width);
   margin: 0 auto;
-  padding: 20px;
+  padding: var(--page-margin);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
+  /* WYSIWYG paper: white pages stacked with a small gutter at each break. */
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--paper) 0,
+    var(--paper) var(--page-height),
+    var(--desk) var(--page-height),
+    var(--desk) calc(var(--page-height) + var(--page-gap))
+  );
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
 }
 
 .sheet__header {
@@ -89,5 +110,31 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   align-items: start;
+}
+
+/* Keep a card whole rather than letting it split across a page break. */
+.card {
+  break-inside: avoid;
+}
+
+/* Actual print: let the browser paginate and drop the on-screen desk/gutters. */
+@page {
+  size: Letter;
+  margin: var(--page-margin);
+}
+
+@media print {
+  body {
+    padding: 0;
+    background: var(--paper);
+  }
+
+  .sheet {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    box-shadow: none;
+  }
 }
 </style>
