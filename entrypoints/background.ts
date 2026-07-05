@@ -1,6 +1,7 @@
 import { extractAuthorization, setAuthToken } from '@/services/dndbeyond/auth-token';
-import { parseCharacterId } from '@/services/dndbeyond/character-url';
-import { CHARACTER_ID_PARAM, SHEET_PAGE } from '@/services/dndbeyond/sheet-url';
+import { parseCharacterId } from '@/utils/character-url';
+import { CHARACTER_ID_PARAM, SHEET_PAGE } from '@/utils/sheet-url';
+import { debugLog } from '@/utils/debug';
 
 const CONTEXT_MENU_ID = 'open-enhanced-sheet';
 
@@ -8,6 +9,8 @@ const CONTEXT_MENU_ID = 'open-enhanced-sheet';
 let lastCapturedAuthorization: string | null = null;
 
 export default defineBackground(() => {
+  debugLog('bg', 'background script loaded');
+
   browser.runtime.onInstalled.addListener(() => {
     browser.contextMenus.create({
       id: CONTEXT_MENU_ID,
@@ -17,29 +20,41 @@ export default defineBackground(() => {
     });
   });
 
-  // Capture the user's `Authorization` header from D&D Beyond's own character
-  // requests so the sheet can load private characters with the same credentials
-  // the page uses. The header is identical across character-service calls, so we
-  // watch only the character document endpoint and dedupe repeat values.
+  // DIAGNOSTIC: log every character-service request so we can watch the live
+  // traffic, and capture the `Authorization` header off it (deduping repeats).
   browser.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
       const authorization = extractAuthorization(details.requestHeaders);
+      debugLog('bg', 'character-service request', {
+        method: details.method,
+        url: details.url,
+        hasAuthorization: authorization != null,
+        scheme: authorization ? authorization.split(' ')[0] : null,
+        length: authorization?.length ?? 0,
+      });
       if (authorization && authorization !== lastCapturedAuthorization) {
         lastCapturedAuthorization = authorization;
+        debugLog('bg', 'captured authorization from character-service');
         void setAuthToken(authorization);
       }
       return undefined;
     },
-    { urls: ['https://character-service.dndbeyond.com/character/v5/character/*'] },
+    { urls: ['https://character-service.dndbeyond.com/*'] },
     ['requestHeaders'],
   );
+  debugLog('bg', 'webRequest listener registered');
 
   browser.action.onClicked.addListener((tab) => {
+    debugLog('bg', 'action icon clicked', { url: tab.url });
     void openEnhancedSheet(tab.url);
   });
 
   browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === CONTEXT_MENU_ID) {
+      debugLog('bg', 'context menu clicked', {
+        pageUrl: info.pageUrl,
+        tabUrl: tab?.url,
+      });
       void openEnhancedSheet(info.pageUrl ?? tab?.url);
     }
   });
@@ -52,6 +67,7 @@ export default defineBackground(() => {
  */
 async function openEnhancedSheet(pageUrl: string | undefined): Promise<void> {
   const characterId = parseCharacterId(pageUrl);
+  debugLog('bg', 'openEnhancedSheet', { pageUrl, characterId });
   if (characterId == null) return;
 
   const url = new URL(browser.runtime.getURL(`/${SHEET_PAGE}`));

@@ -1,11 +1,22 @@
 import type { DdbApiResponse, RawCharacter } from './api-types';
+import { debugLog } from '@/utils/debug';
 
 const CHARACTER_SERVICE_BASE =
   'https://character-service.dndbeyond.com/character/v5/character';
 
-/** Build the character-service URL for a given character id. */
+/**
+ * Build the character-service URL for a given character id.
+ *
+ * The id is validated as a positive integer so the captured auth token and the
+ * session cookie can only ever be sent to a well-formed character-service URL —
+ * an untrusted id can't inject extra path segments or redirect the request.
+ */
 export function characterServiceUrl(id: number | string): string {
-  return `${CHARACTER_SERVICE_BASE}/${id}`;
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    throw new CharacterFetchError(`Invalid character id: ${String(id)}`);
+  }
+  return `${CHARACTER_SERVICE_BASE}/${numericId}`;
 }
 
 /** Error thrown when a character cannot be fetched or the service reports failure. */
@@ -44,9 +55,19 @@ export async function fetchCharacter(
     headers.Authorization = options.authorization;
   }
 
+  debugLog('sheet', 'fetchCharacter request', {
+    url: characterServiceUrl(id),
+    hasAuthorization: options.authorization != null,
+  });
+
   const response = await fetch(characterServiceUrl(id), {
     credentials: 'include',
     headers,
+  });
+
+  debugLog('sheet', 'fetchCharacter response', {
+    status: response.status,
+    ok: response.ok,
   });
 
   if (!response.ok) {

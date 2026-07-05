@@ -22,6 +22,14 @@ describe('characterServiceUrl', () => {
       'https://character-service.dndbeyond.com/character/v5/character/166869100',
     );
   });
+
+  it('rejects ids that are not positive integers', () => {
+    expect(() => characterServiceUrl('1/../../secret')).toThrow(CharacterFetchError);
+    expect(() => characterServiceUrl('https://evil.example/')).toThrow();
+    expect(() => characterServiceUrl(-5)).toThrow();
+    expect(() => characterServiceUrl(0)).toThrow();
+    expect(() => characterServiceUrl(1.5)).toThrow();
+  });
 });
 
 describe('fetchCharacter', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCharacterUrl, parseCharacterId } from '@/services/dndbeyond/character-url';
+import { isCharacterUrl, parseCharacterId } from '@/utils/character-url';
 
 describe('parseCharacterId', () => {
   it('parses a basic character url', () => {

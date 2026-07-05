@@ -1,6 +1,7 @@
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clearAuthToken,
   extractAuthorization,
   getAuthToken,
   setAuthToken,
@@ -33,6 +34,12 @@ describe('auth token store', () => {
   });
 
   it('returns null when no token is stored', async () => {
+    expect(await getAuthToken()).toBeNull();
+  });
+
+  it('clears a stored token', async () => {
+    await setAuthToken('Bearer abc.def');
+    await clearAuthToken();
     expect(await getAuthToken()).toBeNull();
   });
 });

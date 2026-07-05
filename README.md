@@ -81,12 +81,10 @@ Recent Chrome no longer loads unpacked extensions from the command line, so load
 
 ```
 entrypoints/      Extension entrypoints (background, sheet page)
-components/       Vue components (auto-imported)
+services/         Interacting with APIs and external services (the D&D Beyond data layer)
+utils/            Generic code utilities — URL parsing, logging (auto-imported)
 composables/      Vue composables (auto-imported)
-utils/            Generic utilities (auto-imported)
 modules/          Local WXT modules
-services/         Framework-agnostic domain logic (D&D Beyond data layer)
-assets/           Assets processed by the bundler
 public/           Static files copied as-is (icons)
 tests/            Unit and integration tests (mirrors source layout)
 wxt.config.ts     WXT configuration

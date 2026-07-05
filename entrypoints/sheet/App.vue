@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import type { Character } from '@/services/dndbeyond/model';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
+import { debugLog } from '@/utils/debug';
 
 const props = defineProps<{ characterId: number | null }>();
 
@@ -23,15 +24,23 @@ const subtitle = computed(() => {
 });
 
 onMounted(async () => {
-  if (props.characterId == null) return;
+  if (props.characterId == null) {
+    debugLog('sheet', 'App mounted without a character id');
+    return;
+  }
   status.value = 'loading';
   try {
     character.value = await loadCharacter(props.characterId);
     status.value = 'loaded';
+    debugLog('sheet', 'App loaded character', { id: props.characterId });
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : 'Failed to load character.';
     status.value = 'error';
+    debugLog('sheet', 'App failed to load character', {
+      id: props.characterId,
+      error: errorMessage.value,
+    });
   }
 });
 </script>

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
-import { setAuthToken } from '@/services/dndbeyond/auth-token';
+import { getAuthToken, setAuthToken } from '@/services/dndbeyond/auth-token';
 
 const noctData = JSON.parse(readFileSync('tests/fixtures/noct.json', 'utf-8'));
 
@@ -70,5 +70,16 @@ describe('loadCharacter', () => {
     );
 
     await expect(loadCharacter(1)).rejects.toThrow();
+  });
+
+  it('clears the captured token when the fetch is rejected (403)', async () => {
+    await setAuthToken('Bearer stale');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(null, { ok: false, status: 403 })),
+    );
+
+    await expect(loadCharacter(166869100)).rejects.toThrow();
+    expect(await getAuthToken()).toBeNull();
   });
 });

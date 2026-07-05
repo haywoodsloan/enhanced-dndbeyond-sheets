@@ -3,7 +3,7 @@ import {
   CHARACTER_ID_PARAM,
   SHEET_PAGE,
   parseSheetCharacterId,
-} from '@/services/dndbeyond/sheet-url';
+} from '@/utils/sheet-url';
 
 describe('parseSheetCharacterId', () => {
   it('reads the id from an absolute extension url', () => {
