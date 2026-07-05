@@ -25,6 +25,14 @@ const sampleCharacter: Character = {
     { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
     { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
   ],
+  basics: {
+    armorClass: 20,
+    initiative: 0,
+    speed: 30,
+    proficiencyBonus: 2,
+    hitPoints: { current: 4, max: 31, temp: 0 },
+    conditions: [],
+  },
   sections: [
     { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },

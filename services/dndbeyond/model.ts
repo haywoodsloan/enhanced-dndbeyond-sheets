@@ -46,6 +46,26 @@ export interface AbilityScore {
   modifier: number;
 }
 
+/** Current, maximum, and temporary hit points. */
+export interface HitPoints {
+  current: number;
+  max: number;
+  temp: number;
+}
+
+/** At-a-glance combat and vital stats shown in the Basics section. */
+export interface CharacterBasics {
+  armorClass: number;
+  /** Initiative modifier (signed). */
+  initiative: number;
+  /** Walking speed in feet. */
+  speed: number;
+  proficiencyBonus: number;
+  hitPoints: HitPoints;
+  /** Active condition names; empty when none. */
+  conditions: string[];
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -56,5 +76,7 @@ export interface Character {
   level: number;
   /** The six ability scores in canonical order (STR … CHA). */
   abilities: AbilityScore[];
+  /** Combat and vital stats for the Basics section. */
+  basics: CharacterBasics;
   sections: CharacterSection[];
 }

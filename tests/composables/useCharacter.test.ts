@@ -17,6 +17,14 @@ const sample: Character = {
   level: 4,
   classes: [{ name: 'Cleric', level: 4 }],
   abilities: [],
+  basics: {
+    armorClass: 10,
+    initiative: 0,
+    speed: 30,
+    proficiencyBonus: 2,
+    hitPoints: { current: 10, max: 10, temp: 0 },
+    conditions: [],
+  },
   sections: [],
 };
 

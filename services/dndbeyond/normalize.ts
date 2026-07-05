@@ -1,4 +1,13 @@
-import { ABILITIES, abilityModifier } from '@/utils/dnd5e';
+import {
+  ABILITIES,
+  abilityModifier,
+  armorClass,
+  conditionName,
+  maxHitPoints,
+  proficiencyBonus,
+  type AbilityKey,
+  type ArmorCategory,
+} from '@/utils/dnd5e';
 import type {
   RawCharacter,
   RawModifier,
@@ -8,6 +17,7 @@ import type {
 import type {
   AbilityScore,
   Character,
+  CharacterBasics,
   CharacterClassSummary,
   CharacterSection,
   SectionKey,
@@ -88,9 +98,8 @@ function statValue(stats: RawStat[] | undefined, id: number): number | null {
   return entry?.value ?? null;
 }
 
-/** Sum ability-score bonus modifiers for one ability (e.g. "strength-score"). */
-function abilityScoreBonus(raw: RawCharacter, abilityName: string): number {
-  const subType = `${abilityName.toLowerCase()}-score`;
+/** Sum flat `bonus` modifiers of a given subtype from the top-level map. */
+function sumBonusModifiers(raw: RawCharacter, subType: string): number {
   if (!raw.modifiers) return 0;
   return Object.values(raw.modifiers).reduce<number>(
     (total, mods) =>
@@ -100,6 +109,11 @@ function abilityScoreBonus(raw: RawCharacter, abilityName: string): number {
         .reduce((sum, mod) => sum + (mod.value ?? mod.fixedValue ?? 0), 0),
     0,
   );
+}
+
+/** Sum ability-score bonus modifiers for one ability (e.g. "strength-score"). */
+function abilityScoreBonus(raw: RawCharacter, abilityName: string): number {
+  return sumBonusModifiers(raw, `${abilityName.toLowerCase()}-score`);
 }
 
 /**
@@ -123,6 +137,69 @@ function resolveAbilities(raw: RawCharacter): AbilityScore[] {
       modifier: abilityModifier(score),
     };
   });
+}
+
+/** Broad armor category by DDB `armorTypeId` (1 light, 2 medium, 3 heavy). */
+const ARMOR_CATEGORY: Record<number, ArmorCategory> = {
+  1: 'light',
+  2: 'medium',
+  3: 'heavy',
+};
+
+/** Armor Class from equipped armor and shield, plus flat AC-bonus modifiers. */
+function resolveArmorClass(raw: RawCharacter, dexModifier: number): number {
+  const worn = asArray(raw.inventory).filter(
+    (item) => item.equipped === true && item.definition?.filterType === 'Armor',
+  );
+  const shield = worn.find((item) => item.definition?.armorTypeId === 4);
+  const armor = worn.find((item) => {
+    const id = item.definition?.armorTypeId;
+    return id === 1 || id === 2 || id === 3;
+  });
+  return armorClass({
+    category: ARMOR_CATEGORY[armor?.definition?.armorTypeId ?? 0] ?? 'none',
+    armorBase: armor?.definition?.armorClass ?? 0,
+    dexModifier,
+    shieldBonus: shield?.definition?.armorClass ?? 0,
+    bonus: sumBonusModifiers(raw, 'armor-class'),
+  });
+}
+
+/** Map active condition entries to their names, dropping any unknown ids. */
+function resolveConditions(raw: RawCharacter): string[] {
+  return asArray(raw.conditions)
+    .map((condition) => conditionName(condition.id))
+    .filter((name): name is string => name != null);
+}
+
+/** Combat and vital stats for the Basics section. */
+function resolveBasics(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): CharacterBasics {
+  const modifierOf = (key: AbilityKey) =>
+    abilities.find((ability) => ability.key === key)?.modifier ?? 0;
+  const dexModifier = modifierOf('dex');
+  const max = maxHitPoints({
+    base: raw.baseHitPoints ?? 0,
+    conModifier: modifierOf('con'),
+    level,
+    bonus: raw.bonusHitPoints ?? 0,
+    override: raw.overrideHitPoints,
+  });
+  return {
+    armorClass: resolveArmorClass(raw, dexModifier),
+    initiative: dexModifier + sumBonusModifiers(raw, 'initiative'),
+    speed: raw.race?.weightSpeeds?.normal?.walk ?? 30,
+    proficiencyBonus: proficiencyBonus(level),
+    hitPoints: {
+      current: max - (raw.removedHitPoints ?? 0),
+      max,
+      temp: raw.temporaryHitPoints ?? 0,
+    },
+    conditions: resolveConditions(raw),
+  };
 }
 
 function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
@@ -175,12 +252,15 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('features', 'Features & Traits', countFeatures(raw)),
   ];
 
+  const abilities = resolveAbilities(raw);
+
   const character: Character = {
     id: raw.id,
     name: raw.name,
     classes,
     level,
-    abilities: resolveAbilities(raw),
+    abilities,
+    basics: resolveBasics(raw, abilities, level),
     sections,
   };
 

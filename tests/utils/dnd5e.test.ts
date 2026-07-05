@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   ABILITIES,
   abilityModifier,
+  armorClass,
+  conditionName,
   formatModifier,
+  maxHitPoints,
   proficiencyBonus,
 } from '@/utils/dnd5e';
 
@@ -60,5 +63,46 @@ describe('ABILITIES', () => {
       'cha',
     ]);
     expect(ABILITIES.map((ability) => ability.id)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+});
+
+describe('armorClass', () => {
+  it('applies the Dex rule for each armor category', () => {
+    expect(armorClass({ category: 'none', dexModifier: 3 })).toBe(13);
+    expect(armorClass({ category: 'light', armorBase: 11, dexModifier: 3 })).toBe(14);
+    expect(armorClass({ category: 'medium', armorBase: 14, dexModifier: 3 })).toBe(16);
+    expect(armorClass({ category: 'heavy', armorBase: 18, dexModifier: 3 })).toBe(18);
+  });
+
+  it('adds shield and flat bonuses', () => {
+    expect(
+      armorClass({ category: 'heavy', armorBase: 18, dexModifier: 0, shieldBonus: 2 }),
+    ).toBe(20);
+    expect(
+      armorClass({ category: 'none', dexModifier: 2, shieldBonus: 2, bonus: 1 }),
+    ).toBe(15);
+  });
+});
+
+describe('maxHitPoints', () => {
+  it('adds the Con modifier per level to the base', () => {
+    expect(maxHitPoints({ base: 23, conModifier: 2, level: 4 })).toBe(31);
+    expect(maxHitPoints({ base: 10, conModifier: 1, level: 2, bonus: 4 })).toBe(16);
+  });
+
+  it('honors an explicit override', () => {
+    expect(
+      maxHitPoints({ base: 23, conModifier: 2, level: 4, override: 50 }),
+    ).toBe(50);
+  });
+});
+
+describe('conditionName', () => {
+  it('maps known ids and ignores the rest', () => {
+    expect(conditionName(1)).toBe('Blinded');
+    expect(conditionName(11)).toBe('Poisoned');
+    expect(conditionName(15)).toBe('Unconscious');
+    expect(conditionName(99)).toBeUndefined();
+    expect(conditionName(undefined)).toBeUndefined();
   });
 });

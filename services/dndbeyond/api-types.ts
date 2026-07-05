@@ -44,6 +44,9 @@ export interface RawRace {
   fullName?: string;
   baseRaceName?: string;
   racialTraits?: RawRacialTrait[];
+  weightSpeeds?: {
+    normal?: { walk?: number | null } | null;
+  } | null;
 }
 
 export interface RawBackground {
@@ -58,6 +61,8 @@ export interface RawInventoryItem {
   definition?: {
     name?: string;
     filterType?: string;
+    armorClass?: number | null;
+    armorTypeId?: number | null;
   };
 }
 
@@ -95,9 +100,20 @@ export interface RawModifier {
   fixedValue?: number | null;
 }
 
+/** An active condition entry; `id` maps to a standard 5e condition. */
+export interface RawCondition {
+  id?: number;
+  level?: number | null;
+}
+
 export interface RawCharacter {
   id: number;
   name: string;
+  baseHitPoints?: number | null;
+  bonusHitPoints?: number | null;
+  overrideHitPoints?: number | null;
+  removedHitPoints?: number | null;
+  temporaryHitPoints?: number | null;
   stats: RawStat[];
   bonusStats?: RawStat[];
   overrideStats?: RawStat[];
@@ -110,7 +126,7 @@ export interface RawCharacter {
   actions?: RawSourceMap<RawAction> | null;
   feats?: unknown[];
   optionalClassFeatures?: unknown[];
-  conditions?: unknown[] | null;
+  conditions?: RawCondition[] | null;
   currencies?: RawCurrencies | null;
   modifiers?: RawSourceMap<RawModifier> | null;
 }

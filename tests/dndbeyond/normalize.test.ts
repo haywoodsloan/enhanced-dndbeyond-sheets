@@ -49,6 +49,18 @@ describe('normalizeCharacter', () => {
     expect(byKey.cha).toMatchObject({ score: 8, modifier: -1 });
   });
 
+  it('computes the basics block', () => {
+    const { basics } = normalizeCharacter(raw);
+    // Plate (18, heavy) + shield (+2); heavy armor ignores Dex.
+    expect(basics.armorClass).toBe(20);
+    // Base 23 + Con(+2) x 4 = 31 max; 27 removed -> 4 current.
+    expect(basics.hitPoints).toEqual({ current: 4, max: 31, temp: 0 });
+    expect(basics.initiative).toBe(0);
+    expect(basics.speed).toBe(30);
+    expect(basics.proficiencyBonus).toBe(2);
+    expect(basics.conditions).toEqual([]);
+  });
+
   it('produces all ten sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([

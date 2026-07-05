@@ -52,6 +52,14 @@ describe('SectionCard', () => {
             { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
             { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
           ],
+          basics: {
+            armorClass: 20,
+            initiative: 0,
+            speed: 30,
+            proficiencyBonus: 2,
+            hitPoints: { current: 4, max: 31, temp: 0 },
+            conditions: [],
+          },
           sections: [],
         },
       },
@@ -59,6 +67,42 @@ describe('SectionCard', () => {
 
     expect(wrapper.find('[data-ability="wis"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('+4');
+    expect(wrapper.text()).not.toContain('Details coming soon');
+  });
+
+  it('renders the basics stats for the basics section', () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: {
+          key: 'basics',
+          title: 'Basics',
+          count: 0,
+          isEmpty: false,
+        },
+        size: 'large',
+        character: {
+          id: 1,
+          name: 'Test',
+          classes: [],
+          level: 4,
+          abilities: [],
+          basics: {
+            armorClass: 20,
+            initiative: 0,
+            speed: 30,
+            proficiencyBonus: 2,
+            hitPoints: { current: 4, max: 31, temp: 0 },
+            conditions: [],
+          },
+          sections: [],
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-stat="ac"]').text()).toContain('20');
+    expect(wrapper.find('[data-stat="hp"]').text()).toContain('4');
+    expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
+    expect(wrapper.find('[data-stat="conditions"]').text()).toContain('None');
     expect(wrapper.text()).not.toContain('Details coming soon');
   });
 });
