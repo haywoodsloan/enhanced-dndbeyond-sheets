@@ -41,7 +41,7 @@ defineProps<{ abilities: AbilityScore[] }>();
 }
 
 .ability__abbr {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--p-text-muted-color, #888);
@@ -54,7 +54,7 @@ defineProps<{ abilities: AbilityScore[] }>();
 }
 
 .ability__score {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--p-text-muted-color, #888);
 }
 </style>

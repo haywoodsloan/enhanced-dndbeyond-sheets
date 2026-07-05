@@ -75,7 +75,7 @@ defineProps<{ basics: CharacterBasics }>();
 }
 
 .basics__value small {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
 }
 
@@ -86,7 +86,7 @@ defineProps<{ basics: CharacterBasics }>();
 }
 
 .basics__label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--p-text-muted-color, #888);
   text-align: center;
 }

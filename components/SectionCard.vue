@@ -70,7 +70,7 @@ defineProps<{
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .card__note {

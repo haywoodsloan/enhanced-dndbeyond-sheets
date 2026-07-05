@@ -13,5 +13,9 @@ debugLog('sheet', 'sheet page loaded', {
 });
 
 createApp(App, { characterId })
-  .use(PrimeVue, { theme: { preset: Aura } })
+  .use(PrimeVue, {
+    // Always render the light theme: a print-friendly sheet should avoid the
+    // ink-heavy dark surfaces the OS "dark mode" would otherwise trigger.
+    theme: { preset: Aura, options: { darkModeSelector: false } },
+  })
   .mount('#app');

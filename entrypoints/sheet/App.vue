@@ -66,7 +66,7 @@ body {
   max-width: 1100px;
   margin: 0 auto;
   padding: 20px;
-  font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
 }
 
