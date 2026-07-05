@@ -17,6 +17,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@primevue/themes": "^4.5.4",
+    "primevue": "^4.5.5",
     "vue": "^3.5.29"
   },
   "devDependencies": {

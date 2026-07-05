@@ -7,5 +7,6 @@ export default defineConfig({
   test: {
     // happy-dom gives component tests a DOM to mount into.
     environment: 'happy-dom',
+    setupFiles: ['tests/setup.ts'],
   },
 });

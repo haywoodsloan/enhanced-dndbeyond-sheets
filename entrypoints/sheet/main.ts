@@ -1,4 +1,6 @@
 import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import Aura from '@primevue/themes/aura';
 import App from './App.vue';
 import { parseSheetCharacterId } from '@/utils/sheet-url';
 import { debugLog } from '@/utils/debug';
@@ -10,4 +12,6 @@ debugLog('sheet', 'sheet page loaded', {
   characterId,
 });
 
-createApp(App, { characterId }).mount('#app');
+createApp(App, { characterId })
+  .use(PrimeVue, { theme: { preset: Aura } })
+  .mount('#app');
