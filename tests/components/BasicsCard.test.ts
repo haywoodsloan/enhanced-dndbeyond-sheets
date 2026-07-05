@@ -56,4 +56,21 @@ describe('BasicsCard', () => {
       false,
     );
   });
+
+  it('renders empty death save tracks', () => {
+    const wrapper = mount(BasicsCard, { props: { basics } });
+
+    const track = wrapper.find('[data-stat="death-saves"]');
+    expect(track.exists()).toBe(true);
+    expect(track.text()).toContain('Successes');
+    expect(track.text()).toContain('Failures');
+
+    const boxes = wrapper.findAll(
+      '[data-stat="death-saves"] input[type="checkbox"]',
+    );
+    expect(boxes).toHaveLength(6);
+    expect(
+      boxes.every((box) => !(box.element as HTMLInputElement).checked),
+    ).toBe(true);
+  });
 });

@@ -47,6 +47,34 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
       <span class="basics__label">Proficiency</span>
     </div>
 
+    <div class="basics__deathsaves" data-stat="death-saves">
+      <span class="basics__label">Death Saves</span>
+      <div class="deathsaves">
+        <div class="deathsaves__track">
+          <span class="deathsaves__caption">Successes</span>
+          <span class="deathsaves__boxes">
+            <input
+              v-for="n in 3"
+              :key="n"
+              type="checkbox"
+              aria-label="Death save success"
+            />
+          </span>
+        </div>
+        <div class="deathsaves__track">
+          <span class="deathsaves__caption">Failures</span>
+          <span class="deathsaves__boxes">
+            <input
+              v-for="n in 3"
+              :key="n"
+              type="checkbox"
+              aria-label="Death save failure"
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+
     <div class="basics__conditions" data-stat="conditions">
       <span class="basics__label">Conditions</span>
       <ul class="conditions">
@@ -99,6 +127,37 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   font-size: 12px;
   color: var(--p-text-muted-color, #888);
   text-align: center;
+}
+
+.basics__deathsaves {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 4px;
+  border-top: 1px solid var(--p-content-border-color, #e5e5e5);
+}
+
+.deathsaves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+}
+
+.deathsaves__track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.deathsaves__boxes {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.deathsaves__boxes input {
+  margin: 0;
 }
 
 .basics__conditions {
