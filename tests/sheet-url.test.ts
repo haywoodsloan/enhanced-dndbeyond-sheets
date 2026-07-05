@@ -2,8 +2,17 @@ import { describe, it, expect } from 'vitest';
 import {
   CHARACTER_ID_PARAM,
   SHEET_PAGE,
+  enhancedSheetUrl,
   parseSheetCharacterId,
 } from '@/utils/sheet-url';
+
+describe('enhancedSheetUrl', () => {
+  it('builds a sheet url carrying the character id', () => {
+    const url = enhancedSheetUrl(166869100);
+    expect(url).toContain('sheet.html');
+    expect(url).toContain('characterId=166869100');
+  });
+});
 
 describe('parseSheetCharacterId', () => {
   it('reads the id from an absolute extension url', () => {

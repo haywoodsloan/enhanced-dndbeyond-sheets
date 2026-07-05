@@ -6,12 +6,12 @@ export default defineConfig({
   // Build Manifest V3 for all browsers (including Firefox).
   manifestVersion: 3,
   manifest: {
-    action: { default_title: 'Open enhanced character sheet' },
-    // `contextMenus` (right-click entry), `activeTab` (read the current tab's URL
-    // on click), `webRequest` (capture the user's Authorization header from D&D
+    // `contextMenus` (right-click entry), `activeTab` (the popup reads the active
+    // tab's URL), `webRequest` (capture the user's Authorization header from D&D
     // Beyond's own request so private characters load), `storage` (hold that
-    // header in storage.session).
-    permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage', 'notifications'],
+    // header in storage.session). The toolbar popup comes from the `popup`
+    // entrypoint (its <title> becomes the icon tooltip).
+    permissions: ['contextMenus', 'activeTab', 'webRequest', 'storage'],
     // Minimal hosts: `www.dndbeyond.com` is the page that INITIATES the requests
     // (Firefox's webRequest won't surface them without access to the initiator),
     // and `character-service` is where the token rides and where the sheet

@@ -1,6 +1,6 @@
 import { extractAuthorization, setAuthToken } from '@/services/dndbeyond/auth-token';
 import { parseCharacterId } from '@/utils/character-url';
-import { CHARACTER_ID_PARAM, SHEET_PAGE } from '@/utils/sheet-url';
+import { enhancedSheetUrl } from '@/utils/sheet-url';
 import { debugLog } from '@/utils/debug';
 
 const CONTEXT_MENU_ID = 'open-enhanced-sheet';
@@ -44,11 +44,6 @@ export default defineBackground(() => {
   );
   debugLog('bg', 'webRequest listener registered');
 
-  browser.action.onClicked.addListener((tab) => {
-    debugLog('bg', 'action icon clicked', { url: tab.url });
-    void openEnhancedSheet(tab.url);
-  });
-
   browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === CONTEXT_MENU_ID) {
       debugLog('bg', 'context menu clicked', {
@@ -68,23 +63,6 @@ export default defineBackground(() => {
 async function openEnhancedSheet(pageUrl: string | undefined): Promise<void> {
   const characterId = parseCharacterId(pageUrl);
   debugLog('bg', 'openEnhancedSheet', { pageUrl, characterId });
-  if (characterId == null) {
-    await notifyOpenCharacter();
-    return;
-  }
-
-  const url = new URL(browser.runtime.getURL(`/${SHEET_PAGE}`));
-  url.searchParams.set(CHARACTER_ID_PARAM, String(characterId));
-  await browser.tabs.create({ url: url.toString() });
-}
-
-/** Prompt the user to open a D&D Beyond character page when none is active. */
-async function notifyOpenCharacter(): Promise<void> {
-  debugLog('bg', 'not a character page — prompting user');
-  await browser.notifications.create({
-    type: 'basic',
-    iconUrl: browser.runtime.getURL('/icon/128.png'),
-    title: 'Enhanced D&D Beyond Sheets',
-    message: 'Please open a D&D Beyond character and try again.',
-  });
+  if (characterId == null) return;
+  await browser.tabs.create({ url: enhancedSheetUrl(characterId) });
 }
