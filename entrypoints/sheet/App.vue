@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import { computed, toRef } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import { useCharacter } from '@/composables/useCharacter';
+import { useSheetPagination } from '@/composables/useSheetPagination';
 import { defaultSectionOrder } from '@/utils/section-order';
 import { sectionSize } from '@/utils/section-layout';
 import SectionCard from '@/components/SectionCard.vue';
@@ -23,10 +24,23 @@ const subtitle = computed(() => {
 const orderedSections = computed(() =>
   character.value ? defaultSectionOrder(character.value) : [],
 );
+
+const sheetRef = ref<HTMLElement | null>(null);
+const gridRef = ref<HTMLElement | null>(null);
+
+// Page geometry in CSS pixels (1in = 96px). Must mirror the :root vars below.
+const PX_PER_INCH = 96;
+const pageMetrics = {
+  band: 11 * PX_PER_INCH,
+  gutter: 20,
+  margin: 0.5 * PX_PER_INCH,
+};
+
+useSheetPagination(sheetRef, gridRef, pageMetrics, () => character.value);
 </script>
 
 <template>
-  <main class="sheet">
+  <main class="sheet" ref="sheetRef">
     <p v-if="characterId == null">
       No character selected. Open this from a D&amp;D Beyond character page.
     </p>
@@ -43,7 +57,7 @@ const orderedSections = computed(() =>
         <p>{{ subtitle }}</p>
       </header>
 
-      <div class="sheet__grid">
+      <div class="sheet__grid" ref="gridRef">
         <SectionCard
           v-for="section in orderedSections"
           :key="section.key"
