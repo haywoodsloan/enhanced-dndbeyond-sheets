@@ -66,6 +66,15 @@ export interface CharacterBasics {
   conditions: string[];
 }
 
+/** A single saving throw with its total modifier and proficiency. */
+export interface SavingThrow {
+  key: AbilityKey;
+  name: string;
+  /** Total save modifier (signed). */
+  modifier: number;
+  proficient: boolean;
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -78,5 +87,7 @@ export interface Character {
   abilities: AbilityScore[];
   /** Combat and vital stats for the Basics section. */
   basics: CharacterBasics;
+  /** The six saving throws in canonical order. */
+  savingThrows: SavingThrow[];
   sections: CharacterSection[];
 }

@@ -3,6 +3,7 @@ import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import AbilityScores from '@/components/AbilityScores.vue';
 import BasicsCard from '@/components/BasicsCard.vue';
+import SavingThrowsCard from '@/components/SavingThrowsCard.vue';
 import type { Character, CharacterSection } from '@/services/dndbeyond/model';
 import type { CardSize } from '@/utils/section-layout';
 
@@ -41,6 +42,10 @@ defineProps<{
       <BasicsCard
         v-else-if="section.key === 'basics' && character"
         :basics="character.basics"
+      />
+      <SavingThrowsCard
+        v-else-if="section.key === 'savingThrows' && character"
+        :saves="character.savingThrows"
       />
       <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
       <p v-else class="card__note">Details coming soon.</p>

@@ -61,6 +61,20 @@ describe('normalizeCharacter', () => {
     expect(basics.conditions).toEqual([]);
   });
 
+  it('computes saving throws with proficiency', () => {
+    const character = normalizeCharacter(raw);
+    const byKey = Object.fromEntries(
+      character.savingThrows.map((save) => [save.key, save]),
+    );
+    // Cleric is proficient in Wisdom and Charisma saves (+prof 2).
+    expect(byKey.wis).toMatchObject({ modifier: 6, proficient: true });
+    expect(byKey.cha).toMatchObject({ modifier: 1, proficient: true });
+    expect(byKey.str).toMatchObject({ modifier: 2, proficient: false });
+    expect(byKey.dex).toMatchObject({ modifier: 0, proficient: false });
+    expect(byKey.con).toMatchObject({ modifier: 2, proficient: false });
+    expect(byKey.int).toMatchObject({ modifier: 1, proficient: false });
+  });
+
   it('produces all ten sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([

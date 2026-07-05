@@ -20,6 +20,7 @@ import type {
   CharacterBasics,
   CharacterClassSummary,
   CharacterSection,
+  SavingThrow,
   SectionKey,
 } from './model';
 
@@ -202,6 +203,40 @@ function resolveBasics(
   };
 }
 
+/** True when the character is proficient in a given ability's saving throw. */
+function hasSaveProficiency(raw: RawCharacter, abilityName: string): boolean {
+  const subType = `${abilityName.toLowerCase()}-saving-throws`;
+  if (!raw.modifiers) return false;
+  return Object.values(raw.modifiers).some((mods) =>
+    asArray<RawModifier>(mods).some(
+      (mod) => mod.type === 'proficiency' && mod.subType === subType,
+    ),
+  );
+}
+
+/** The six saving throws: ability modifier + proficiency (if trained) + bonuses. */
+function resolveSavingThrows(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): SavingThrow[] {
+  const prof = proficiencyBonus(level);
+  return ABILITIES.map((meta) => {
+    const abilityMod =
+      abilities.find((ability) => ability.key === meta.key)?.modifier ?? 0;
+    const proficient = hasSaveProficiency(raw, meta.name);
+    const bonus =
+      sumBonusModifiers(raw, 'saving-throws') +
+      sumBonusModifiers(raw, `${meta.name.toLowerCase()}-saving-throws`);
+    return {
+      key: meta.key,
+      name: meta.name,
+      modifier: abilityMod + (proficient ? prof : 0) + bonus,
+      proficient,
+    };
+  });
+}
+
 function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
   return asArray(raw.classes).map((cls) => {
     const summary: CharacterClassSummary = {
@@ -261,6 +296,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     level,
     abilities,
     basics: resolveBasics(raw, abilities, level),
+    savingThrows: resolveSavingThrows(raw, abilities, level),
     sections,
   };
 

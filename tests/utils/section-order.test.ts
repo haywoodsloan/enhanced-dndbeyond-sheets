@@ -30,6 +30,7 @@ function makeCharacter(
       hitPoints: { current: 10, max: 10, temp: 0 },
       conditions: [],
     },
+    savingThrows: [],
     sections,
   };
 }

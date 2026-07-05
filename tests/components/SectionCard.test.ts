@@ -60,6 +60,7 @@ describe('SectionCard', () => {
             hitPoints: { current: 4, max: 31, temp: 0 },
             conditions: [],
           },
+          savingThrows: [],
           sections: [],
         },
       },
@@ -94,6 +95,7 @@ describe('SectionCard', () => {
             hitPoints: { current: 4, max: 31, temp: 0 },
             conditions: [],
           },
+          savingThrows: [],
           sections: [],
         },
       },
@@ -106,5 +108,41 @@ describe('SectionCard', () => {
       wrapper.findAll('[data-stat="conditions"] input[type="checkbox"]'),
     ).toHaveLength(15);
     expect(wrapper.text()).not.toContain('Details coming soon');
+  });
+
+  it('renders saving throws for the savingThrows section', () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: {
+          key: 'savingThrows',
+          title: 'Saves & Defences',
+          count: 6,
+          isEmpty: false,
+        },
+        size: 'medium',
+        character: {
+          id: 1,
+          name: 'Test',
+          classes: [],
+          level: 4,
+          abilities: [],
+          basics: {
+            armorClass: 20,
+            initiative: 0,
+            speed: 30,
+            proficiencyBonus: 2,
+            hitPoints: { current: 4, max: 31, temp: 0 },
+            conditions: [],
+          },
+          savingThrows: [
+            { key: 'wis', name: 'Wisdom', modifier: 6, proficient: true },
+          ],
+          sections: [],
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-save="wis"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('+6');
   });
 });

@@ -33,6 +33,7 @@ const sampleCharacter: Character = {
     hitPoints: { current: 4, max: 31, temp: 0 },
     conditions: [],
   },
+  savingThrows: [],
   sections: [
     { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },
