@@ -75,6 +75,16 @@ describe('normalizeCharacter', () => {
     expect(byKey.int).toMatchObject({ modifier: 1, proficient: false });
   });
 
+  it('lists defensive traits from modifiers', () => {
+    const { defences } = normalizeCharacter(raw);
+    expect(defences).toContain('Magical Sleep Immunity');
+    expect(defences).toContain(
+      'Advantage on saves (Made to avoid or end the Charmed condition)',
+    );
+    // A non-save advantage (item Stealth) is not counted as a defence.
+    expect(defences.some((entry) => entry.toLowerCase().includes('stealth'))).toBe(false);
+  });
+
   it('computes 18 skills consistent with abilities and proficiency', () => {
     const character = normalizeCharacter(raw);
     expect(character.skills).toHaveLength(18);

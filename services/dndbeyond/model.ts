@@ -144,6 +144,8 @@ export interface Character {
   basics: CharacterBasics;
   /** The six saving throws in canonical order. */
   savingThrows: SavingThrow[];
+  /** Defensive traits: resistances, immunities, and save advantages. */
+  defences: string[];
   /** The 18 skills in canonical order. */
   skills: Skill[];
   /** Language and training proficiencies. */

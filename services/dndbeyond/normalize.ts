@@ -451,6 +451,35 @@ function toSection(
   };
 }
 
+/** Damage/condition defence modifier types worth surfacing on the sheet. */
+const DEFENCE_TYPES = new Set(['resistance', 'immunity', 'vulnerability']);
+
+/** A short, readable label for a defensive modifier. */
+function defenceLabel(mod: RawModifier): string {
+  const type = mod.friendlyTypeName ?? mod.type ?? '';
+  if (mod.type === 'advantage' || mod.type === 'disadvantage') {
+    return mod.restriction ? `${type} on saves (${mod.restriction})` : `${type} on saves`;
+  }
+  const sub = mod.friendlySubtypeName ?? mod.subType ?? '';
+  return `${sub} ${type}`.trim();
+}
+
+/** Resistances, immunities, vulnerabilities, and save advantages/disadvantages. */
+function resolveDefences(raw: RawCharacter): string[] {
+  if (!raw.modifiers) return [];
+  const labels = new Set<string>();
+  for (const mods of Object.values(raw.modifiers)) {
+    for (const mod of asArray<RawModifier>(mods)) {
+      const isDamageDefence = DEFENCE_TYPES.has(mod.type ?? '');
+      const isSaveMod =
+        (mod.type === 'advantage' || mod.type === 'disadvantage') &&
+        mod.subType === 'saving-throws';
+      if (isDamageDefence || isSaveMod) labels.add(defenceLabel(mod));
+    }
+  }
+  return [...labels];
+}
+
 /**
  * Convert a raw D&D Beyond character payload into the internal `Character`
  * model. Section counts reflect presence of content; exact per-entry rendering
@@ -486,6 +515,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     abilities,
     basics: resolveBasics(raw, abilities, level),
     savingThrows: resolveSavingThrows(raw, abilities, level),
+    defences: resolveDefences(raw),
     skills: resolveSkills(raw, abilities, level),
     proficiencies: resolveProficiencies(raw),
     actions: resolveActions(raw),

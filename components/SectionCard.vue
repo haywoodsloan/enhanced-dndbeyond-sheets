@@ -61,6 +61,7 @@ defineProps<{
       <SavingThrowsCard
         v-else-if="section.key === 'savingThrows' && character"
         :saves="character.savingThrows"
+        :defences="character.defences"
       />
       <SkillsCard
         v-else-if="section.key === 'skills' && character"

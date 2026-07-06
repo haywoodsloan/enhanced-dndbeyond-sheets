@@ -120,7 +120,9 @@ export interface RawModifier {
   subType?: string;
   value?: number | null;
   fixedValue?: number | null;
+  friendlyTypeName?: string;
   friendlySubtypeName?: string;
+  restriction?: string | null;
 }
 
 /** An active condition entry; `id` maps to a standard 5e condition. */

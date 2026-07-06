@@ -2,24 +2,44 @@
 import type { SavingThrow } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/dnd5e';
 
-defineProps<{ saves: SavingThrow[] }>();
+withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
+  defences: () => [],
+});
 </script>
 
 <template>
-  <ul class="saves">
-    <li v-for="save in saves" :key="save.key" class="save" :data-save="save.key">
-      <span
-        class="save__prof"
-        :class="{ 'save__prof--on': save.proficient }"
-        :title="save.proficient ? 'Proficient' : 'Not proficient'"
-      ></span>
-      <span class="save__name">{{ save.name }}</span>
-      <span class="save__mod">{{ formatModifier(save.modifier) }}</span>
-    </li>
-  </ul>
+  <div class="saves-card">
+    <ul class="saves">
+      <li v-for="save in saves" :key="save.key" class="save" :data-save="save.key">
+        <span
+          class="save__prof"
+          :class="{ 'save__prof--on': save.proficient }"
+          :title="save.proficient ? 'Proficient' : 'Not proficient'"
+        ></span>
+        <span class="save__name">{{ save.name }}</span>
+        <span class="save__mod">{{ formatModifier(save.modifier) }}</span>
+      </li>
+    </ul>
+
+    <div v-if="defences.length" class="defences" data-defences>
+      <span class="defences__title">Defences</span>
+      <ul class="defences__list">
+        <li v-for="entry in defences" :key="entry" class="defences__item">
+          {{ entry }}
+        </li>
+      </ul>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.saves-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
 .saves {
   display: flex;
   flex-direction: column;
@@ -56,5 +76,34 @@ defineProps<{ saves: SavingThrow[] }>();
 .save__mod {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.defences {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  border-left: 1px solid var(--p-primary-300, #d4d4d8);
+  padding-left: 16px;
+}
+
+.defences__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--p-text-muted-color, #888);
+}
+
+.defences__list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.defences__item {
+  font-size: 12px;
+  line-height: 1.3;
 }
 </style>
