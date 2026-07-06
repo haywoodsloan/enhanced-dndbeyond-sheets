@@ -20,7 +20,7 @@ describe('SavingThrowsCard', () => {
     expect(rows).toHaveLength(6);
 
     const wis = wrapper.get('[data-save="wis"]');
-    expect(wis.text()).toContain('Wisdom');
+    expect(wis.text()).toContain('WIS');
     expect(wis.text()).toContain('+6');
     expect(wis.find('.save__prof--on').exists()).toBe(true);
 

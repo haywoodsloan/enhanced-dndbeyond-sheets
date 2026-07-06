@@ -16,7 +16,7 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
           :class="{ 'save__prof--on': save.proficient }"
           :title="save.proficient ? 'Proficient' : 'Not proficient'"
         ></span>
-        <span class="save__name">{{ save.name }}</span>
+        <span class="save__name" :title="save.name">{{ save.key.toUpperCase() }}</span>
         <span class="save__mod">{{ formatModifier(save.modifier) }}</span>
       </li>
     </ul>
