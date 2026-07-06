@@ -490,7 +490,6 @@ function resolveNotes(raw: RawCharacter): NoteEntry[] {
     [n.allies, 'Allies'],
     [n.organizations, 'Organizations'],
     [n.enemies, 'Enemies'],
-    [n.personalPossessions, 'Personal Possessions'],
     [n.otherHoldings, 'Other Holdings'],
     [n.otherNotes, 'Other Notes'],
   ];

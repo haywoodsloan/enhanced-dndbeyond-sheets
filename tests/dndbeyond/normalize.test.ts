@@ -167,12 +167,23 @@ describe('normalizeCharacter', () => {
     ]);
   });
 
-  it('collects free-text notes', () => {
-    const { notes } = normalizeCharacter(raw);
-    expect(notes).toContainEqual({
-      label: 'Personal Possessions',
-      text: 'Gaming Set (Chosen Proficiency)',
-    });
+  it('collects free-text notes but omits personal possessions', () => {
+    const withNotes = {
+      ...raw,
+      notes: {
+        allies: 'The Harpers',
+        personalPossessions: 'Gaming Set (Chosen Proficiency)',
+        otherHoldings: null,
+        organizations: null,
+        enemies: null,
+        backstory: 'Raised in the Underdark.',
+        otherNotes: null,
+      },
+    } as RawCharacter;
+    const { notes } = normalizeCharacter(withNotes);
+    expect(notes).toContainEqual({ label: 'Backstory', text: 'Raised in the Underdark.' });
+    expect(notes).toContainEqual({ label: 'Allies', text: 'The Harpers' });
+    expect(notes.some((note) => note.label === 'Personal Possessions')).toBe(false);
   });
 
   it('counts section contents', () => {
