@@ -3,7 +3,7 @@
  * decoupled from D&D Beyond's raw API shape (see `api-types.ts`) so the rest of
  * the app depends on a stable structure.
  */
-import type { AbilityKey } from '@/utils/dnd5e';
+import type { AbilityKey, ProficiencyLevel } from '@/utils/dnd5e';
 /** The character-sheet sections this extension knows how to lay out. */
 export const SECTION_KEYS = [
   'basics',
@@ -75,6 +75,58 @@ export interface SavingThrow {
   proficient: boolean;
 }
 
+/** A single skill with its total modifier, governing ability, and proficiency. */
+export interface Skill {
+  key: string;
+  name: string;
+  ability: AbilityKey;
+  modifier: number;
+  proficiency: ProficiencyLevel;
+}
+
+/** Non-skill proficiencies grouped for the Proficiencies & Training section. */
+export interface CharacterProficiencies {
+  languages: string[];
+  armor: string[];
+  weapons: string[];
+  tools: string[];
+}
+
+/** A named action, attack, reaction, or other activatable option. */
+export interface CharacterAction {
+  name: string;
+}
+
+/** A known or prepared spell. */
+export interface SpellEntry {
+  name: string;
+  /** Spell level; 0 for cantrips. */
+  level: number;
+}
+
+/** A carried inventory item. */
+export interface InventoryEntry {
+  name: string;
+  quantity: number;
+  equipped: boolean;
+  attuned: boolean;
+}
+
+/** Coin counts held by the character. */
+export interface Coins {
+  cp: number;
+  sp: number;
+  ep: number;
+  gp: number;
+  pp: number;
+}
+
+/** A labeled group of features/traits (e.g. Class Features, Racial Traits). */
+export interface FeatureGroup {
+  label: string;
+  items: string[];
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -89,5 +141,19 @@ export interface Character {
   basics: CharacterBasics;
   /** The six saving throws in canonical order. */
   savingThrows: SavingThrow[];
+  /** The 18 skills in canonical order. */
+  skills: Skill[];
+  /** Language and training proficiencies. */
+  proficiencies: CharacterProficiencies;
+  /** Attacks and other actions. */
+  actions: CharacterAction[];
+  /** Known/prepared spells. */
+  spells: SpellEntry[];
+  /** Carried items. */
+  inventory: InventoryEntry[];
+  /** Coins held. */
+  wealth: Coins;
+  /** Features and traits, grouped by source. */
+  features: FeatureGroup[];
   sections: CharacterSection[];
 }

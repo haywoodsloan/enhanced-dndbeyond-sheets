@@ -1,27 +1,39 @@
 import {
   ABILITIES,
+  SKILLS,
   abilityModifier,
   armorClass,
   conditionName,
   maxHitPoints,
   proficiencyBonus,
+  proficiencyContribution,
   type AbilityKey,
   type ArmorCategory,
+  type ProficiencyLevel,
 } from '@/utils/dnd5e';
 import type {
+  RawAction,
   RawCharacter,
   RawModifier,
   RawSourceMap,
+  RawSpell,
   RawStat,
 } from './api-types';
 import type {
   AbilityScore,
   Character,
+  CharacterAction,
   CharacterBasics,
   CharacterClassSummary,
+  CharacterProficiencies,
   CharacterSection,
+  Coins,
+  FeatureGroup,
+  InventoryEntry,
   SavingThrow,
   SectionKey,
+  Skill,
+  SpellEntry,
 } from './model';
 
 /** Fixed counts: 6 saving throws and 18 skills in 5e. */
@@ -203,15 +215,19 @@ function resolveBasics(
   };
 }
 
-/** True when the character is proficient in a given ability's saving throw. */
-function hasSaveProficiency(raw: RawCharacter, abilityName: string): boolean {
-  const subType = `${abilityName.toLowerCase()}-saving-throws`;
+/** True when any top-level modifier matches the given type and subtype. */
+function hasModifier(raw: RawCharacter, type: string, subType: string): boolean {
   if (!raw.modifiers) return false;
   return Object.values(raw.modifiers).some((mods) =>
     asArray<RawModifier>(mods).some(
-      (mod) => mod.type === 'proficiency' && mod.subType === subType,
+      (mod) => mod.type === type && mod.subType === subType,
     ),
   );
+}
+
+/** True when the character is proficient in a given ability's saving throw. */
+function hasSaveProficiency(raw: RawCharacter, abilityName: string): boolean {
+  return hasModifier(raw, 'proficiency', `${abilityName.toLowerCase()}-saving-throws`);
 }
 
 /** The six saving throws: ability modifier + proficiency (if trained) + bonuses. */
@@ -235,6 +251,159 @@ function resolveSavingThrows(
       proficient,
     };
   });
+}
+
+/** Add a value to a list only if it is not already present. */
+function pushUnique(list: string[], value: string): void {
+  if (!list.includes(value)) list.push(value);
+}
+
+/** Highest proficiency level the character has in a skill. */
+function skillProficiency(raw: RawCharacter, skillKey: string): ProficiencyLevel {
+  if (hasModifier(raw, 'expertise', skillKey)) return 'expertise';
+  if (hasModifier(raw, 'proficiency', skillKey)) return 'proficient';
+  if (hasModifier(raw, 'half-proficiency', skillKey)) return 'half';
+  return 'none';
+}
+
+/** The 18 skills: ability modifier + proficiency contribution. */
+function resolveSkills(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): Skill[] {
+  const prof = proficiencyBonus(level);
+  const modifierByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
+  return SKILLS.map((meta) => {
+    const proficiency = skillProficiency(raw, meta.key);
+    const abilityMod = modifierByKey.get(meta.ability) ?? 0;
+    return {
+      key: meta.key,
+      name: meta.name,
+      ability: meta.ability,
+      proficiency,
+      modifier: abilityMod + proficiencyContribution(proficiency, prof),
+    };
+  });
+}
+
+/** Languages plus armor/weapon/tool training, from the modifier map. */
+function resolveProficiencies(raw: RawCharacter): CharacterProficiencies {
+  const languages: string[] = [];
+  const armor: string[] = [];
+  const weapons: string[] = [];
+  const tools: string[] = [];
+  const skillKeys = new Set(SKILLS.map((skill) => skill.key));
+
+  if (raw.modifiers) {
+    for (const mods of Object.values(raw.modifiers)) {
+      for (const mod of asArray<RawModifier>(mods)) {
+        const label = mod.friendlySubtypeName;
+        if (!label) continue;
+        if (mod.type === 'language') {
+          pushUnique(languages, label);
+        } else if (mod.type === 'proficiency') {
+          const sub = mod.subType ?? '';
+          if (sub.endsWith('-saving-throws') || skillKeys.has(sub)) continue;
+          if (sub.includes('armor') || sub === 'shields') pushUnique(armor, label);
+          else if (sub.includes('weapon')) pushUnique(weapons, label);
+          else pushUnique(tools, label);
+        }
+      }
+    }
+  }
+
+  return { languages, armor, weapons, tools };
+}
+
+/** Weapon attacks plus every listed action. */
+function resolveActions(raw: RawCharacter): CharacterAction[] {
+  const attacks = asArray(raw.inventory)
+    .filter((item) => item.displayAsAttack === true && item.definition?.name)
+    .map((item) => ({ name: item.definition!.name! }));
+  const actions: CharacterAction[] = [];
+  if (raw.actions) {
+    for (const group of Object.values(raw.actions)) {
+      for (const action of asArray<RawAction>(group)) {
+        if (action.name) actions.push({ name: action.name });
+      }
+    }
+  }
+  return [...attacks, ...actions];
+}
+
+/** Known/prepared spells from class spells and other sources, deduped and sorted. */
+function resolveSpells(raw: RawCharacter): SpellEntry[] {
+  const entries: SpellEntry[] = [];
+  const add = (spell: RawSpell) => {
+    if (spell.definition?.name != null) {
+      entries.push({ name: spell.definition.name, level: spell.definition.level ?? 0 });
+    }
+  };
+  for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(add);
+  if (raw.spells) {
+    for (const group of Object.values(raw.spells)) asArray<RawSpell>(group).forEach(add);
+  }
+  const seen = new Set<string>();
+  return entries
+    .filter((entry) => (seen.has(entry.name) ? false : seen.add(entry.name)))
+    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+}
+
+/** Carried items with quantity and equipped/attuned flags. */
+function resolveInventory(raw: RawCharacter): InventoryEntry[] {
+  return asArray(raw.inventory)
+    .filter((item) => item.definition?.name)
+    .map((item) => ({
+      name: item.definition!.name!,
+      quantity: item.quantity ?? 1,
+      equipped: item.equipped === true,
+      attuned: item.isAttuned === true,
+    }));
+}
+
+/** Coin counts, defaulting missing denominations to zero. */
+function resolveWealth(raw: RawCharacter): Coins {
+  const coins = raw.currencies ?? {};
+  return {
+    cp: coins.cp ?? 0,
+    sp: coins.sp ?? 0,
+    ep: coins.ep ?? 0,
+    gp: coins.gp ?? 0,
+    pp: coins.pp ?? 0,
+  };
+}
+
+/** Features and traits grouped by source. */
+function resolveFeatures(raw: RawCharacter): FeatureGroup[] {
+  const classFeatures: string[] = [];
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.definition?.classFeatures)) {
+      if (
+        feature.name &&
+        (feature.requiredLevel == null || feature.requiredLevel <= cls.level)
+      ) {
+        pushUnique(classFeatures, feature.name);
+      }
+    }
+    for (const feature of asArray(cls.classFeatures)) {
+      if (feature.definition?.name && feature.definition.hideInSheet !== true) {
+        pushUnique(classFeatures, feature.definition.name);
+      }
+    }
+  }
+  const racialTraits = asArray(raw.race?.racialTraits)
+    .filter((trait) => trait.definition?.hideInSheet !== true && trait.definition?.name)
+    .map((trait) => trait.definition!.name!);
+  const feats = asArray(raw.feats)
+    .filter((feat) => feat.definition?.name)
+    .map((feat) => feat.definition!.name!);
+
+  const groups: FeatureGroup[] = [];
+  if (classFeatures.length) groups.push({ label: 'Class Features', items: classFeatures });
+  if (racialTraits.length) groups.push({ label: 'Racial Traits', items: racialTraits });
+  if (feats.length) groups.push({ label: 'Feats', items: feats });
+  return groups;
 }
 
 function summarizeClasses(raw: RawCharacter): CharacterClassSummary[] {
@@ -297,6 +466,13 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     abilities,
     basics: resolveBasics(raw, abilities, level),
     savingThrows: resolveSavingThrows(raw, abilities, level),
+    skills: resolveSkills(raw, abilities, level),
+    proficiencies: resolveProficiencies(raw),
+    actions: resolveActions(raw),
+    spells: resolveSpells(raw),
+    inventory: resolveInventory(raw),
+    wealth: resolveWealth(raw),
+    features: resolveFeatures(raw),
     sections,
   };
 

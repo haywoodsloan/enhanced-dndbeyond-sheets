@@ -23,21 +23,31 @@ export interface RawStat {
 export interface RawClassDefinition {
   name?: string;
   canCastSpells?: boolean;
+  classFeatures?: RawClassFeature[];
 }
 
 export interface RawSubclassDefinition {
   name?: string;
 }
 
+export interface RawClassFeature {
+  name?: string;
+  requiredLevel?: number;
+}
+
+export interface RawGrantedFeature {
+  definition?: { name?: string; hideInSheet?: boolean };
+}
+
 export interface RawCharacterClass {
   level: number;
   definition: RawClassDefinition;
   subclassDefinition?: RawSubclassDefinition | null;
-  classFeatures?: unknown[];
+  classFeatures?: RawGrantedFeature[];
 }
 
 export interface RawRacialTrait {
-  definition?: { name?: string };
+  definition?: { name?: string; hideInSheet?: boolean };
 }
 
 export interface RawRace {
@@ -57,6 +67,7 @@ export interface RawInventoryItem {
   id: number;
   displayAsAttack?: boolean | null;
   equipped?: boolean | null;
+  isAttuned?: boolean | null;
   quantity?: number;
   definition?: {
     name?: string;
@@ -66,9 +77,20 @@ export interface RawInventoryItem {
   };
 }
 
+export interface RawSpell {
+  definition?: {
+    name?: string;
+    level?: number;
+  };
+}
+
+export interface RawFeat {
+  definition?: { name?: string };
+}
+
 export interface RawClassSpellGroup {
   characterClassId?: number;
-  spells?: unknown[];
+  spells?: RawSpell[];
 }
 
 export interface RawAction {
@@ -98,6 +120,7 @@ export interface RawModifier {
   subType?: string;
   value?: number | null;
   fixedValue?: number | null;
+  friendlySubtypeName?: string;
 }
 
 /** An active condition entry; `id` maps to a standard 5e condition. */
@@ -122,9 +145,9 @@ export interface RawCharacter {
   background?: RawBackground | null;
   inventory?: RawInventoryItem[];
   classSpells?: RawClassSpellGroup[];
-  spells?: RawSourceMap<unknown> | null;
+  spells?: RawSourceMap<RawSpell> | null;
   actions?: RawSourceMap<RawAction> | null;
-  feats?: unknown[];
+  feats?: RawFeat[];
   optionalClassFeatures?: unknown[];
   conditions?: RawCondition[] | null;
   currencies?: RawCurrencies | null;

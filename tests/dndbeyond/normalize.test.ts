@@ -75,6 +75,60 @@ describe('normalizeCharacter', () => {
     expect(byKey.int).toMatchObject({ modifier: 1, proficient: false });
   });
 
+  it('computes 18 skills consistent with abilities and proficiency', () => {
+    const character = normalizeCharacter(raw);
+    expect(character.skills).toHaveLength(18);
+    const abilityMod = Object.fromEntries(
+      character.abilities.map((ability) => [ability.key, ability.modifier]),
+    );
+    const multiplier = { none: 0, half: 0.5, proficient: 1, expertise: 2 };
+    for (const skill of character.skills) {
+      const expected =
+        abilityMod[skill.ability] + Math.floor(2 * multiplier[skill.proficiency]);
+      expect(skill.modifier).toBe(expected);
+    }
+  });
+
+  it('groups languages and training proficiencies', () => {
+    const { proficiencies } = normalizeCharacter(raw);
+    expect(proficiencies.languages).toEqual(
+      expect.arrayContaining(['Common', 'Elvish', 'Goblin']),
+    );
+    expect(proficiencies.weapons.length).toBeGreaterThan(0);
+    expect(proficiencies.armor.length).toBeGreaterThan(0);
+  });
+
+  it('lists actions including Channel Divinity', () => {
+    const { actions } = normalizeCharacter(raw);
+    expect(actions.some((action) => action.name === 'Channel Divinity')).toBe(true);
+  });
+
+  it('lists spells with levels, sorted ascending', () => {
+    const { spells } = normalizeCharacter(raw);
+    expect(spells.length).toBeGreaterThan(0);
+    expect(spells.some((spell) => spell.name === 'Guidance' && spell.level === 0)).toBe(
+      true,
+    );
+    for (let i = 1; i < spells.length; i += 1) {
+      expect(spells[i].level).toBeGreaterThanOrEqual(spells[i - 1].level);
+    }
+  });
+
+  it('lists inventory items and coins', () => {
+    const character = normalizeCharacter(raw);
+    expect(
+      character.inventory.some((item) => item.name === 'Cloak of Elvenkind'),
+    ).toBe(true);
+    expect(character.wealth.gp).toBe(224);
+  });
+
+  it('groups features by source', () => {
+    const { features } = normalizeCharacter(raw);
+    expect(features.map((group) => group.label)).toContain('Class Features');
+    const classFeatures = features.find((group) => group.label === 'Class Features');
+    expect(classFeatures?.items).toContain('Spellcasting');
+  });
+
   it('produces all ten sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([

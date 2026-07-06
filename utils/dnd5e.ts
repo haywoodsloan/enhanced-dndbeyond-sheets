@@ -128,3 +128,52 @@ export function conditionName(id: number | undefined): string | undefined {
  * (integer keys iterate in ascending order) so it never drifts from the map.
  */
 export const CONDITION_NAMES: readonly string[] = Object.values(CONDITIONS);
+
+/** How strongly a proficiency applies to a skill or save. */
+export type ProficiencyLevel = 'none' | 'half' | 'proficient' | 'expertise';
+
+const PROFICIENCY_MULTIPLIER: Record<ProficiencyLevel, number> = {
+  none: 0,
+  half: 0.5,
+  proficient: 1,
+  expertise: 2,
+};
+
+/**
+ * The bonus a proficiency level contributes given the proficiency bonus. Half
+ * proficiency rounds down.
+ */
+export function proficiencyContribution(
+  level: ProficiencyLevel,
+  proficiencyBonus: number,
+): number {
+  return Math.floor(proficiencyBonus * PROFICIENCY_MULTIPLIER[level]);
+}
+
+export interface SkillMeta {
+  key: string;
+  name: string;
+  ability: AbilityKey;
+}
+
+/** The 18 standard skills with their governing ability. */
+export const SKILLS: readonly SkillMeta[] = [
+  { key: 'acrobatics', name: 'Acrobatics', ability: 'dex' },
+  { key: 'animal-handling', name: 'Animal Handling', ability: 'wis' },
+  { key: 'arcana', name: 'Arcana', ability: 'int' },
+  { key: 'athletics', name: 'Athletics', ability: 'str' },
+  { key: 'deception', name: 'Deception', ability: 'cha' },
+  { key: 'history', name: 'History', ability: 'int' },
+  { key: 'insight', name: 'Insight', ability: 'wis' },
+  { key: 'intimidation', name: 'Intimidation', ability: 'cha' },
+  { key: 'investigation', name: 'Investigation', ability: 'int' },
+  { key: 'medicine', name: 'Medicine', ability: 'wis' },
+  { key: 'nature', name: 'Nature', ability: 'int' },
+  { key: 'perception', name: 'Perception', ability: 'wis' },
+  { key: 'performance', name: 'Performance', ability: 'cha' },
+  { key: 'persuasion', name: 'Persuasion', ability: 'cha' },
+  { key: 'religion', name: 'Religion', ability: 'int' },
+  { key: 'sleight-of-hand', name: 'Sleight of Hand', ability: 'dex' },
+  { key: 'stealth', name: 'Stealth', ability: 'dex' },
+  { key: 'survival', name: 'Survival', ability: 'wis' },
+];

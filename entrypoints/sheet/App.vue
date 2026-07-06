@@ -168,15 +168,17 @@ body {
 
 .settings {
   position: sticky;
-  top: 0;
+  top: 24px;
   flex: none;
   box-sizing: border-box;
   width: 240px;
-  max-height: 100vh;
+  margin: 24px;
+  max-height: calc(100vh - 48px);
   overflow: auto;
   padding: 20px 16px;
   background: var(--paper);
-  border-right: 1px solid #cfcfd6;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
 }

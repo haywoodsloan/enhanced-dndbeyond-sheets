@@ -3,7 +3,7 @@ import { flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCharacter } from '@/composables/useCharacter';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
-import type { Character } from '@/services/dndbeyond/model';
+import { makeCharacter } from '../fixtures/character';
 
 vi.mock('@/services/dndbeyond/load-character', () => ({
   loadCharacter: vi.fn(),
@@ -11,23 +11,12 @@ vi.mock('@/services/dndbeyond/load-character', () => ({
 
 const mockedLoad = vi.mocked(loadCharacter);
 
-const sample: Character = {
+const sample = makeCharacter({
   id: 166869100,
   name: 'Noct',
   level: 4,
   classes: [{ name: 'Cleric', level: 4 }],
-  abilities: [],
-  basics: {
-    armorClass: 10,
-    initiative: 0,
-    speed: 30,
-    proficiencyBonus: 2,
-    hitPoints: { current: 10, max: 10, temp: 0 },
-    conditions: [],
-  },
-  savingThrows: [],
-  sections: [],
-};
+});
 
 describe('useCharacter', () => {
   beforeEach(() => {

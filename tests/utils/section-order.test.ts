@@ -6,6 +6,7 @@ import {
   type CharacterSection,
   type SectionKey,
 } from '@/services/dndbeyond/model';
+import { makeCharacter as buildCharacter } from '../fixtures/character';
 
 function makeCharacter(
   classes: { name: string; level: number }[],
@@ -16,23 +17,11 @@ function makeCharacter(
     const isEmpty = empties.has(key);
     return { key, title: key, count: isEmpty ? 0 : 1, isEmpty };
   });
-  return {
-    id: 1,
-    name: 'Test',
+  return buildCharacter({
     classes: classes.map((cls) => ({ name: cls.name, level: cls.level })),
     level: classes.reduce((sum, cls) => sum + cls.level, 0),
-    abilities: [],
-    basics: {
-      armorClass: 10,
-      initiative: 0,
-      speed: 30,
-      proficiencyBonus: 2,
-      hitPoints: { current: 10, max: 10, temp: 0 },
-      conditions: [],
-    },
-    savingThrows: [],
     sections,
-  };
+  });
 }
 
 const orderedKeys = (character: Character) =>

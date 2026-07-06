@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
+import { makeCharacter } from '../fixtures/character';
 
 vi.mock('@/services/dndbeyond/load-character', () => ({
   loadCharacter: vi.fn(),
@@ -10,7 +11,7 @@ vi.mock('@/services/dndbeyond/load-character', () => ({
 
 const mockedLoad = vi.mocked(loadCharacter);
 
-const sampleCharacter: Character = {
+const sampleCharacter = makeCharacter({
   id: 166869100,
   name: 'Noct',
   race: 'Elf',
@@ -25,15 +26,6 @@ const sampleCharacter: Character = {
     { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
     { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
   ],
-  basics: {
-    armorClass: 20,
-    initiative: 0,
-    speed: 30,
-    proficiencyBonus: 2,
-    hitPoints: { current: 4, max: 31, temp: 0 },
-    conditions: [],
-  },
-  savingThrows: [],
   sections: [
     { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },
@@ -46,7 +38,7 @@ const sampleCharacter: Character = {
     { key: 'wealth', title: 'Wealth', count: 0, isEmpty: false },
     { key: 'features', title: 'Features & Traits', count: 39, isEmpty: false },
   ],
-};
+});
 
 describe('sheet App', () => {
   beforeEach(() => {

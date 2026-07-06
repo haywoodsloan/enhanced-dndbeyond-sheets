@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import SectionCard from '@/components/SectionCard.vue';
+import { makeCharacter } from '../fixtures/character';
 
 describe('SectionCard', () => {
   it('renders the title and count with a size class', () => {
@@ -39,11 +40,7 @@ describe('SectionCard', () => {
           isEmpty: false,
         },
         size: 'medium',
-        character: {
-          id: 1,
-          name: 'Test',
-          classes: [],
-          level: 1,
+        character: makeCharacter({
           abilities: [
             { key: 'str', name: 'Strength', score: 15, modifier: 2 },
             { key: 'dex', name: 'Dexterity', score: 10, modifier: 0 },
@@ -52,17 +49,7 @@ describe('SectionCard', () => {
             { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
             { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
           ],
-          basics: {
-            armorClass: 20,
-            initiative: 0,
-            speed: 30,
-            proficiencyBonus: 2,
-            hitPoints: { current: 4, max: 31, temp: 0 },
-            conditions: [],
-          },
-          savingThrows: [],
-          sections: [],
-        },
+        }),
       },
     });
 
@@ -81,12 +68,7 @@ describe('SectionCard', () => {
           isEmpty: false,
         },
         size: 'large',
-        character: {
-          id: 1,
-          name: 'Test',
-          classes: [],
-          level: 4,
-          abilities: [],
+        character: makeCharacter({
           basics: {
             armorClass: 20,
             initiative: 0,
@@ -95,9 +77,7 @@ describe('SectionCard', () => {
             hitPoints: { current: 4, max: 31, temp: 0 },
             conditions: [],
           },
-          savingThrows: [],
-          sections: [],
-        },
+        }),
       },
     });
 
@@ -120,25 +100,11 @@ describe('SectionCard', () => {
           isEmpty: false,
         },
         size: 'medium',
-        character: {
-          id: 1,
-          name: 'Test',
-          classes: [],
-          level: 4,
-          abilities: [],
-          basics: {
-            armorClass: 20,
-            initiative: 0,
-            speed: 30,
-            proficiencyBonus: 2,
-            hitPoints: { current: 4, max: 31, temp: 0 },
-            conditions: [],
-          },
+        character: makeCharacter({
           savingThrows: [
             { key: 'wis', name: 'Wisdom', modifier: 6, proficient: true },
           ],
-          sections: [],
-        },
+        }),
       },
     });
 
