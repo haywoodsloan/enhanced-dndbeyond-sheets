@@ -1,9 +1,17 @@
 <script lang="ts" setup>
-import { computed, ref, toRef } from 'vue';
+import { computed, onUnmounted, ref, toRef, watchEffect } from 'vue';
+import Select from 'primevue/select';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { defaultSectionOrder } from '@/utils/section-order';
 import { sectionSize } from '@/utils/section-layout';
+import {
+  DEFAULT_FORMAT_ID,
+  DEFAULT_MARGIN_ID,
+  MARGIN_PRESETS,
+  PAGE_FORMATS,
+  mmToPx,
+} from '@/utils/page-format';
 import SectionCard from '@/components/SectionCard.vue';
 
 const props = defineProps<{ characterId: number | null }>();
@@ -25,57 +33,123 @@ const orderedSections = computed(() =>
   character.value ? defaultSectionOrder(character.value) : [],
 );
 
+// Page layout settings (page type + margins). Kept in memory for now.
+const formatId = ref(DEFAULT_FORMAT_ID);
+const marginId = ref(DEFAULT_MARGIN_ID);
+
+// PrimeVue Select needs mutable arrays; the source lists stay readonly.
+const formatOptions = [...PAGE_FORMATS];
+const marginOptions = [...MARGIN_PRESETS];
+
+const format = computed(
+  () => PAGE_FORMATS.find((entry) => entry.id === formatId.value) ?? PAGE_FORMATS[0],
+);
+const margin = computed(
+  () => MARGIN_PRESETS.find((entry) => entry.id === marginId.value) ?? MARGIN_PRESETS[0],
+);
+
+// Drive the paper geometry (and thus its aspect ratio) from the chosen format.
+const pageStyle = computed(() => ({
+  '--page-width': `${format.value.width}mm`,
+  '--page-height': `${format.value.height}mm`,
+  '--page-margin': `${margin.value.mm}mm`,
+}));
+
+const pageMetrics = computed(() => ({
+  band: mmToPx(format.value.height),
+  gutter: 20,
+  margin: mmToPx(margin.value.mm),
+}));
+
 const sheetRef = ref<HTMLElement | null>(null);
 const gridRef = ref<HTMLElement | null>(null);
 
-// Page geometry in CSS pixels (1in = 96px). Must mirror the :root vars below.
-const PX_PER_INCH = 96;
-const pageMetrics = {
-  band: 11 * PX_PER_INCH,
-  gutter: 20,
-  margin: 0.5 * PX_PER_INCH,
-};
+useSheetPagination(
+  sheetRef,
+  gridRef,
+  () => pageMetrics.value,
+  () => character.value,
+);
 
-useSheetPagination(sheetRef, gridRef, pageMetrics, () => character.value);
+// Keep the print @page rule in sync with the selection so print matches screen.
+let pageRule: HTMLStyleElement | null = null;
+watchEffect(() => {
+  if (typeof document === 'undefined') return;
+  if (!pageRule) {
+    pageRule = document.createElement('style');
+    document.head.appendChild(pageRule);
+  }
+  pageRule.textContent = `@page { size: ${format.value.width}mm ${format.value.height}mm; margin: ${margin.value.mm}mm; }`;
+});
+onUnmounted(() => {
+  pageRule?.remove();
+  pageRule = null;
+});
 </script>
 
 <template>
-  <main class="sheet" ref="sheetRef">
-    <p v-if="characterId == null">
-      No character selected. Open this from a D&amp;D Beyond character page.
-    </p>
+  <div class="workspace">
+    <aside class="settings">
+      <h2 class="settings__title">Page layout</h2>
 
-    <p v-else-if="status === 'idle' || status === 'loading'">Loading character…</p>
-
-    <p v-else-if="status === 'error'" role="alert">
-      Could not load character: {{ error }}
-    </p>
-
-    <template v-else-if="character">
-      <header class="sheet__header">
-        <h1>{{ character.name }}</h1>
-        <p>{{ subtitle }}</p>
-      </header>
-
-      <div class="sheet__grid" ref="gridRef">
-        <SectionCard
-          v-for="section in orderedSections"
-          :key="section.key"
-          :section="section"
-          :size="sectionSize(section.key)"
-          :character="character"
+      <label class="settings__field">
+        <span class="settings__label">Page type</span>
+        <Select
+          v-model="formatId"
+          :options="formatOptions"
+          option-label="name"
+          option-value="id"
+          class="settings__control"
         />
-      </div>
-    </template>
-  </main>
+      </label>
+
+      <label class="settings__field">
+        <span class="settings__label">Margins</span>
+        <Select
+          v-model="marginId"
+          :options="marginOptions"
+          option-label="name"
+          option-value="id"
+          class="settings__control"
+        />
+      </label>
+    </aside>
+
+    <div class="sheet-area">
+      <main class="sheet" ref="sheetRef" :style="pageStyle">
+        <p v-if="characterId == null">
+          No character selected. Open this from a D&amp;D Beyond character page.
+        </p>
+
+        <p v-else-if="status === 'idle' || status === 'loading'">Loading character…</p>
+
+        <p v-else-if="status === 'error'" role="alert">
+          Could not load character: {{ error }}
+        </p>
+
+        <template v-else-if="character">
+          <header class="sheet__header">
+            <h1>{{ character.name }}</h1>
+            <p>{{ subtitle }}</p>
+          </header>
+
+          <div class="sheet__grid" ref="gridRef">
+            <SectionCard
+              v-for="section in orderedSections"
+              :key="section.key"
+              :section="section"
+              :size="sectionSize(section.key)"
+              :character="character"
+            />
+          </div>
+        </template>
+      </main>
+    </div>
+  </div>
 </template>
 
 <style>
 :root {
-  /* Paper geometry — the on-screen view mirrors the printed page. */
-  --page-width: 8.5in;
-  --page-height: 11in;
-  --page-margin: 0.5in;
   --page-gap: 20px;
   --desk: #dcdce1;
   --paper: #ffffff;
@@ -83,14 +157,62 @@ useSheetPagination(sheetRef, gridRef, pageMetrics, () => character.value);
 
 body {
   margin: 0;
-  padding: 24px 0;
   background: var(--desk);
+}
+
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+.settings {
+  position: sticky;
+  top: 0;
+  flex: none;
+  box-sizing: border-box;
+  width: 240px;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 20px 16px;
+  background: var(--paper);
+  border-right: 1px solid #cfcfd6;
+  font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #1c1c1e;
+}
+
+.settings__title {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+
+.settings__field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.settings__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+.settings__control {
+  width: 100%;
+}
+
+.sheet-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
 }
 
 .sheet {
   box-sizing: border-box;
   width: var(--page-width);
-  margin: 0 auto;
+  min-height: var(--page-height);
   padding: var(--page-margin);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
@@ -131,21 +253,26 @@ body {
   break-inside: avoid;
 }
 
-/* Actual print: let the browser paginate and drop the on-screen desk/gutters. */
-@page {
-  size: Letter;
-  margin: var(--page-margin);
-}
-
 @media print {
   body {
-    padding: 0;
     background: var(--paper);
+  }
+
+  .workspace {
+    display: block;
+  }
+
+  .settings {
+    display: none;
+  }
+
+  .sheet-area {
+    padding: 0;
   }
 
   .sheet {
     width: auto;
-    margin: 0;
+    min-height: 0;
     padding: 0;
     background: var(--paper);
     box-shadow: none;

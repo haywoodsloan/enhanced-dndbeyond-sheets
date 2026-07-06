@@ -15,7 +15,7 @@ describe('useSheetPagination', () => {
         const { apply } = useSheetPagination(
           sheet,
           grid,
-          { band: 1000, gutter: 20, margin: 50 },
+          () => ({ band: 1000, gutter: 20, margin: 50 }),
           () => 0,
         );
         return () => h('main', { ref: sheet }, [h('div', { ref: grid })]);

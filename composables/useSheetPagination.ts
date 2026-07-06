@@ -10,7 +10,7 @@ import { paginate, type PageMetrics } from '@/utils/pagination';
 export function useSheetPagination(
   sheet: Ref<HTMLElement | null>,
   grid: Ref<HTMLElement | null>,
-  metrics: PageMetrics,
+  metrics: () => PageMetrics,
   source: () => unknown,
 ) {
   function apply() {
@@ -28,7 +28,7 @@ export function useSheetPagination(
       return { top: rect.top - sheetTop, height: rect.height };
     });
 
-    const offsets = paginate(boxes, metrics);
+    const offsets = paginate(boxes, metrics());
     offsets.forEach((offset, index) => {
       if (offset > 0) cards[index].style.marginTop = `${offset}px`;
     });
@@ -48,7 +48,7 @@ export function useSheetPagination(
     window.removeEventListener('resize', apply);
   });
 
-  watch(source, schedule);
+  watch([source, metrics], schedule);
 
   return { apply };
 }

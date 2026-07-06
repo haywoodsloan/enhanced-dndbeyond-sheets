@@ -63,6 +63,13 @@ describe('sheet App', () => {
     expect(mockedLoad).not.toHaveBeenCalled();
   });
 
+  it('shows the page layout settings panel', () => {
+    const wrapper = mount(App, { props: { characterId: null } });
+    expect(wrapper.text()).toContain('Page layout');
+    expect(wrapper.text()).toContain('Page type');
+    expect(wrapper.text()).toContain('Margins');
+  });
+
   it('shows a loading state while the character loads', () => {
     mockedLoad.mockReturnValue(new Promise<Character>(() => {}));
     const wrapper = mount(App, { props: { characterId: 166869100 } });
