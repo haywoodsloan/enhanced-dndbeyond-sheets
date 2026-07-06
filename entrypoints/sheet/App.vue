@@ -5,7 +5,7 @@ import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { defaultSectionOrder } from '@/utils/section-order';
-import { sectionSpan } from '@/utils/section-layout';
+import { GRID_GAP, gridRowsPerPage, sectionSpan } from '@/utils/section-layout';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -52,11 +52,23 @@ const margin = computed(
   () => MARGIN_PRESETS.find((entry) => entry.id === marginId.value) ?? MARGIN_PRESETS[0],
 );
 
+// Row height chosen so the grid's rows:columns ratio matches the print area's
+// height:width (margins removed) — i.e. roughly square cells.
+const rowUnit = computed(() => {
+  const marginPx = mmToPx(margin.value.mm);
+  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  const printHeight = mmToPx(format.value.height) - 2 * marginPx;
+  const rows = gridRowsPerPage(printWidth, printHeight);
+  return (printHeight - (rows - 1) * GRID_GAP) / rows;
+});
+
 // Drive the paper geometry (and thus its aspect ratio) from the chosen format.
 const pageStyle = computed(() => ({
   '--page-width': `${format.value.width}mm`,
   '--page-height': `${format.value.height}mm`,
   '--page-margin': `${margin.value.mm}mm`,
+  '--row-unit': `${rowUnit.value}px`,
+  '--grid-gap': `${GRID_GAP}px`,
 }));
 
 const pageMetrics = computed(() => ({
@@ -303,7 +315,7 @@ body {
 .sheet__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: var(--grid-gap, 12px);
   align-items: start;
 }
 
