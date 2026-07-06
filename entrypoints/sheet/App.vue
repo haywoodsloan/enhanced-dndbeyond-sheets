@@ -5,7 +5,7 @@ import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { defaultSectionOrder } from '@/utils/section-order';
-import { sectionSize } from '@/utils/section-layout';
+import { sectionSpan } from '@/utils/section-layout';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -168,7 +168,7 @@ onUnmounted(() => {
               v-for="section in orderedSections"
               :key="section.key"
               :section="section"
-              :size="sectionSize(section.key)"
+              :span="sectionSpan(section.key)"
               :character="character"
             />
           </div>

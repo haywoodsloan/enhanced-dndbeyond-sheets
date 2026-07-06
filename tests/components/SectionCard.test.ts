@@ -8,13 +8,13 @@ describe('SectionCard', () => {
     const wrapper = mount(SectionCard, {
       props: {
         section: { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
-        size: 'large',
+        span: { cols: 3, rows: 3 },
       },
     });
 
     expect(wrapper.text()).toContain('Spells');
     expect(wrapper.text()).toContain('18');
-    expect(wrapper.classes()).toContain('card--large');
+    expect(wrapper.attributes('style')).toContain('grid-column: span 3');
     expect(wrapper.attributes('data-section-key')).toBe('spells');
   });
 
@@ -22,12 +22,12 @@ describe('SectionCard', () => {
     const wrapper = mount(SectionCard, {
       props: {
         section: { key: 'spells', title: 'Spells', count: 0, isEmpty: true },
-        size: 'small',
+        span: { cols: 1, rows: 1 },
       },
     });
 
     expect(wrapper.text()).toContain('Nothing here yet');
-    expect(wrapper.classes()).toContain('card--small');
+    expect(wrapper.attributes('style')).toContain('grid-column: span 1');
   });
 
   it('renders ability scores for the attributes section', () => {
@@ -39,7 +39,7 @@ describe('SectionCard', () => {
           count: 6,
           isEmpty: false,
         },
-        size: 'medium',
+        span: { cols: 2, rows: 2 },
         character: makeCharacter({
           abilities: [
             { key: 'str', name: 'Strength', score: 15, modifier: 2 },
@@ -67,7 +67,7 @@ describe('SectionCard', () => {
           count: 0,
           isEmpty: false,
         },
-        size: 'large',
+        span: { cols: 3, rows: 3 },
         character: makeCharacter({
           basics: {
             armorClass: 20,
@@ -99,7 +99,7 @@ describe('SectionCard', () => {
           count: 6,
           isEmpty: false,
         },
-        size: 'medium',
+        span: { cols: 2, rows: 2 },
         character: makeCharacter({
           savingThrows: [
             { key: 'wis', name: 'Wisdom', modifier: 6, proficient: true },

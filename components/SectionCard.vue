@@ -12,13 +12,13 @@ import InventoryCard from '@/components/InventoryCard.vue';
 import WealthCard from '@/components/WealthCard.vue';
 import FeaturesCard from '@/components/FeaturesCard.vue';
 import type { Character, CharacterSection } from '@/services/dndbeyond/model';
-import type { CardSize } from '@/utils/section-layout';
+import { cardHeight, type SectionSpan } from '@/utils/section-layout';
 
-// `size` controls the card width (grid span). A future `expanded` prop will
-// swap between a compact and a detailed body — the layout is structured for it.
+// `span` controls the card footprint (columns × row-units). A future `expanded`
+// prop will swap between a compact and a detailed body.
 defineProps<{
   section: CharacterSection;
-  size: CardSize;
+  span: SectionSpan;
   character?: Character | null;
 }>();
 </script>
@@ -26,7 +26,7 @@ defineProps<{
 <template>
   <Card
     class="card"
-    :class="`card--${size}`"
+    :style="{ gridColumn: `span ${span.cols}`, height: `${cardHeight(span.rows)}px` }"
     :data-section-key="section.key"
     draggable="true"
   >
@@ -91,20 +91,9 @@ defineProps<{
 <style scoped>
 .card {
   cursor: grab;
+  overflow: hidden;
   border: 1px solid var(--p-primary-300, #d4d4d8);
   box-shadow: none;
-}
-
-.card--small {
-  grid-column: span 1;
-}
-
-.card--medium {
-  grid-column: span 2;
-}
-
-.card--large {
-  grid-column: span 3;
 }
 
 .card__title {
