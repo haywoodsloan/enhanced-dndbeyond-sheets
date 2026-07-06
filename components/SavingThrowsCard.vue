@@ -94,16 +94,17 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 }
 
 .defences__list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   margin: 0;
-  padding: 0;
-  list-style: none;
+  padding-left: 18px;
+  list-style: disc;
 }
 
 .defences__item {
   font-size: 12px;
   line-height: 1.3;
+}
+
+.defences__item + .defences__item {
+  margin-top: 4px;
 }
 </style>
