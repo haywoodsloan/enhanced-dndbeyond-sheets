@@ -37,7 +37,6 @@ export interface MarginPreset {
 }
 
 export const MARGIN_PRESETS: readonly MarginPreset[] = [
-  { id: 'none', name: 'None', mm: 0 },
   { id: 'narrow', name: 'Narrow (6 mm)', mm: 6 },
   { id: 'normal', name: 'Normal (13 mm)', mm: 13 },
   { id: 'wide', name: 'Wide (19 mm)', mm: 19 },

@@ -16,7 +16,7 @@ export const GRID_GAP = 12;
  */
 const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   portrait: { cols: 1, rows: 1 },
-  basics: { cols: 3, rows: 2 },
+  basics: { cols: 3, rows: 1 },
   attributes: { cols: 2, rows: 1 },
   skills: { cols: 3, rows: 1 },
   savingThrows: { cols: 2, rows: 1 },
