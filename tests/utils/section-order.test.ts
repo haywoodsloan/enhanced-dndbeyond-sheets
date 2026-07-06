@@ -28,50 +28,50 @@ const orderedKeys = (character: Character) =>
   defaultSectionOrder(character).map((section) => section.key);
 
 describe('defaultSectionOrder', () => {
-  it('leads with spells for a full caster', () => {
+  it('puts skills, saves, and proficiencies before spells for a full caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Cleric', level: 4 }]))).toEqual([
       'basics',
       'attributes',
       'portrait',
-      'spells',
-      'actions',
       'savingThrows',
       'skills',
-      'features',
       'proficiencies',
+      'spells',
+      'actions',
+      'features',
       'inventory',
       'wealth',
     ]);
   });
 
-  it('leads with actions for a martial class', () => {
+  it('puts checks before actions with spells last for a martial class', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Fighter', level: 5 }]))).toEqual([
       'basics',
       'attributes',
       'portrait',
-      'actions',
       'savingThrows',
       'skills',
+      'proficiencies',
+      'actions',
       'features',
       'inventory',
-      'proficiencies',
       'wealth',
       'spells',
     ]);
   });
 
-  it('interleaves actions and spells for a half-caster', () => {
+  it('puts checks before actions and spells for a half-caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Paladin', level: 6 }]))).toEqual([
       'basics',
       'attributes',
       'portrait',
-      'actions',
-      'spells',
       'savingThrows',
       'skills',
+      'proficiencies',
+      'actions',
+      'spells',
       'features',
       'inventory',
-      'proficiencies',
       'wealth',
     ]);
   });
@@ -84,11 +84,11 @@ describe('defaultSectionOrder', () => {
       'basics',
       'attributes',
       'portrait',
-      'spells',
       'savingThrows',
       'skills',
-      'features',
       'proficiencies',
+      'spells',
+      'features',
       'inventory',
       'wealth',
       'actions',
@@ -107,12 +107,12 @@ describe('defaultSectionOrder', () => {
       'basics',
       'attributes',
       'portrait',
-      'actions',
       'savingThrows',
       'skills',
+      'proficiencies',
+      'actions',
       'features',
       'inventory',
-      'proficiencies',
       'wealth',
       'spells',
     ]);
