@@ -91,7 +91,7 @@ defineProps<{
 <style scoped>
 .card {
   cursor: grab;
-  border: 1px solid var(--p-content-border-color, #d4d4d8);
+  border: 1px solid var(--p-primary-300, #d4d4d8);
   box-shadow: none;
 }
 

@@ -52,20 +52,20 @@ defineProps<{ skills: Skill[] }>();
 
 .skill__prof--proficient,
 .skill__prof--expertise {
-  background: var(--p-text-color, #1c1c1e);
-  border-color: var(--p-text-color, #1c1c1e);
+  background: var(--p-primary-color, #1c1c1e);
+  border-color: var(--p-primary-color, #1c1c1e);
 }
 
 .skill__prof--expertise {
   box-shadow:
     0 0 0 2px var(--paper, #fff),
-    0 0 0 3.5px var(--p-text-color, #1c1c1e);
+    0 0 0 3.5px var(--p-primary-color, #1c1c1e);
 }
 
 .skill__prof--half {
   background: linear-gradient(
     90deg,
-    var(--p-text-color, #1c1c1e) 50%,
+    var(--p-primary-color, #1c1c1e) 50%,
     transparent 50%
   );
 }

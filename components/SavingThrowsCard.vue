@@ -45,8 +45,8 @@ defineProps<{ saves: SavingThrow[] }>();
 }
 
 .save__prof--on {
-  background: var(--p-text-color, #1c1c1e);
-  border-color: var(--p-text-color, #1c1c1e);
+  background: var(--p-primary-color, #1c1c1e);
+  border-color: var(--p-primary-color, #1c1c1e);
 }
 
 .save__name {

@@ -216,6 +216,7 @@ body {
 .settings__title {
   margin: 0 0 16px;
   font-size: 15px;
+  color: var(--p-primary-color);
 }
 
 .settings__field {
@@ -248,6 +249,9 @@ body {
   padding: var(--page-margin);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
+  /* Tie borders and secondary text to the theme (lighter/darker shades). */
+  --p-content-border-color: var(--p-primary-200, #e5e5e5);
+  --p-text-muted-color: var(--p-primary-700, #6b7280);
   /* WYSIWYG paper: white pages stacked with a small gutter at each break. */
   background: repeating-linear-gradient(
     to bottom,
@@ -271,7 +275,7 @@ body {
 
 .sheet__header p {
   margin: 0;
-  color: #666;
+  color: var(--p-primary-700, #666);
 }
 
 .sheet__grid {
