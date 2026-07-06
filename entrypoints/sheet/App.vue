@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, toRef, watchEffect } from 'vue';
+import { computed, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
+import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { defaultSectionOrder } from '@/utils/section-order';
@@ -12,6 +13,7 @@ import {
   PAGE_FORMATS,
   mmToPx,
 } from '@/utils/page-format';
+import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
 import SectionCard from '@/components/SectionCard.vue';
 
 const props = defineProps<{ characterId: number | null }>();
@@ -33,13 +35,15 @@ const orderedSections = computed(() =>
   character.value ? defaultSectionOrder(character.value) : [],
 );
 
-// Page layout settings (page type + margins). Kept in memory for now.
+// Page layout settings (page type, margins, theme color). In memory for now.
 const formatId = ref(DEFAULT_FORMAT_ID);
 const marginId = ref(DEFAULT_MARGIN_ID);
+const colorId = ref(DEFAULT_COLOR_ID);
 
 // PrimeVue Select needs mutable arrays; the source lists stay readonly.
 const formatOptions = [...PAGE_FORMATS];
 const marginOptions = [...MARGIN_PRESETS];
+const colorOptions = [...THEME_COLORS];
 
 const format = computed(
   () => PAGE_FORMATS.find((entry) => entry.id === formatId.value) ?? PAGE_FORMATS[0],
@@ -69,6 +73,21 @@ useSheetPagination(
   gridRef,
   () => pageMetrics.value,
   () => character.value,
+);
+
+// Apply the selected primary theme color across the document. Wrapped
+// defensively because the update needs PrimeVue's theme service to be present.
+watch(
+  colorId,
+  (id) => {
+    const color = THEME_COLORS.find((entry) => entry.id === id) ?? THEME_COLORS[0];
+    try {
+      updatePrimaryPalette(palette(color.base));
+    } catch {
+      // Theme service unavailable (e.g. in unit tests); skip the accent update.
+    }
+  },
+  { immediate: true },
 );
 
 // Keep the print @page rule in sync with the selection so print matches screen.
@@ -108,6 +127,17 @@ onUnmounted(() => {
         <Select
           v-model="marginId"
           :options="marginOptions"
+          option-label="name"
+          option-value="id"
+          class="settings__control"
+        />
+      </label>
+
+      <label class="settings__field">
+        <span class="settings__label">Theme color</span>
+        <Select
+          v-model="colorId"
+          :options="colorOptions"
           option-label="name"
           option-value="id"
           class="settings__control"
@@ -236,6 +266,7 @@ body {
 .sheet__header h1 {
   margin: 0 0 2px;
   font-size: 22px;
+  color: var(--p-primary-color);
 }
 
 .sheet__header p {

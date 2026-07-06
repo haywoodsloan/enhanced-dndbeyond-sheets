@@ -91,6 +91,8 @@ defineProps<{
 <style scoped>
 .card {
   cursor: grab;
+  border: 1px solid var(--p-content-border-color, #d4d4d8);
+  box-shadow: none;
 }
 
 .card--small {
@@ -111,6 +113,7 @@ defineProps<{
   justify-content: space-between;
   gap: 8px;
   font-size: 15px;
+  color: var(--p-primary-color);
 }
 
 .card__note {

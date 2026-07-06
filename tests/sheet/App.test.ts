@@ -60,6 +60,7 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Page layout');
     expect(wrapper.text()).toContain('Page type');
     expect(wrapper.text()).toContain('Margins');
+    expect(wrapper.text()).toContain('Theme color');
   });
 
   it('shows a loading state while the character loads', () => {
