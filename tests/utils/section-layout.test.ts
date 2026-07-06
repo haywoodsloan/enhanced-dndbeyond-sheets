@@ -4,6 +4,7 @@ import { gridRowsPerPage, sectionSpan } from '@/utils/section-layout';
 describe('sectionSpan', () => {
   it('gives content-heavy sections a larger footprint', () => {
     expect(sectionSpan('features')).toEqual({ cols: 3, rows: 2 });
+    expect(sectionSpan('portrait')).toEqual({ cols: 1, rows: 2 });
     expect(sectionSpan('basics')).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 1 });

@@ -129,9 +129,17 @@ describe('normalizeCharacter', () => {
     expect(classFeatures?.items).toContain('Spellcasting');
   });
 
-  it('produces all ten sections in a stable order', () => {
+  it('resolves the portrait section and avatar url', () => {
+    const character = normalizeCharacter(raw);
+    expect(character.avatarUrl).toBeDefined();
+    const portrait = character.sections.find((section) => section.key === 'portrait');
+    expect(portrait?.isEmpty).toBe(false);
+  });
+
+  it('produces all eleven sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
+      'portrait',
       'basics',
       'attributes',
       'skills',

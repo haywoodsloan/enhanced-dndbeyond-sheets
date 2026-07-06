@@ -44,6 +44,20 @@ function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
+/** The character's portrait URL, upscaled from the small default avatar. */
+function resolveAvatarUrl(raw: RawCharacter): string | undefined {
+  const url = raw.decorations?.avatarUrl;
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.has('width')) parsed.searchParams.set('width', '400');
+    if (parsed.searchParams.has('height')) parsed.searchParams.set('height', '400');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 /** Sum the lengths of every array in a source-grouped map. */
 function sumSourceMap<T>(map: RawSourceMap<T> | null | undefined): number {
   if (!map) return 0;
@@ -442,8 +456,10 @@ function toSection(
 export function normalizeCharacter(raw: RawCharacter): Character {
   const classes = summarizeClasses(raw);
   const level = classes.reduce((total, cls) => total + cls.level, 0);
+  const avatarUrl = resolveAvatarUrl(raw);
 
   const sections: CharacterSection[] = [
+    toSection('portrait', 'Portrait', 0, { alwaysPresent: Boolean(avatarUrl) }),
     toSection('basics', 'Basics', asArray(raw.conditions).length, { alwaysPresent: true }),
     toSection('attributes', 'Attributes', asArray(raw.stats).length, { alwaysPresent: true }),
     toSection('skills', 'Skills', SKILL_COUNT, { alwaysPresent: true }),
@@ -481,6 +497,8 @@ export function normalizeCharacter(raw: RawCharacter): Character {
 
   const background = raw.background?.definition?.name;
   if (background) character.background = background;
+
+  if (avatarUrl) character.avatarUrl = avatarUrl;
 
   return character;
 }

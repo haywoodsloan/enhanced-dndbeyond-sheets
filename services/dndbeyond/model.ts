@@ -6,6 +6,7 @@
 import type { AbilityKey, ProficiencyLevel } from '@/utils/dnd5e';
 /** The character-sheet sections this extension knows how to lay out. */
 export const SECTION_KEYS = [
+  'portrait',
   'basics',
   'attributes',
   'skills',
@@ -132,6 +133,8 @@ export interface Character {
   name: string;
   race?: string;
   background?: string;
+  /** Portrait image URL, if the character has one. */
+  avatarUrl?: string;
   classes: CharacterClassSummary[];
   /** Sum of all class levels. */
   level: number;

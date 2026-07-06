@@ -132,6 +132,7 @@ export interface RawCondition {
 export interface RawCharacter {
   id: number;
   name: string;
+  decorations?: { avatarUrl?: string } | null;
   baseHitPoints?: number | null;
   bonusHitPoints?: number | null;
   overrideHitPoints?: number | null;

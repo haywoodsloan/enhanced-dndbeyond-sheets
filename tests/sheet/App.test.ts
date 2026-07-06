@@ -26,7 +26,9 @@ const sampleCharacter = makeCharacter({
     { key: 'wis', name: 'Wisdom', score: 18, modifier: 4 },
     { key: 'cha', name: 'Charisma', score: 8, modifier: -1 },
   ],
+  avatarUrl: 'https://example.com/avatar.jpeg',
   sections: [
+    { key: 'portrait', title: 'Portrait', count: 0, isEmpty: false },
     { key: 'basics', title: 'Basics', count: 0, isEmpty: false },
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },
     { key: 'skills', title: 'Skills', count: 18, isEmpty: false },
@@ -78,8 +80,9 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Noct');
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(11);
     expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
+      'portrait',
       'basics',
       'attributes',
       'spells',

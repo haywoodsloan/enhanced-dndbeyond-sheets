@@ -15,6 +15,7 @@ export const GRID_GAP = 12;
  * spanning the same number of rows render at the same height.
  */
 const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
+  portrait: { cols: 1, rows: 2 },
   basics: { cols: 3, rows: 2 },
   attributes: { cols: 2, rows: 1 },
   skills: { cols: 3, rows: 1 },

@@ -3,6 +3,7 @@ import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import AbilityScores from '@/components/AbilityScores.vue';
 import BasicsCard from '@/components/BasicsCard.vue';
+import PortraitCard from '@/components/PortraitCard.vue';
 import SavingThrowsCard from '@/components/SavingThrowsCard.vue';
 import SkillsCard from '@/components/SkillsCard.vue';
 import ProficienciesCard from '@/components/ProficienciesCard.vue';
@@ -45,8 +46,12 @@ defineProps<{
       </div>
     </template>
     <template #content>
+      <PortraitCard
+        v-if="section.key === 'portrait' && character?.avatarUrl"
+        :avatar-url="character.avatarUrl"
+      />
       <AbilityScores
-        v-if="section.key === 'attributes' && character"
+        v-else-if="section.key === 'attributes' && character"
         :abilities="character.abilities"
       />
       <BasicsCard

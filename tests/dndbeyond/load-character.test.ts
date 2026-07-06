@@ -40,6 +40,7 @@ describe('loadCharacter', () => {
       { name: 'Cleric', level: 4, subclass: 'Grave Domain' },
     ]);
     expect(character.sections.map((section) => section.key)).toEqual([
+      'portrait',
       'basics',
       'attributes',
       'skills',
