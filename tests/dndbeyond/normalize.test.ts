@@ -129,9 +129,12 @@ describe('normalizeCharacter', () => {
     expect(classFeatures?.items).toContain('Spellcasting');
   });
 
-  it('resolves the portrait section and avatar url', () => {
+  it('resolves the portrait section and an uncropped avatar url', () => {
     const character = normalizeCharacter(raw);
     expect(character.avatarUrl).toBeDefined();
+    // The full avatar is fit within bounds, never cropped to a square token.
+    expect(character.avatarUrl).toContain('fit=bounds');
+    expect(character.avatarUrl).not.toContain('fit=crop');
     const portrait = character.sections.find((section) => section.key === 'portrait');
     expect(portrait?.isEmpty).toBe(false);
   });

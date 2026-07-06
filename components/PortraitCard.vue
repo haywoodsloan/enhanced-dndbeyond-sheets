@@ -17,8 +17,7 @@ defineProps<{ avatarUrl: string }>();
 .portrait__img {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: auto;
   border-radius: 6px;
 }
 </style>

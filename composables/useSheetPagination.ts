@@ -14,11 +14,24 @@ export function useSheetPagination(
   source: () => unknown,
 ) {
   const pageCount = ref(1);
+  // Images load after first render and change card heights; re-measure on load.
+  const wiredImages = new WeakSet<HTMLImageElement>();
+
+  function wireImages(gridEl: HTMLElement) {
+    for (const img of Array.from(gridEl.querySelectorAll('img'))) {
+      if (img.complete || wiredImages.has(img)) continue;
+      wiredImages.add(img);
+      img.addEventListener('load', apply, { once: true });
+      img.addEventListener('error', apply, { once: true });
+    }
+  }
 
   function apply() {
     const sheetEl = sheet.value;
     const gridEl = grid.value;
     if (!sheetEl || !gridEl) return;
+
+    wireImages(gridEl);
 
     const cards = Array.from(gridEl.children) as HTMLElement[];
     // Reset so the next measurement reflects the natural (unpushed) layout.

@@ -44,12 +44,16 @@ function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-/** The character's portrait URL, upscaled from the small default avatar. */
+/**
+ * The character's portrait URL, upscaled from the small default avatar and
+ * forced to `fit=bounds` so the full image shows instead of a cropped square.
+ */
 function resolveAvatarUrl(raw: RawCharacter): string | undefined {
   const url = raw.decorations?.avatarUrl;
   if (!url) return undefined;
   try {
     const parsed = new URL(url);
+    if (parsed.searchParams.has('fit')) parsed.searchParams.set('fit', 'bounds');
     if (parsed.searchParams.has('width')) parsed.searchParams.set('width', '400');
     if (parsed.searchParams.has('height')) parsed.searchParams.set('height', '400');
     return parsed.toString();
