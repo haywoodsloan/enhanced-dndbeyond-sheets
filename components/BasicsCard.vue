@@ -97,7 +97,7 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 .basics {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 18px;
 }
 
 /* Core combat stats across the top. */
