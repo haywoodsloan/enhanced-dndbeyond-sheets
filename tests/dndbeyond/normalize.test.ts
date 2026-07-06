@@ -149,7 +149,7 @@ describe('normalizeCharacter', () => {
     expect(portrait?.isEmpty).toBe(false);
   });
 
-  it('produces all eleven sections in a stable order', () => {
+  it('produces all twelve sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -163,7 +163,16 @@ describe('normalizeCharacter', () => {
       'inventory',
       'wealth',
       'features',
+      'notes',
     ]);
+  });
+
+  it('collects free-text notes', () => {
+    const { notes } = normalizeCharacter(raw);
+    expect(notes).toContainEqual({
+      label: 'Personal Possessions',
+      text: 'Gaming Set (Chosen Proficiency)',
+    });
   });
 
   it('counts section contents', () => {

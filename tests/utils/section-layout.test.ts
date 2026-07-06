@@ -8,6 +8,7 @@ describe('sectionSpan', () => {
     expect(sectionSpan('basics')).toEqual({ cols: 3, rows: 1 });
     expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 1 });
+    expect(sectionSpan('notes')).toEqual({ cols: 3, rows: 2 });
   });
 });
 

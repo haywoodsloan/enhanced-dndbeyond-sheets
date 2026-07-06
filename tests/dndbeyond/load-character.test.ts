@@ -51,6 +51,7 @@ describe('loadCharacter', () => {
       'inventory',
       'wealth',
       'features',
+      'notes',
     ]);
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers).toEqual({ Authorization: 'Bearer tok' });

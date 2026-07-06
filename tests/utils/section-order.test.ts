@@ -36,11 +36,12 @@ describe('defaultSectionOrder', () => {
       'skills',
       'savingThrows',
       'proficiencies',
+      'wealth',
       'spells',
       'actions',
       'features',
       'inventory',
-      'wealth',
+      'notes',
     ]);
   });
 
@@ -52,11 +53,12 @@ describe('defaultSectionOrder', () => {
       'skills',
       'savingThrows',
       'proficiencies',
+      'wealth',
       'actions',
       'features',
       'inventory',
-      'wealth',
       'spells',
+      'notes',
     ]);
   });
 
@@ -68,11 +70,12 @@ describe('defaultSectionOrder', () => {
       'skills',
       'savingThrows',
       'proficiencies',
+      'wealth',
       'actions',
       'spells',
       'features',
       'inventory',
-      'wealth',
+      'notes',
     ]);
   });
 
@@ -87,10 +90,11 @@ describe('defaultSectionOrder', () => {
       'skills',
       'savingThrows',
       'proficiencies',
+      'wealth',
       'spells',
       'features',
       'inventory',
-      'wealth',
+      'notes',
       'actions',
     ]);
   });
@@ -110,11 +114,12 @@ describe('defaultSectionOrder', () => {
       'skills',
       'savingThrows',
       'proficiencies',
+      'wealth',
       'actions',
       'features',
       'inventory',
-      'wealth',
       'spells',
+      'notes',
     ]);
   });
 });

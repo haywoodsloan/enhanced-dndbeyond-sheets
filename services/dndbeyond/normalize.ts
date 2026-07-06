@@ -30,6 +30,7 @@ import type {
   Coins,
   FeatureGroup,
   InventoryEntry,
+  NoteEntry,
   SavingThrow,
   SectionKey,
   Skill,
@@ -480,6 +481,28 @@ function resolveDefences(raw: RawCharacter): string[] {
   return [...labels];
 }
 
+/** Free-text notes from the character's D&D Beyond notes fields. */
+function resolveNotes(raw: RawCharacter): NoteEntry[] {
+  const n = raw.notes;
+  if (!n) return [];
+  const fields: [string | null | undefined, string][] = [
+    [n.backstory, 'Backstory'],
+    [n.allies, 'Allies'],
+    [n.organizations, 'Organizations'],
+    [n.enemies, 'Enemies'],
+    [n.personalPossessions, 'Personal Possessions'],
+    [n.otherHoldings, 'Other Holdings'],
+    [n.otherNotes, 'Other Notes'],
+  ];
+  const entries: NoteEntry[] = [];
+  for (const [text, label] of fields) {
+    if (typeof text === 'string' && text.trim()) {
+      entries.push({ label, text: text.trim() });
+    }
+  }
+  return entries;
+}
+
 /**
  * Convert a raw D&D Beyond character payload into the internal `Character`
  * model. Section counts reflect presence of content; exact per-entry rendering
@@ -503,6 +526,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('inventory', 'Inventory', asArray(raw.inventory).length),
     toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
     toSection('features', 'Features & Traits', countFeatures(raw)),
+    toSection('notes', 'Notes', resolveNotes(raw).length, { alwaysPresent: true }),
   ];
 
   const abilities = resolveAbilities(raw);
@@ -523,6 +547,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),
     features: resolveFeatures(raw),
+    notes: resolveNotes(raw),
     sections,
   };
 

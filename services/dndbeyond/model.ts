@@ -17,6 +17,7 @@ export const SECTION_KEYS = [
   'inventory',
   'wealth',
   'features',
+  'notes',
 ] as const;
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
@@ -128,6 +129,12 @@ export interface FeatureGroup {
   items: string[];
 }
 
+/** A labeled free-text note (backstory, allies, possessions, etc.). */
+export interface NoteEntry {
+  label: string;
+  text: string;
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -160,5 +167,7 @@ export interface Character {
   wealth: Coins;
   /** Features and traits, grouped by source. */
   features: FeatureGroup[];
+  /** Free-text notes (backstory, allies, possessions, etc.). */
+  notes: NoteEntry[];
   sections: CharacterSection[];
 }

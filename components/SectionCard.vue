@@ -11,6 +11,7 @@ import SpellsCard from '@/components/SpellsCard.vue';
 import InventoryCard from '@/components/InventoryCard.vue';
 import WealthCard from '@/components/WealthCard.vue';
 import FeaturesCard from '@/components/FeaturesCard.vue';
+import NotesCard from '@/components/NotesCard.vue';
 import type { Character, CharacterSection } from '@/services/dndbeyond/model';
 import type { SectionSpan } from '@/utils/section-layout';
 
@@ -83,6 +84,10 @@ defineProps<{
       <FeaturesCard
         v-else-if="section.key === 'features' && character"
         :features="character.features"
+      />
+      <NotesCard
+        v-else-if="section.key === 'notes' && character"
+        :notes="character.notes"
       />
       <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
       <p v-else class="card__note">Details coming soon.</p>

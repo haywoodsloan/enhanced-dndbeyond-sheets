@@ -131,6 +131,17 @@ export interface RawCondition {
   level?: number | null;
 }
 
+/** Free-text note fields from the character's notes tab. */
+export interface RawNotes {
+  allies?: string | null;
+  personalPossessions?: string | null;
+  otherHoldings?: string | null;
+  organizations?: string | null;
+  enemies?: string | null;
+  backstory?: string | null;
+  otherNotes?: string | null;
+}
+
 export interface RawCharacter {
   id: number;
   name: string;
@@ -155,4 +166,5 @@ export interface RawCharacter {
   conditions?: RawCondition[] | null;
   currencies?: RawCurrencies | null;
   modifiers?: RawSourceMap<RawModifier> | null;
+  notes?: RawNotes | null;
 }
