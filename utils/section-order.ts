@@ -22,9 +22,9 @@ const HALF_CASTER_CLASSES = new Set(['paladin', 'ranger', 'artificer']);
 /** Default section priority (best first) for each play style. */
 const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
   caster: [
-    'portrait',
     'basics',
     'attributes',
+    'portrait',
     'spells',
     'actions',
     'savingThrows',
@@ -35,9 +35,9 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'wealth',
   ],
   half: [
-    'portrait',
     'basics',
     'attributes',
+    'portrait',
     'actions',
     'spells',
     'savingThrows',
@@ -48,9 +48,9 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'wealth',
   ],
   martial: [
-    'portrait',
     'basics',
     'attributes',
+    'portrait',
     'actions',
     'savingThrows',
     'skills',

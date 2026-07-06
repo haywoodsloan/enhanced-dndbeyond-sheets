@@ -82,9 +82,9 @@ describe('sheet App', () => {
     const items = wrapper.findAll('[data-section-key]');
     expect(items).toHaveLength(11);
     expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'spells',
       'actions',
       'savingThrows',

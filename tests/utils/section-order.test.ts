@@ -30,9 +30,9 @@ const orderedKeys = (character: Character) =>
 describe('defaultSectionOrder', () => {
   it('leads with spells for a full caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Cleric', level: 4 }]))).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'spells',
       'actions',
       'savingThrows',
@@ -46,9 +46,9 @@ describe('defaultSectionOrder', () => {
 
   it('leads with actions for a martial class', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Fighter', level: 5 }]))).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'actions',
       'savingThrows',
       'skills',
@@ -62,9 +62,9 @@ describe('defaultSectionOrder', () => {
 
   it('interleaves actions and spells for a half-caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Paladin', level: 6 }]))).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'actions',
       'spells',
       'savingThrows',
@@ -81,9 +81,9 @@ describe('defaultSectionOrder', () => {
     expect(
       orderedKeys(makeCharacter([{ name: 'Wizard', level: 3 }], ['actions'])),
     ).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'spells',
       'savingThrows',
       'skills',
@@ -104,9 +104,9 @@ describe('defaultSectionOrder', () => {
         ]),
       ),
     ).toEqual([
-      'portrait',
       'basics',
       'attributes',
+      'portrait',
       'actions',
       'savingThrows',
       'skills',
