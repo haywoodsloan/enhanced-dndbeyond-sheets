@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import Card from 'primevue/card';
-import Tag from 'primevue/tag';
 import AbilityScores from '@/components/AbilityScores.vue';
 import BasicsCard from '@/components/BasicsCard.vue';
 import PortraitCard from '@/components/PortraitCard.vue';
@@ -37,12 +36,6 @@ defineProps<{
     <template #title>
       <div class="card__title">
         <span>{{ section.title }}</span>
-        <Tag
-          v-if="section.count > 0"
-          :value="String(section.count)"
-          severity="secondary"
-          rounded
-        />
       </div>
     </template>
     <template #content>

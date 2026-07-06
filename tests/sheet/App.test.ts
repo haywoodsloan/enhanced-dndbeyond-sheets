@@ -96,7 +96,7 @@ describe('sheet App', () => {
     ]);
     const attributesCard = wrapper.get('[data-section-key="attributes"]');
     expect(attributesCard.text()).toContain('Attributes');
-    expect(attributesCard.text()).toContain('6');
+    expect(attributesCard.text()).toContain('Strength');
   });
 
   it('shows an error message when loading fails', async () => {

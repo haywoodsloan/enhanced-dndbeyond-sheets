@@ -4,7 +4,7 @@ import SectionCard from '@/components/SectionCard.vue';
 import { makeCharacter } from '../fixtures/character';
 
 describe('SectionCard', () => {
-  it('renders the title and count with a size class', () => {
+  it('renders the title with a size class', () => {
     const wrapper = mount(SectionCard, {
       props: {
         section: { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
@@ -13,7 +13,6 @@ describe('SectionCard', () => {
     });
 
     expect(wrapper.text()).toContain('Spells');
-    expect(wrapper.text()).toContain('18');
     expect(wrapper.attributes('style')).toContain('grid-column: span 3');
     expect(wrapper.attributes('data-section-key')).toBe('spells');
   });
