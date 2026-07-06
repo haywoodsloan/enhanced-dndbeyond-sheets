@@ -16,15 +16,15 @@ const groups = computed(() =>
 
 <template>
   <div class="profs">
-    <div
+    <p
       v-for="group in groups"
       :key="group.label"
       class="profs__group"
       :data-group="group.label"
     >
-      <span class="profs__label">{{ group.label }}</span>
+      <span class="profs__label">{{ group.label }}:</span>
       <span class="profs__items">{{ group.items.join(', ') }}</span>
-    </div>
+    </p>
     <p v-if="groups.length === 0" class="profs__empty">None</p>
   </div>
 </template>
@@ -33,23 +33,23 @@ const groups = computed(() =>
 .profs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .profs__group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .profs__label {
-  font-size: 12px;
+  margin-right: 5px;
   font-weight: 600;
   color: var(--p-text-muted-color, #888);
 }
 
 .profs__items {
-  font-size: 14px;
+  color: #1c1c1e;
 }
 
 .profs__empty {
