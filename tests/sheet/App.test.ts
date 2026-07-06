@@ -33,6 +33,7 @@ const sampleCharacter = makeCharacter({
     { key: 'attributes', title: 'Attributes', count: 6, isEmpty: false },
     { key: 'skills', title: 'Skills', count: 18, isEmpty: false },
     { key: 'savingThrows', title: 'Saves & Defences', count: 6, isEmpty: false },
+    { key: 'senses', title: 'Senses', count: 4, isEmpty: false },
     { key: 'proficiencies', title: 'Proficiencies', count: 12, isEmpty: false },
     { key: 'actions', title: 'Actions', count: 3, isEmpty: false },
     { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
@@ -81,13 +82,14 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Noct');
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(13);
     expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
       'basics',
       'attributes',
       'portrait',
       'skills',
       'savingThrows',
+      'senses',
       'proficiencies',
       'wealth',
       'spells',

@@ -7,6 +7,9 @@ describe('sectionSpan', () => {
     expect(sectionSpan('portrait')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('basics')).toEqual({ cols: 3, rows: 1 });
     expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 1 });
+    expect(sectionSpan('savingThrows')).toEqual({ cols: 2, rows: 1 });
+    expect(sectionSpan('senses')).toEqual({ cols: 1, rows: 1 });
+    expect(sectionSpan('proficiencies')).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('notes')).toEqual({ cols: 3, rows: 2 });
   });

@@ -4,6 +4,7 @@ import AbilityScores from '@/components/AbilityScores.vue';
 import BasicsCard from '@/components/BasicsCard.vue';
 import PortraitCard from '@/components/PortraitCard.vue';
 import SavingThrowsCard from '@/components/SavingThrowsCard.vue';
+import SensesCard from '@/components/SensesCard.vue';
 import SkillsCard from '@/components/SkillsCard.vue';
 import ProficienciesCard from '@/components/ProficienciesCard.vue';
 import ActionsCard from '@/components/ActionsCard.vue';
@@ -56,6 +57,10 @@ defineProps<{
         v-else-if="section.key === 'savingThrows' && character"
         :saves="character.savingThrows"
         :defences="character.defences"
+      />
+      <SensesCard
+        v-else-if="section.key === 'senses' && character"
+        :senses="character.senses"
       />
       <SkillsCard
         v-else-if="section.key === 'skills' && character"

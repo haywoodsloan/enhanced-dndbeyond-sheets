@@ -11,6 +11,7 @@ export const SECTION_KEYS = [
   'attributes',
   'skills',
   'savingThrows',
+  'senses',
   'proficiencies',
   'actions',
   'spells',
@@ -153,6 +154,8 @@ export interface Character {
   savingThrows: SavingThrow[];
   /** Defensive traits: resistances, immunities, and save advantages. */
   defences: string[];
+  /** Passive skill scores and special senses (darkvision, etc.). */
+  senses: string[];
   /** The 18 skills in canonical order. */
   skills: Skill[];
   /** Language and training proficiencies. */

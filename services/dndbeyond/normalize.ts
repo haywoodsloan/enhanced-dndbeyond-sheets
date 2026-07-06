@@ -502,6 +502,48 @@ function resolveNotes(raw: RawCharacter): NoteEntry[] {
   return entries;
 }
 
+/** Passive skills shown on the Senses card, by skill key and label. */
+const PASSIVE_SENSES: [string, string][] = [
+  ['perception', 'Passive Perception'],
+  ['investigation', 'Passive Investigation'],
+  ['insight', 'Passive Insight'],
+];
+
+/** Special-sense modifier subtypes worth surfacing, in display order. */
+const SPECIAL_SENSES = ['darkvision', 'blindsight', 'tremorsense', 'truesight'];
+
+/** Passive skill scores (10 + modifier) plus special senses like Darkvision. */
+function resolveSenses(raw: RawCharacter, skills: Skill[]): string[] {
+  const senses: string[] = [];
+  const modifierByKey = new Map(skills.map((skill) => [skill.key, skill.modifier]));
+  for (const [key, label] of PASSIVE_SENSES) {
+    const modifier = modifierByKey.get(key);
+    if (modifier !== undefined) senses.push(`${label} ${10 + modifier}`);
+  }
+
+  // Special senses come from `set-base` modifiers; keep the largest range each.
+  const bySubtype = new Map<string, { label: string; range: number }>();
+  if (raw.modifiers) {
+    for (const mods of Object.values(raw.modifiers)) {
+      for (const mod of asArray<RawModifier>(mods)) {
+        const sub = mod.subType ?? '';
+        if (mod.type !== 'set-base' || !SPECIAL_SENSES.includes(sub)) continue;
+        const range = mod.value ?? mod.fixedValue ?? 0;
+        const current = bySubtype.get(sub);
+        if (!current || range > current.range) {
+          bySubtype.set(sub, { label: mod.friendlySubtypeName ?? sub, range });
+        }
+      }
+    }
+  }
+  for (const sub of SPECIAL_SENSES) {
+    const entry = bySubtype.get(sub);
+    if (entry) senses.push(`${entry.label} ${entry.range} ft.`);
+  }
+
+  return senses;
+}
+
 /**
  * Convert a raw D&D Beyond character payload into the internal `Character`
  * model. Section counts reflect presence of content; exact per-entry rendering
@@ -512,6 +554,9 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const classes = summarizeClasses(raw);
   const level = classes.reduce((total, cls) => total + cls.level, 0);
   const avatarUrl = resolveAvatarUrl(raw);
+  const abilities = resolveAbilities(raw);
+  const skills = resolveSkills(raw, abilities, level);
+  const senses = resolveSenses(raw, skills);
 
   const sections: CharacterSection[] = [
     toSection('portrait', 'Portrait', 0, { alwaysPresent: Boolean(avatarUrl) }),
@@ -519,6 +564,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('attributes', 'Attributes', asArray(raw.stats).length, { alwaysPresent: true }),
     toSection('skills', 'Skills', SKILL_COUNT, { alwaysPresent: true }),
     toSection('savingThrows', 'Saves & Defences', SAVE_COUNT, { alwaysPresent: true }),
+    toSection('senses', 'Senses', senses.length, { alwaysPresent: true }),
     toSection('proficiencies', 'Proficiencies', countProficiencies(raw)),
     toSection('actions', 'Actions', countActions(raw)),
     toSection('spells', 'Spells', countSpells(raw)),
@@ -527,8 +573,6 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('features', 'Features & Traits', countFeatures(raw)),
     toSection('notes', 'Notes', resolveNotes(raw).length, { alwaysPresent: true }),
   ];
-
-  const abilities = resolveAbilities(raw);
 
   const character: Character = {
     id: raw.id,
@@ -539,7 +583,8 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     basics: resolveBasics(raw, abilities, level),
     savingThrows: resolveSavingThrows(raw, abilities, level),
     defences: resolveDefences(raw),
-    skills: resolveSkills(raw, abilities, level),
+    senses,
+    skills,
     proficiencies: resolveProficiencies(raw),
     actions: resolveActions(raw),
     spells: resolveSpells(raw),

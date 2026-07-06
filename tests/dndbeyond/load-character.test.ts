@@ -45,6 +45,7 @@ describe('loadCharacter', () => {
       'attributes',
       'skills',
       'savingThrows',
+      'senses',
       'proficiencies',
       'actions',
       'spells',

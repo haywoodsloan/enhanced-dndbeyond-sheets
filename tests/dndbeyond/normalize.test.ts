@@ -149,7 +149,7 @@ describe('normalizeCharacter', () => {
     expect(portrait?.isEmpty).toBe(false);
   });
 
-  it('produces all twelve sections in a stable order', () => {
+  it('produces all thirteen sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -157,6 +157,7 @@ describe('normalizeCharacter', () => {
       'attributes',
       'skills',
       'savingThrows',
+      'senses',
       'proficiencies',
       'actions',
       'spells',
@@ -165,6 +166,12 @@ describe('normalizeCharacter', () => {
       'features',
       'notes',
     ]);
+  });
+
+  it('resolves senses with passive scores and darkvision', () => {
+    const { senses } = normalizeCharacter(raw);
+    expect(senses).toContain('Darkvision 120 ft.');
+    expect(senses.some((entry) => entry.startsWith('Passive Perception'))).toBe(true);
   });
 
   it('collects free-text notes but omits personal possessions', () => {
