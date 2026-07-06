@@ -315,7 +315,7 @@ body {
 .sheet__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-auto-flow: row dense;
+  grid-auto-flow: row;
   gap: var(--grid-gap, 12px);
   align-items: start;
 }

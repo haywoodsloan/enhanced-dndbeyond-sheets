@@ -29,10 +29,7 @@ defineProps<{
     class="card"
     :style="{
       gridColumn: `span ${span.cols}`,
-      height:
-        section.key === 'portrait'
-          ? 'auto'
-          : `calc(${span.rows} * var(--row-unit, 130px) + ${span.rows - 1} * var(--grid-gap, 12px))`,
+      height: `calc(${span.rows} * var(--row-unit, 130px) + ${span.rows - 1} * var(--grid-gap, 12px))`,
     }"
     :data-section-key="section.key"
     draggable="true"
@@ -105,6 +102,24 @@ defineProps<{
   overflow: hidden;
   border: 1px solid var(--p-primary-300, #d4d4d8);
   box-shadow: none;
+}
+
+/* Let the portrait fill its card so the image can scale to fit without cropping. */
+.card[data-section-key='portrait'] {
+  display: flex;
+  flex-direction: column;
+}
+
+.card[data-section-key='portrait'] :deep(.p-card-body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.card[data-section-key='portrait'] :deep(.p-card-content) {
+  flex: 1;
+  min-height: 0;
 }
 
 .card__title {

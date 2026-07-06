@@ -10,14 +10,14 @@ defineProps<{ avatarUrl: string }>();
 
 <style scoped>
 .portrait {
-  display: flex;
-  justify-content: center;
+  height: 100%;
 }
 
 .portrait__img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   border-radius: 6px;
 }
 </style>
