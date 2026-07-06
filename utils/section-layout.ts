@@ -19,7 +19,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   basics: { cols: 3, rows: 1 },
   attributes: { cols: 2, rows: 1 },
   skills: { cols: 3, rows: 1 },
-  savingThrows: { cols: 2, rows: 1 },
+  savingThrows: { cols: 1, rows: 1 },
   proficiencies: { cols: 2, rows: 1 },
   actions: { cols: 3, rows: 1 },
   spells: { cols: 3, rows: 1 },

@@ -21,9 +21,9 @@ defineProps<{ saves: SavingThrow[] }>();
 
 <style scoped>
 .saves {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 6px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -33,7 +33,7 @@ defineProps<{ saves: SavingThrow[] }>();
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .save__prof {
