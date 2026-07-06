@@ -145,7 +145,7 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .basics__deathsaves,
@@ -154,6 +154,12 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+/* Thin divider so the death saves and conditions read as separate groups. */
+.basics__conditions {
+  border-left: 1px solid var(--p-primary-300, #d4d4d8);
+  padding-left: 16px;
 }
 
 .basics__deathsaves .basics__label,

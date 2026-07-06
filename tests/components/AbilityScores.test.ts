@@ -13,7 +13,7 @@ const abilities: AbilityScore[] = [
 ];
 
 describe('AbilityScores', () => {
-  it('renders each ability with its abbreviation, modifier, and score', () => {
+  it('renders each ability with its name, modifier, and score', () => {
     const wrapper = mount(AbilityScores, { props: { abilities } });
 
     const tiles = wrapper.findAll('[data-ability]');
@@ -28,7 +28,7 @@ describe('AbilityScores', () => {
     ]);
 
     const wis = wrapper.get('[data-ability="wis"]');
-    expect(wis.text()).toContain('WIS');
+    expect(wis.text()).toContain('Wisdom');
     expect(wis.text()).toContain('+4');
     expect(wis.text()).toContain('18');
 

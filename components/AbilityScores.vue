@@ -13,7 +13,7 @@ defineProps<{ abilities: AbilityScore[] }>();
       class="ability"
       :data-ability="ability.key"
     >
-      <span class="ability__abbr">{{ ability.key.toUpperCase() }}</span>
+      <span class="ability__name">{{ ability.name }}</span>
       <span class="ability__mod">{{ formatModifier(ability.modifier) }}</span>
       <span class="ability__score">{{ ability.score }}</span>
     </li>
@@ -26,7 +26,7 @@ defineProps<{ abilities: AbilityScore[] }>();
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin: 0;
-  padding: 0;
+  padding: 0 0 6px;
   list-style: none;
 }
 
@@ -34,21 +34,21 @@ defineProps<{ abilities: AbilityScore[] }>();
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 4px;
+  gap: 1px;
+  padding: 6px 4px;
   border: 1px solid var(--p-content-border-color, #e5e5e5);
   border-radius: 8px;
 }
 
-.ability__abbr {
+.ability__name {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  white-space: nowrap;
   color: var(--p-text-muted-color, #888);
 }
 
 .ability__mod {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1;
 }
