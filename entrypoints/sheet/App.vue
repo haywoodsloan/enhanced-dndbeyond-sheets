@@ -68,12 +68,16 @@ const pageMetrics = computed(() => ({
 const sheetRef = ref<HTMLElement | null>(null);
 const gridRef = ref<HTMLElement | null>(null);
 
-useSheetPagination(
+const { pageCount } = useSheetPagination(
   sheetRef,
   gridRef,
   () => pageMetrics.value,
   () => character.value,
 );
+
+// Position of each page rectangle in the backdrop layer.
+const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
+const pageHeightPx = computed(() => pageMetrics.value.band);
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
@@ -147,6 +151,15 @@ onUnmounted(() => {
 
     <div class="sheet-area">
       <main class="sheet" ref="sheetRef" :style="pageStyle">
+        <div class="sheet__pages" aria-hidden="true">
+          <div
+            v-for="page in pageCount"
+            :key="page"
+            class="sheet__page"
+            :style="{ top: `${(page - 1) * pageStride}px`, height: `${pageHeightPx}px` }"
+          ></div>
+        </div>
+
         <p v-if="characterId == null">
           No character selected. Open this from a D&amp;D Beyond character page.
         </p>
@@ -243,6 +256,8 @@ body {
 }
 
 .sheet {
+  position: relative;
+  isolation: isolate;
   box-sizing: border-box;
   width: var(--page-width);
   min-height: var(--page-height);
@@ -252,15 +267,22 @@ body {
   /* Tie borders and secondary text to the theme (lighter/darker shades). */
   --p-content-border-color: var(--p-primary-200, #e5e5e5);
   --p-text-muted-color: var(--p-primary-700, #6b7280);
-  /* WYSIWYG paper: white pages stacked with a small gutter at each break. */
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--paper) 0,
-    var(--paper) var(--page-height),
-    var(--desk) var(--page-height),
-    var(--desk) calc(var(--page-height) + var(--page-gap))
-  );
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* WYSIWYG paper: one shadowed white page per printed page, behind the content. */
+.sheet__pages {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.sheet__page {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--paper);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
 }
 
 .sheet__header {
@@ -300,6 +322,10 @@ body {
   }
 
   .settings {
+    display: none;
+  }
+
+  .sheet__pages {
     display: none;
   }
 

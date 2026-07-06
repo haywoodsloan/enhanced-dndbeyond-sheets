@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, watch, nextTick, type Ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch, nextTick, type Ref } from 'vue';
 import { paginate, type PageMetrics } from '@/utils/pagination';
 
 /**
@@ -13,6 +13,8 @@ export function useSheetPagination(
   metrics: () => PageMetrics,
   source: () => unknown,
 ) {
+  const pageCount = ref(1);
+
   function apply() {
     const sheetEl = sheet.value;
     const gridEl = grid.value;
@@ -28,10 +30,16 @@ export function useSheetPagination(
       return { top: rect.top - sheetTop, height: rect.height };
     });
 
-    const offsets = paginate(boxes, metrics());
+    const layout = metrics();
+    const offsets = paginate(boxes, layout);
     offsets.forEach((offset, index) => {
       if (offset > 0) cards[index].style.marginTop = `${offset}px`;
     });
+
+    // How many printed pages the content now spans (for the page backdrop).
+    const stride = layout.band + layout.gutter;
+    const height = sheetEl.getBoundingClientRect().height;
+    pageCount.value = Math.max(1, Math.ceil(height / stride));
   }
 
   const schedule = () => {
@@ -50,5 +58,5 @@ export function useSheetPagination(
 
   watch([source, metrics], schedule);
 
-  return { apply };
+  return { apply, pageCount };
 }

@@ -11,7 +11,7 @@ describe('sectionSpan', () => {
     expect(sectionSpan('spells')).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('features')).toEqual({ cols: 3, rows: 3 });
     expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 2 });
-    expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 1 });
+    expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 2 });
   });
 });
 
