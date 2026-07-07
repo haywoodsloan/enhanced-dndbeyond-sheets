@@ -51,3 +51,5 @@ export const pageMarginPref = definePreference<string>('pref-page-margin');
 export const themeColorPref = definePreference<string>('pref-theme-color');
 export const sectionOrderPref = definePreference<SectionKey[]>('pref-section-order');
 export const hiddenSectionsPref = definePreference<SectionKey[]>('pref-hidden-sections');
+/** Per-section chosen layout-option index (section key → index). */
+export const sectionLayoutPref = definePreference<Record<string, number>>('pref-section-layout');

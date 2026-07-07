@@ -143,4 +143,30 @@ describe('SectionCard', () => {
     expect(wrapper.emitted('show')).toEqual([['spells']]);
     expect(wrapper.emitted('hide')).toBeUndefined();
   });
+
+  it('emits cycleLayout from the layout button when a card has options', async () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'inventory', title: 'Inventory', count: 24, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        layoutCount: 3,
+        layoutLabel: 'Wide',
+      },
+    });
+
+    await wrapper.find('.card__layout').trigger('click');
+    expect(wrapper.emitted('cycleLayout')).toEqual([['inventory']]);
+  });
+
+  it('hides the layout button when a card has a single layout', () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'notes', title: 'Notes', count: 0, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        layoutCount: 1,
+      },
+    });
+
+    expect(wrapper.find('.card__layout').exists()).toBe(false);
+  });
 });

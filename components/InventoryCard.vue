@@ -2,23 +2,23 @@
 import { computed } from 'vue';
 import type { InventoryEntry } from '@/services/dndbeyond/model';
 
-const props = defineProps<{ inventory: InventoryEntry[] }>();
+const props = defineProps<{ inventory: InventoryEntry[]; columns?: number }>();
 
-// Split into three balanced columns so the wide card uses its full width; each
-// column carries its own header so the circles stay labeled.
-const columns = computed(() => {
-  const size = Math.ceil(props.inventory.length / 3);
-  return [
-    props.inventory.slice(0, size),
-    props.inventory.slice(size, size * 2),
-    props.inventory.slice(size * 2),
-  ].filter((column) => column.length > 0);
+// Split into N balanced columns (from the chosen layout) so each footprint uses
+// its full width; every column carries its own header so the circles stay
+// labeled. Empty trailing columns are dropped.
+const columnGroups = computed(() => {
+  const count = Math.max(1, props.columns ?? 3);
+  const size = Math.ceil(props.inventory.length / count);
+  return Array.from({ length: count }, (_, index) =>
+    props.inventory.slice(index * size, (index + 1) * size),
+  ).filter((column) => column.length > 0);
 });
 </script>
 
 <template>
   <div class="inventory">
-    <div v-for="(column, colIndex) in columns" :key="colIndex" class="column">
+    <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="column">
       <span class="column__spacer" aria-hidden="true"></span>
       <span class="column__label">Equipped</span>
       <span class="column__label">Attuned</span>

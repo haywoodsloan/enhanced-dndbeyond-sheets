@@ -3,6 +3,7 @@ import { fakeBrowser } from 'wxt/testing';
 import {
   hiddenSectionsPref,
   pageFormatPref,
+  sectionLayoutPref,
   sectionOrderPref,
   themeColorPref,
 } from '@/utils/preferences';
@@ -36,5 +37,10 @@ describe('preferences', () => {
     // Legacy corruption: an array once serialized as {0:..,1:..} by storage.
     await fakeBrowser.storage.local.set({ 'pref-hidden-sections': { 0: 'notes' } });
     expect(await hiddenSectionsPref.get([])).toEqual([]);
+  });
+
+  it('round-trips the per-section layout map', async () => {
+    await sectionLayoutPref.set({ inventory: 2 });
+    expect(await sectionLayoutPref.get({})).toEqual({ inventory: 2 });
   });
 });

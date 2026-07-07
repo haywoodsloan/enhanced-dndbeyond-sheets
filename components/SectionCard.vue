@@ -20,15 +20,22 @@ import { computed } from 'vue';
 // `span` controls the card footprint (columns × row-units). A future `expanded`
 // prop will swap between a compact and a detailed body. `hidden` renders the
 // card in the off-page tray: no fixed height, no drag handle, and the toggle
-// restores it to the printable pages instead of removing it.
+// restores it to the printable pages instead of removing it. `layoutCount` /
+// `layoutLabel` drive the layout cycle button (shown when a card has >1 option).
 const props = defineProps<{
   section: CharacterSection;
   span: SectionSpan;
   character?: Character | null;
   hidden?: boolean;
+  layoutCount?: number;
+  layoutLabel?: string;
 }>();
 
-const emit = defineEmits<{ hide: [key: SectionKey]; show: [key: SectionKey] }>();
+const emit = defineEmits<{
+  hide: [key: SectionKey];
+  show: [key: SectionKey];
+  cycleLayout: [key: SectionKey];
+}>();
 
 const cardStyle = computed(() => {
   const gridColumn = `span ${props.span.cols}`;
@@ -54,6 +61,20 @@ const cardStyle = computed(() => {
     </template>
     <template #content>
       <span v-if="!hidden" class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
+      <button
+        v-if="!hidden && (layoutCount ?? 1) > 1"
+        type="button"
+        class="card__layout"
+        :title="`Layout: ${layoutLabel} (click to change)`"
+        :aria-label="`Change layout (currently ${layoutLabel})`"
+        @click="emit('cycleLayout', section.key)"
+      >
+        <svg class="card__toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+          <line x1="15" y1="3" x2="15" y2="21" />
+        </svg>
+      </button>
       <button
         type="button"
         class="card__toggle"
@@ -113,6 +134,7 @@ const cardStyle = computed(() => {
       <InventoryCard
         v-else-if="section.key === 'inventory' && character"
         :inventory="character.inventory"
+        :columns="span.cols"
       />
       <WealthCard
         v-else-if="section.key === 'wealth' && character"
@@ -198,6 +220,33 @@ const cardStyle = computed(() => {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease;
+}
+
+/* Layout cycle: mirrors the hide toggle at the top-left; switches the card
+   between its curated layout options. Only rendered when there's more than one. */
+.card__layout {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 999px;
+  background: var(--p-primary-50, #fff);
+  color: var(--p-primary-700, #6b7280);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.card:hover .card__layout,
+.card__layout:focus-visible {
+  opacity: 1;
 }
 
 .card__toggle-icon {

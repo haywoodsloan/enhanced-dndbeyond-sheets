@@ -7,7 +7,13 @@ import { useSheetPagination } from '@/composables/useSheetPagination';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import { useSortableGrid } from '@/composables/useSortableGrid';
 import { useStoredRef } from '@/composables/useStoredRef';
-import { GRID_GAP, gridRowsPerPage, sectionSpan } from '@/utils/section-layout';
+import {
+  GRID_GAP,
+  gridRowsPerPage,
+  sectionLayoutCount,
+  sectionLayoutLabel,
+  sectionSpan,
+} from '@/utils/section-layout';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -34,7 +40,7 @@ const subtitle = computed(() => {
   return [loaded.race, classes].filter(Boolean).join(' · ');
 });
 
-const { sections: orderedSections, hiddenSections, moveByIndex, hide, show } =
+const { sections: orderedSections, hiddenSections, layoutIndices, moveByIndex, cycleLayout, hide, show } =
   useSectionLayout(character);
 
 // Page layout settings (page type, margins, theme color), persisted locally.
@@ -117,6 +123,9 @@ useSortableGrid(gridRef, {
 // reorder, or the character loading) so stale push-margins are cleared and the
 // reflowed cards are re-checked against the page breaks.
 watch(orderedSections, () => void nextTick(repaginate));
+
+// A layout change resizes one card in place (same order), so re-paginate too.
+watch(layoutIndices, () => void nextTick(repaginate), { deep: true });
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
@@ -224,9 +233,12 @@ onUnmounted(() => {
               v-for="section in orderedSections"
               :key="section.key"
               :section="section"
-              :span="sectionSpan(section.key, section.count)"
+              :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0)"
               :character="character"
+              :layout-count="sectionLayoutCount(section.key)"
+              :layout-label="sectionLayoutLabel(section.key, layoutIndices[section.key] ?? 0)"
               @hide="hide"
+              @cycle-layout="cycleLayout"
             />
           </div>
         </template>
@@ -244,7 +256,7 @@ onUnmounted(() => {
             v-for="section in hiddenSections"
             :key="section.key"
             :section="section"
-            :span="sectionSpan(section.key, section.count)"
+            :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0)"
             :character="character"
             hidden
             @show="show"

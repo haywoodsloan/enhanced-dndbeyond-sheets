@@ -22,4 +22,23 @@ describe('InventoryCard', () => {
     // Only Plate is equipped → exactly one filled circle across both items.
     expect(wrapper.findAll('.item__dot--on')).toHaveLength(1);
   });
+
+  it('splits items into the requested number of columns', () => {
+    const inventory = Array.from({ length: 6 }, (_, index) => ({
+      name: `Item ${index}`,
+      quantity: 1,
+      equipped: false,
+      attuned: false,
+    }));
+
+    const twoCol = mount(InventoryCard, { props: { inventory, columns: 2 } });
+    expect(twoCol.findAll('.column')).toHaveLength(2);
+
+    const oneCol = mount(InventoryCard, { props: { inventory, columns: 1 } });
+    expect(oneCol.findAll('.column')).toHaveLength(1);
+
+    // Defaults to three balanced columns when no count is given.
+    const threeCol = mount(InventoryCard, { props: { inventory } });
+    expect(threeCol.findAll('.column')).toHaveLength(3);
+  });
 });

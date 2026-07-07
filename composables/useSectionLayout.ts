@@ -5,7 +5,12 @@ import {
   defaultSectionOrder,
   moveVisibleByIndex,
 } from '@/utils/section-order';
-import { hiddenSectionsPref, sectionOrderPref } from '@/utils/preferences';
+import { sectionLayoutCount } from '@/utils/section-layout';
+import {
+  hiddenSectionsPref,
+  sectionLayoutPref,
+  sectionOrderPref,
+} from '@/utils/preferences';
 
 /**
  * Reactive section layout for the sheet. Starts from the class-aware default
@@ -17,6 +22,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
   const sections = ref<CharacterSection[]>([]);
   const savedOrder = ref<SectionKey[]>([]);
   const hiddenKeys = ref<SectionKey[]>([]);
+  const layoutIndices = ref<Record<string, number>>({});
 
   function rebuild() {
     sections.value = character.value
@@ -27,6 +33,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
   onMounted(async () => {
     savedOrder.value = await sectionOrderPref.get([]);
     hiddenKeys.value = await hiddenSectionsPref.get([]);
+    layoutIndices.value = await sectionLayoutPref.get({});
     rebuild();
   });
   watch(character, rebuild);
@@ -59,10 +66,21 @@ export function useSectionLayout(character: Ref<Character | null>) {
     void hiddenSectionsPref.set(hiddenKeys.value);
   }
 
+  /** Advance a section to its next curated layout option, then persist it. */
+  function cycleLayout(key: SectionKey) {
+    const count = sectionLayoutCount(key);
+    if (count <= 1) return;
+    const next = ((layoutIndices.value[key] ?? 0) + 1) % count;
+    layoutIndices.value = { ...layoutIndices.value, [key]: next };
+    void sectionLayoutPref.set(layoutIndices.value);
+  }
+
   return {
     sections: visibleSections,
     hiddenSections,
+    layoutIndices,
     moveByIndex,
+    cycleLayout,
     hide: (key: SectionKey) => setHidden(key, true),
     show: (key: SectionKey) => setHidden(key, false),
   };

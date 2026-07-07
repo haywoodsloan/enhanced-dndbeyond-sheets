@@ -43,13 +43,69 @@ const DYNAMIC_ROWS: Partial<Record<SectionKey, { perRow: number; maxRows: number
   features: { perRow: 13, maxRows: 6 },
 };
 
+/** One hand-designed footprint a card can be toggled to. */
+export interface LayoutOption {
+  /** Short name shown in the card's layout toggle. */
+  label: string;
+  /** Grid columns the card spans. */
+  cols: number;
+  /** Base height in row-units (the floor when it also grows with content). */
+  rows: number;
+  /** Grow rows with the entry count, capped at `maxRows` (like DYNAMIC_ROWS). */
+  dynamic?: { perRow: number; maxRows: number };
+}
+
 /**
- * The card footprint for a section. For content-heavy sections (actions,
- * spells, inventory, features) `rows` grows with `count` — the number of
- * entries in the section — clamped between the section's base rows and its
- * `maxRows`. All other sections ignore `count` and keep their fixed footprint.
+ * Curated layout options per section: a small, ordered set the user can toggle
+ * between, each tuned to how that card presents its content. The FIRST option is
+ * the default. Sections without an entry keep a single fixed footprint (no
+ * toggle) driven by SECTION_SPAN / DYNAMIC_ROWS above.
  */
-export function sectionSpan(key: SectionKey, count = 0): SectionSpan {
+const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
+  inventory: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 20, maxRows: 6 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 13, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 7, maxRows: 6 } },
+  ],
+};
+
+/** How many layout options a section offers (1 = no toggle). */
+export function sectionLayoutCount(key: SectionKey): number {
+  return SECTION_LAYOUTS[key]?.length ?? 1;
+}
+
+/** The label of a section's chosen layout option (empty when it has none). */
+export function sectionLayoutLabel(key: SectionKey, layoutIndex = 0): string {
+  const options = SECTION_LAYOUTS[key];
+  if (!options || options.length === 0) return '';
+  return options[clampIndex(layoutIndex, options.length)].label;
+}
+
+function clampIndex(index: number, length: number): number {
+  if (index < 0) return 0;
+  if (index > length - 1) return length - 1;
+  return index;
+}
+
+/**
+ * The card footprint for a section. When the section has curated `SECTION_LAYOUTS`
+ * the chosen `layoutIndex` picks the option (its `cols` plus a floor/grown
+ * `rows`); otherwise `rows` grows with `count` for content-heavy sections and all
+ * others keep their fixed footprint.
+ */
+export function sectionSpan(key: SectionKey, count = 0, layoutIndex = 0): SectionSpan {
+  const options = SECTION_LAYOUTS[key];
+  if (options && options.length > 0) {
+    const option = options[clampIndex(layoutIndex, options.length)];
+    const rows = option.dynamic
+      ? Math.min(
+          option.dynamic.maxRows,
+          Math.max(option.rows, Math.ceil(count / option.dynamic.perRow)),
+        )
+      : option.rows;
+    return { cols: option.cols, rows };
+  }
+
   const base = SECTION_SPAN[key];
   const dynamic = DYNAMIC_ROWS[key];
   if (!dynamic) return base;
