@@ -1,11 +1,19 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue';
 import Sortable from 'sortablejs';
 
+interface SortableGridOptions {
+  /** Called once the drop changes the order. */
+  onReorder: (fromIndex: number, toIndex: number) => void;
+  /** Called as the preview order shifts during a drag (to re-run pagination). */
+  onDragMove?: () => void;
+}
+
 /**
  * Make the cards in `grid` drag-reorderable with SortableJS. Dragging starts
  * only from each card's `.card__drag-handle`; SortableJS shows its default drag
  * preview and sibling cards animate to open the drop slot. `onReorder(from, to)`
- * fires once the drop changes the order.
+ * fires once the drop changes the order; `onDragMove` fires as the preview shifts
+ * (used to re-paginate so the preview respects page breaks).
  *
  * `fallbackOnBody` appends the drag clone to `<body>` so it isn't offset by a
  * positioned ancestor (otherwise the preview drifts from the cursor). A lower
@@ -15,10 +23,7 @@ import Sortable from 'sortablejs';
  * The grid renders only after the character loads, so we (re)create the instance
  * whenever the element ref becomes available rather than on mount.
  */
-export function useSortableGrid(
-  grid: Ref<HTMLElement | null>,
-  onReorder: (fromIndex: number, toIndex: number) => void,
-) {
+export function useSortableGrid(grid: Ref<HTMLElement | null>, options: SortableGridOptions) {
   let sortable: Sortable | null = null;
 
   function destroy() {
@@ -39,10 +44,12 @@ export function useSortableGrid(
           swapThreshold: 0.65,
           invertSwap: true,
           handle: '.card__drag-handle',
+          onChange: () => options.onDragMove?.(),
+          onEnd: () => options.onDragMove?.(),
           onUpdate: (event) => {
             const { oldIndex, newIndex } = event;
             if (oldIndex == null || newIndex == null || oldIndex === newIndex) return;
-            onReorder(oldIndex, newIndex);
+            options.onReorder(oldIndex, newIndex);
           },
         });
       } catch {

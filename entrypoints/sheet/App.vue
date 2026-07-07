@@ -92,14 +92,17 @@ const { pageCount, apply: repaginate } = useSheetPagination(
 const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
 const pageHeightPx = computed(() => pageMetrics.value.band);
 
-// Drag-and-drop reordering of the section cards. nextTick lets SortableJS
-// finish its DOM move before Vue re-renders from the reordered list; then we
-// persist (inside moveByIndex) and re-run pagination once the drop lands.
-useSortableGrid(gridRef, (from, to) => {
-  void nextTick(() => {
-    moveByIndex(from, to);
-    void nextTick(repaginate);
-  });
+// Drag-and-drop reordering of the section cards. `onDragMove` re-paginates as
+// the preview shifts so cards never straddle a page boundary mid-drag; on drop,
+// nextTick lets SortableJS finish its DOM move before we persist + re-paginate.
+useSortableGrid(gridRef, {
+  onReorder: (from, to) => {
+    void nextTick(() => {
+      moveByIndex(from, to);
+      void nextTick(repaginate);
+    });
+  },
+  onDragMove: () => repaginate(),
 });
 
 // Apply the selected primary theme color across the document. Wrapped

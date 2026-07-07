@@ -4,13 +4,15 @@ import type { InventoryEntry } from '@/services/dndbeyond/model';
 
 const props = defineProps<{ inventory: InventoryEntry[] }>();
 
-// Split into two balanced columns so the card uses its width instead of one
-// tall column; each column carries its own header so the circles stay labeled.
+// Split into three balanced columns so the wide card uses its full width; each
+// column carries its own header so the circles stay labeled.
 const columns = computed(() => {
-  const mid = Math.ceil(props.inventory.length / 2);
-  return [props.inventory.slice(0, mid), props.inventory.slice(mid)].filter(
-    (column) => column.length > 0,
-  );
+  const size = Math.ceil(props.inventory.length / 3);
+  return [
+    props.inventory.slice(0, size),
+    props.inventory.slice(size, size * 2),
+    props.inventory.slice(size * 2),
+  ].filter((column) => column.length > 0);
 });
 </script>
 
@@ -43,7 +45,7 @@ const columns = computed(() => {
 <style scoped>
 .inventory {
   display: flex;
-  gap: 24px;
+  gap: 16px;
   align-items: flex-start;
 }
 
@@ -52,7 +54,7 @@ const columns = computed(() => {
   min-width: 0;
   display: grid;
   grid-template-columns: 1fr auto auto;
-  column-gap: 10px;
+  column-gap: 8px;
   row-gap: 4px;
   align-content: start;
 }

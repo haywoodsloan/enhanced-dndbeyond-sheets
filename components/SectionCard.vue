@@ -125,6 +125,19 @@ defineProps<{
   transition: opacity 0.12s ease;
 }
 
+/* A lighter grip bar (~1/3 width) centered in the handle. */
+.card__drag-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 33%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--p-primary-100, #e5e5e5);
+}
+
 .card:hover .card__drag-handle {
   opacity: 0.9;
 }
