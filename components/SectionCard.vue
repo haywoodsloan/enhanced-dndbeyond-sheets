@@ -101,6 +101,7 @@ const cardStyle = computed(() => {
       <AbilityScores
         v-else-if="section.key === 'attributes' && character"
         :abilities="character.abilities"
+        :cols="span.cols"
         :rows="span.rows"
       />
       <BasicsCard

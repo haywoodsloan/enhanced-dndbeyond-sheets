@@ -3,16 +3,22 @@ import { computed } from 'vue';
 import type { AbilityScore } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/dnd5e';
 
-const props = defineProps<{ abilities: AbilityScore[]; rows?: number }>();
+const props = defineProps<{ abilities: AbilityScore[]; cols?: number; rows?: number }>();
 
-// Arrange the tiles in `rows` rows (from the chosen layout) and stretch them to
-// fill the card: columns = ceil(count / rows), every track 1fr.
+// Arrange the tiles to stay roughly square for the card's aspect (its cols:rows)
+// and stretch to fill: tileCols ≈ sqrt(count · cols / rows), tileRows the rest.
 const gridStyle = computed(() => {
+  const cols = Math.max(1, props.cols ?? 2);
   const rows = Math.max(1, props.rows ?? 2);
-  const cols = Math.max(1, Math.ceil(props.abilities.length / rows));
+  const count = props.abilities.length;
+  const tileCols = Math.min(
+    count,
+    Math.max(1, Math.round(Math.sqrt((count * cols) / rows))),
+  );
+  const tileRows = Math.ceil(count / tileCols);
   return {
-    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-    gridTemplateRows: `repeat(${rows}, 1fr)`,
+    gridTemplateColumns: `repeat(${tileCols}, 1fr)`,
+    gridTemplateRows: `repeat(${tileRows}, 1fr)`,
   };
 });
 </script>

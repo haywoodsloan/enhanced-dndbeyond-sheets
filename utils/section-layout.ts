@@ -66,9 +66,8 @@ export interface LayoutOption {
  */
 const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   attributes: [
-    { label: 'Grid', cols: 2, rows: 2 },
-    { label: 'Wide', cols: 3, rows: 1 },
-    { label: 'Tall', cols: 1, rows: 3 },
+    { label: 'Wide', cols: 2, rows: 1 },
+    { label: 'Tall', cols: 1, rows: 2 },
   ],
   skills: [
     { label: 'Wide', cols: 3, rows: 1 },
