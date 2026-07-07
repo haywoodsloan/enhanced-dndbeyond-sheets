@@ -13,8 +13,9 @@ describe('NotesCard', () => {
     expect(wrapper.get('[data-note="Backstory"]').text()).toContain('Born in shadow.');
   });
 
-  it('shows a placeholder when there are no notes', () => {
+  it('renders nothing when there are no notes', () => {
     const wrapper = mount(NotesCard, { props: { notes: [] } });
-    expect(wrapper.text()).toContain('Space for your notes');
+    expect(wrapper.findAll('[data-note]')).toHaveLength(0);
+    expect(wrapper.text()).not.toContain('Space for your notes');
   });
 });

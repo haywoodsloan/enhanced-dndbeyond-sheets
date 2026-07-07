@@ -17,7 +17,6 @@ withDefaults(defineProps<{ notes?: NoteEntry[] }>(), {
       <span class="notes__label">{{ note.label }}</span>
       <p class="notes__text">{{ note.text }}</p>
     </div>
-    <p v-if="notes.length === 0" class="notes__empty">Space for your notes.</p>
   </div>
 </template>
 
@@ -45,11 +44,5 @@ withDefaults(defineProps<{ notes?: NoteEntry[] }>(), {
   font-size: 13px;
   line-height: 1.4;
   white-space: pre-wrap;
-}
-
-.notes__empty {
-  margin: 0;
-  font-size: 13px;
-  color: var(--p-text-muted-color, #888);
 }
 </style>
