@@ -110,4 +110,37 @@ describe('SectionCard', () => {
     expect(wrapper.find('[data-save="wis"]').exists()).toBe(true);
     expect(wrapper.text()).toContain('+6');
   });
+
+  it('emits hide with the section key from the toggle button', async () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+      },
+    });
+
+    await wrapper.find('.card__toggle').trigger('click');
+
+    expect(wrapper.emitted('hide')).toEqual([['spells']]);
+    expect(wrapper.emitted('show')).toBeUndefined();
+  });
+
+  it('drops the fixed height and drag handle and emits show when hidden', async () => {
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'spells', title: 'Spells', count: 18, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        hidden: true,
+      },
+    });
+
+    expect(wrapper.attributes('style')).toContain('grid-column: span 3');
+    expect(wrapper.attributes('style')).not.toContain('height');
+    expect(wrapper.find('.card__drag-handle').exists()).toBe(false);
+
+    await wrapper.find('.card__toggle').trigger('click');
+
+    expect(wrapper.emitted('show')).toEqual([['spells']]);
+    expect(wrapper.emitted('hide')).toBeUndefined();
+  });
 });

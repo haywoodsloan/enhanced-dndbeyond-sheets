@@ -147,3 +147,25 @@ export function moveSectionByIndex(
   result.splice(to, 0, moved);
   return result;
 }
+
+/**
+ * Translate a drag within the VISIBLE (non-hidden) subset into a move over the
+ * FULL ordered list. `fromVisible`/`toVisible` index the sections that remain
+ * after removing the `hidden` keys; the dragged section lands in the target
+ * visible section's slot. Returns a new array, or the same array for a no-op.
+ */
+export function moveVisibleByIndex(
+  sections: CharacterSection[],
+  hidden: SectionKey[],
+  fromVisible: number,
+  toVisible: number,
+): CharacterSection[] {
+  const hiddenSet = new Set(hidden);
+  const visible = sections.filter((section) => !hiddenSet.has(section.key));
+  const fromKey = visible[fromVisible]?.key;
+  const toKey = visible[toVisible]?.key;
+  if (fromKey === undefined || toKey === undefined) return sections;
+  const from = sections.findIndex((section) => section.key === fromKey);
+  const to = sections.findIndex((section) => section.key === toKey);
+  return moveSectionByIndex(sections, from, to);
+}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
 import {
+  hiddenSectionsPref,
   pageFormatPref,
   sectionOrderPref,
   themeColorPref,
@@ -24,5 +25,10 @@ describe('preferences', () => {
   it('round-trips the section order array', async () => {
     await sectionOrderPref.set(['basics', 'attributes', 'skills']);
     expect(await sectionOrderPref.get([])).toEqual(['basics', 'attributes', 'skills']);
+  });
+
+  it('round-trips the hidden sections array', async () => {
+    await hiddenSectionsPref.set(['spells', 'notes']);
+    expect(await hiddenSectionsPref.get([])).toEqual(['spells', 'notes']);
   });
 });

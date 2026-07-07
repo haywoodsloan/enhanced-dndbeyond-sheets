@@ -34,7 +34,8 @@ const subtitle = computed(() => {
   return [loaded.race, classes].filter(Boolean).join(' · ');
 });
 
-const { sections: orderedSections, moveByIndex } = useSectionLayout(character);
+const { sections: orderedSections, hiddenSections, moveByIndex, hide, show } =
+  useSectionLayout(character);
 
 // Page layout settings (page type, margins, theme color), persisted locally.
 const formatId = useStoredRef(pageFormatPref, DEFAULT_FORMAT_ID);
@@ -209,10 +210,31 @@ onUnmounted(() => {
               :section="section"
               :span="sectionSpan(section.key, section.count)"
               :character="character"
+              @hide="hide"
             />
           </div>
         </template>
       </main>
+
+      <section
+        v-if="character && hiddenSections.length"
+        class="hidden-tray"
+        :style="pageStyle"
+        aria-label="Hidden sections"
+      >
+        <p class="hidden-tray__label">Hidden — not printed</p>
+        <div class="hidden-tray__grid">
+          <SectionCard
+            v-for="section in hiddenSections"
+            :key="section.key"
+            :section="section"
+            :span="sectionSpan(section.key, section.count)"
+            :character="character"
+            hidden
+            @show="show"
+          />
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -277,8 +299,34 @@ body {
 .sheet-area {
   flex: 1;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 24px;
+}
+
+/* Parking area for hidden sections: sits on the desk below the pages so it
+   reads as "off the page" (no paper rectangle/shadow) and never takes up print
+   space. Hidden from the actual print output. */
+.hidden-tray {
+  width: var(--page-width);
+  max-width: 100%;
+  margin-top: var(--page-gap, 20px);
+}
+
+.hidden-tray__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--p-primary-700, #6b7280);
+}
+
+.hidden-tray__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--grid-gap, 12px);
+  align-items: start;
 }
 
 .sheet {
@@ -359,6 +407,10 @@ body {
   }
 
   .sheet__pages {
+    display: none;
+  }
+
+  .hidden-tray {
     display: none;
   }
 

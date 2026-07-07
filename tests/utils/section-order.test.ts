@@ -3,6 +3,7 @@ import {
   applySavedOrder,
   defaultSectionOrder,
   moveSectionByIndex,
+  moveVisibleByIndex,
 } from '@/utils/section-order';
 import {
   SECTION_KEYS,
@@ -187,5 +188,37 @@ describe('moveSectionByIndex', () => {
     expect(moveSectionByIndex(base, 1, 1)).toBe(base);
     expect(moveSectionByIndex(base, -1, 2)).toBe(base);
     expect(moveSectionByIndex(base, 0, 9)).toBe(base);
+  });
+});
+
+describe('moveVisibleByIndex', () => {
+  // Full order with 'skills' hidden — visible list is [basics, spells, notes].
+  const base = asSections(['basics', 'skills', 'spells', 'notes']);
+  const hidden: SectionKey[] = ['skills'];
+
+  it('moves a visible card past the hidden section using visible indices', () => {
+    // Drag visible[0] (basics) to visible[1] (spells): basics lands in spells'
+    // full slot, jumping over the hidden 'skills'.
+    expect(moveVisibleByIndex(base, hidden, 0, 1).map((s) => s.key)).toEqual([
+      'skills',
+      'spells',
+      'basics',
+      'notes',
+    ]);
+  });
+
+  it('moves a visible card to the front', () => {
+    // Drag visible[2] (notes) to visible[0] (basics).
+    expect(moveVisibleByIndex(base, hidden, 2, 0).map((s) => s.key)).toEqual([
+      'notes',
+      'basics',
+      'skills',
+      'spells',
+    ]);
+  });
+
+  it('returns the same array for a no-op or out-of-range visible index', () => {
+    expect(moveVisibleByIndex(base, hidden, 1, 1)).toBe(base);
+    expect(moveVisibleByIndex(base, hidden, 0, 5)).toBe(base);
   });
 });

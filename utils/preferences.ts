@@ -43,3 +43,4 @@ export const pageFormatPref = definePreference<string>('pref-page-format');
 export const pageMarginPref = definePreference<string>('pref-page-margin');
 export const themeColorPref = definePreference<string>('pref-theme-color');
 export const sectionOrderPref = definePreference<SectionKey[]>('pref-section-order');
+export const hiddenSectionsPref = definePreference<SectionKey[]>('pref-hidden-sections');

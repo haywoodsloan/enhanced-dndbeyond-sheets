@@ -13,25 +13,38 @@ import InventoryCard from '@/components/InventoryCard.vue';
 import WealthCard from '@/components/WealthCard.vue';
 import FeaturesCard from '@/components/FeaturesCard.vue';
 import NotesCard from '@/components/NotesCard.vue';
-import type { Character, CharacterSection } from '@/services/dndbeyond/model';
+import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import type { SectionSpan } from '@/utils/section-layout';
+import { computed } from 'vue';
 
 // `span` controls the card footprint (columns × row-units). A future `expanded`
-// prop will swap between a compact and a detailed body.
-defineProps<{
+// prop will swap between a compact and a detailed body. `hidden` renders the
+// card in the off-page tray: no fixed height, no drag handle, and the toggle
+// restores it to the printable pages instead of removing it.
+const props = defineProps<{
   section: CharacterSection;
   span: SectionSpan;
   character?: Character | null;
+  hidden?: boolean;
 }>();
+
+const emit = defineEmits<{ hide: [key: SectionKey]; show: [key: SectionKey] }>();
+
+const cardStyle = computed(() => {
+  const gridColumn = `span ${props.span.cols}`;
+  if (props.hidden) return { gridColumn };
+  return {
+    gridColumn,
+    height: `calc(${props.span.rows} * var(--row-unit, 130px) + ${props.span.rows - 1} * var(--grid-gap, 12px))`,
+  };
+});
 </script>
 
 <template>
   <Card
     class="card"
-    :style="{
-      gridColumn: `span ${span.cols}`,
-      height: `calc(${span.rows} * var(--row-unit, 130px) + ${span.rows - 1} * var(--grid-gap, 12px))`,
-    }"
+    :class="{ 'card--hidden': hidden }"
+    :style="cardStyle"
     :data-section-key="section.key"
   >
     <template #title>
@@ -40,7 +53,16 @@ defineProps<{
       </div>
     </template>
     <template #content>
-      <span class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
+      <span v-if="!hidden" class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
+      <button
+        type="button"
+        class="card__toggle"
+        :title="hidden ? 'Show section (add back to the page)' : 'Hide section (don’t print)'"
+        :aria-label="hidden ? 'Show section' : 'Hide section'"
+        @click="hidden ? emit('show', section.key) : emit('hide', section.key)"
+      >
+        {{ hidden ? '+' : '×' }}
+      </button>
       <PortraitCard
         v-if="section.key === 'portrait' && character?.avatarUrl"
         :avatar-url="character.avatarUrl"
@@ -144,6 +166,44 @@ defineProps<{
 
 .card__drag-handle:active {
   cursor: grabbing;
+}
+
+/* Hide / show toggle: a small round button at the top-right that appears on
+   hover; on a hidden card it stays visible so the section can be restored. */
+.card__toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 999px;
+  background: var(--p-primary-50, #fff);
+  color: var(--p-primary-700, #6b7280);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.card:hover .card__toggle,
+.card__toggle:focus-visible {
+  opacity: 1;
+}
+
+/* Dimmed while parked in the not-printed tray; its toggle stays visible. */
+.card--hidden {
+  opacity: 0.72;
+}
+
+.card--hidden .card__toggle {
+  opacity: 1;
 }
 
 /* Let the portrait fill its card so the image can scale to fit without cropping. */
