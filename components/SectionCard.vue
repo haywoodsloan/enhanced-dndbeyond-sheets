@@ -118,6 +118,7 @@ const cardStyle = computed(() => {
       <SkillsCard
         v-else-if="section.key === 'skills' && character"
         :skills="character.skills"
+        :columns="span.cols"
       />
       <ProficienciesCard
         v-else-if="section.key === 'proficiencies' && character"
@@ -275,20 +276,24 @@ const cardStyle = computed(() => {
   opacity: 1;
 }
 
-/* Let the portrait fill its card so the image can scale to fit without cropping. */
-.card[data-section-key='portrait'] {
+/* Let the portrait image and the skills columns fill the card height (the image
+   scales to fit without cropping; the skill columns distribute down the height). */
+.card[data-section-key='portrait'],
+.card[data-section-key='skills'] {
   display: flex;
   flex-direction: column;
 }
 
-.card[data-section-key='portrait'] :deep(.p-card-body) {
+.card[data-section-key='portrait'] :deep(.p-card-body),
+.card[data-section-key='skills'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.card[data-section-key='portrait'] :deep(.p-card-content) {
+.card[data-section-key='portrait'] :deep(.p-card-content),
+.card[data-section-key='skills'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
 }

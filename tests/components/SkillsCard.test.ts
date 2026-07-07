@@ -23,4 +23,21 @@ describe('SkillsCard', () => {
     const arcana = wrapper.get('[data-skill="arcana"]');
     expect(arcana.find('.skill__prof--none').exists()).toBe(true);
   });
+
+  it('splits skills into the requested number of columns', () => {
+    const many: Skill[] = Array.from({ length: 6 }, (_, index) => ({
+      key: `skill-${index}`,
+      name: `Skill ${index}`,
+      ability: 'int',
+      modifier: 0,
+      proficiency: 'none',
+    }));
+
+    const twoCol = mount(SkillsCard, { props: { skills: many, columns: 2 } });
+    expect(twoCol.findAll('.skills__column')).toHaveLength(2);
+    expect(twoCol.findAll('[data-skill]')).toHaveLength(6);
+
+    const oneCol = mount(SkillsCard, { props: { skills: many, columns: 1 } });
+    expect(oneCol.findAll('.skills__column')).toHaveLength(1);
+  });
 });
