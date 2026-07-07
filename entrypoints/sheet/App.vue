@@ -93,6 +93,13 @@ const { pageCount, apply: repaginate } = useSheetPagination(
 const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
 const pageHeightPx = computed(() => pageMetrics.value.band);
 
+// Grow the paper to span all of its pages so a partly-filled last page still
+// shows as a full sheet and the hidden-sections tray sits cleanly below it
+// (rather than overlapping the last page rectangle that overhangs the content).
+const sheetMinHeight = computed(
+  () => (pageCount.value - 1) * pageStride.value + pageHeightPx.value,
+);
+
 // Drag-and-drop reordering of the section cards. `onDragMove` re-paginates as
 // the preview shifts so cards never straddle a page boundary mid-drag; on drop,
 // nextTick lets SortableJS finish its DOM move before we persist + re-paginate.
@@ -177,7 +184,11 @@ onUnmounted(() => {
     </aside>
 
     <div class="sheet-area">
-      <main class="sheet" ref="sheetRef" :style="pageStyle">
+      <main
+        class="sheet"
+        ref="sheetRef"
+        :style="[pageStyle, { '--sheet-min-height': `${sheetMinHeight}px` }]"
+      >
         <div class="sheet__pages" aria-hidden="true">
           <div
             v-for="page in pageCount"
@@ -334,7 +345,7 @@ body {
   isolation: isolate;
   box-sizing: border-box;
   width: var(--page-width);
-  min-height: var(--page-height);
+  min-height: var(--sheet-min-height, var(--page-height));
   padding: var(--page-margin);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;

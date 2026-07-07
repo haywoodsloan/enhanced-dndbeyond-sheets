@@ -37,9 +37,15 @@ export function useSheetPagination(
     });
 
     // How many printed pages the content now spans (for the page backdrop).
+    // Measure the content's own extent (the lowest card after pushes), NOT the
+    // sheet box — the box is inflated to whole pages via `min-height`, which
+    // would otherwise pin the count and stop it shrinking when cards are hidden.
     const stride = layout.band + layout.gutter;
-    const height = sheetEl.getBoundingClientRect().height;
-    pageCount.value = Math.max(1, Math.ceil(height / stride));
+    let contentBottom = 0;
+    for (const card of cards) {
+      contentBottom = Math.max(contentBottom, card.getBoundingClientRect().bottom - sheetTop);
+    }
+    pageCount.value = Math.max(1, Math.ceil(contentBottom / stride));
   }
 
   const schedule = () => {
