@@ -18,7 +18,11 @@ async function read<T>(key: string, fallback: T): Promise<T> {
   try {
     const stored = await browser.storage.local.get(key);
     const value = stored[key] as T | undefined;
-    return value ?? fallback;
+    if (value == null) return fallback;
+    // If the caller expects an array, a legacy/corrupted object value (e.g. an
+    // array once serialized as `{0:..,1:..}`) falls back rather than crashing.
+    if (Array.isArray(fallback) && !Array.isArray(value)) return fallback;
+    return value;
   } catch {
     return fallback;
   }
@@ -26,7 +30,10 @@ async function read<T>(key: string, fallback: T): Promise<T> {
 
 async function write<T>(key: string, value: T): Promise<void> {
   try {
-    await browser.storage.local.set({ [key]: value });
+    // Normalize away Vue reactive proxies (and other wrappers) so an array is
+    // stored as an array — a proxied array can otherwise serialize to an object.
+    const plain = JSON.parse(JSON.stringify(value)) as T;
+    await browser.storage.local.set({ [key]: plain });
   } catch {
     // Storage unavailable (e.g. some test contexts) — preferences are best-effort.
   }

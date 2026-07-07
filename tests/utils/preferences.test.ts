@@ -31,4 +31,10 @@ describe('preferences', () => {
     await hiddenSectionsPref.set(['spells', 'notes']);
     expect(await hiddenSectionsPref.get([])).toEqual(['spells', 'notes']);
   });
+
+  it('falls back when an array preference was stored as an object', async () => {
+    // Legacy corruption: an array once serialized as {0:..,1:..} by storage.
+    await fakeBrowser.storage.local.set({ 'pref-hidden-sections': { 0: 'notes' } });
+    expect(await hiddenSectionsPref.get([])).toEqual([]);
+  });
 });
