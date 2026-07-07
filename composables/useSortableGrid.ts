@@ -16,9 +16,7 @@ interface SortableGridOptions {
  * (used to re-paginate so the preview respects page breaks).
  *
  * `fallbackOnBody` appends the drag clone to `<body>` so it isn't offset by a
- * positioned ancestor (otherwise the preview drifts from the cursor). A lower
- * `swapThreshold` plus `invertSwap` let the dragged card claim a slot even next
- * to a full-width (3-col) card.
+ * positioned ancestor (otherwise the preview drifts from the cursor).
  *
  * The grid renders only after the character loads, so we (re)create the instance
  * whenever the element ref becomes available rather than on mount.
@@ -41,8 +39,6 @@ export function useSortableGrid(grid: Ref<HTMLElement | null>, options: Sortable
           animation: 160,
           forceFallback: true,
           fallbackOnBody: true,
-          swapThreshold: 0.65,
-          invertSwap: true,
           handle: '.card__drag-handle',
           onChange: () => options.onDragMove?.(),
           onEnd: () => options.onDragMove?.(),
