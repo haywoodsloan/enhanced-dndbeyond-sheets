@@ -98,6 +98,6 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 }
 
 .defences__item + .defences__item {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 </style>
