@@ -50,7 +50,7 @@ const cardStyle = computed(() => {
 <template>
   <Card
     class="card"
-    :class="{ 'card--hidden': hidden, 'card--has-layout': !hidden && (layoutCount ?? 1) > 1 }"
+    :class="{ 'card--hidden': hidden }"
     :style="cardStyle"
     :data-section-key="section.key"
   >
@@ -222,13 +222,13 @@ const cardStyle = computed(() => {
   transition: opacity 0.12s ease;
 }
 
-/* Layout cycle: sits just right of the hide toggle at the top-right corner (so
-   the two read as a paired control); switches the card between its curated
-   layout options. Only rendered when there's more than one. */
+/* Layout cycle: sits just left of the hide toggle at the top-right (so the two
+   read as a paired control); switches the card between its curated layout
+   options. Only rendered when there's more than one. */
 .card__layout {
   position: absolute;
   top: 4px;
-  right: 4px;
+  right: 28px;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -243,12 +243,6 @@ const cardStyle = computed(() => {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease;
-}
-
-/* When the layout button occupies the corner, nudge the hide toggle in beside
-   it so the two controls pair up at the top-right. */
-.card--has-layout .card__toggle {
-  right: 28px;
 }
 
 .card:hover .card__layout,
