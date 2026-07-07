@@ -26,4 +26,14 @@ describe('ProficienciesCard', () => {
     // The three non-empty groups still all render.
     expect(wrapper.findAll('[data-group]')).toHaveLength(3);
   });
+
+  it('stacks items under a heading in the multi-column layout', () => {
+    const wrapper = mount(ProficienciesCard, { props: { proficiencies, columns: 2 } });
+
+    const languages = wrapper.get('[data-group="Languages"]');
+    expect(languages.get('.profs__heading').text()).toBe('Languages');
+    // Common + Elvish become one list item each (not comma-joined).
+    const items = languages.findAll('.profs__item');
+    expect(items.map((item) => item.text())).toEqual(['Common', 'Elvish']);
+  });
 });

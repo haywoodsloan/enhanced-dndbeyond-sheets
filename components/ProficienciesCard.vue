@@ -15,10 +15,15 @@ const groups = computed(() =>
 
 // Split the groups into N balanced columns (from the chosen layout) so the wide
 // layout uses its width; each column still spreads down the full height.
+const columnCount = computed(() => Math.max(1, props.columns ?? 1));
+
+// Multi-column layouts stack each category as a heading with one item per line;
+// the single-column layout keeps the compact "Label: a, b, c" inline form.
+const stacked = computed(() => columnCount.value > 1);
+
 const columnGroups = computed(() => {
-  const count = Math.max(1, props.columns ?? 1);
-  const size = Math.ceil(groups.value.length / count);
-  return Array.from({ length: count }, (_, index) =>
+  const size = Math.ceil(groups.value.length / columnCount.value);
+  return Array.from({ length: columnCount.value }, (_, index) =>
     groups.value.slice(index * size, (index + 1) * size),
   ).filter((column) => column.length > 0);
 });
@@ -27,15 +32,23 @@ const columnGroups = computed(() => {
 <template>
   <div class="profs">
     <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="profs__column">
-      <p
+      <div
         v-for="group in column"
         :key="group.label"
         class="profs__group"
         :data-group="group.label"
       >
-        <span class="profs__label">{{ group.label }}:</span>
-        <span class="profs__items">{{ group.items.join(', ') }}</span>
-      </p>
+        <template v-if="stacked">
+          <span class="profs__heading">{{ group.label }}</span>
+          <ul class="profs__list">
+            <li v-for="item in group.items" :key="item" class="profs__item">{{ item }}</li>
+          </ul>
+        </template>
+        <template v-else>
+          <span class="profs__label">{{ group.label }}:</span>
+          <span class="profs__items">{{ group.items.join(', ') }}</span>
+        </template>
+      </div>
     </div>
     <p v-if="groups.length === 0" class="profs__empty">None</p>
   </div>
@@ -73,6 +86,25 @@ const columnGroups = computed(() => {
 }
 
 .profs__items {
+  color: #1c1c1e;
+}
+
+/* Stacked (multi-column) format: a category heading with one item per line. */
+.profs__heading {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--p-text-muted-color, #888);
+}
+
+.profs__list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.profs__item {
   color: #1c1c1e;
 }
 
