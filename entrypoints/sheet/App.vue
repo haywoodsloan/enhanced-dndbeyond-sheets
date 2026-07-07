@@ -94,16 +94,12 @@ const pageHeightPx = computed(() => pageMetrics.value.band);
 
 // Drag-and-drop reordering of the section cards. nextTick lets SortableJS
 // finish its DOM move before Vue re-renders from the reordered list; then we
-// persist (inside moveByIndex) and re-run pagination. `onPreview` re-paginates
-// live during the drag so the make-space preview respects page breaks.
-useSortableGrid(gridRef, {
-  onReorder: (from, to) => {
-    void nextTick(() => {
-      moveByIndex(from, to);
-      void nextTick(repaginate);
-    });
-  },
-  onPreview: () => repaginate(),
+// persist (inside moveByIndex) and re-run pagination once the drop lands.
+useSortableGrid(gridRef, (from, to) => {
+  void nextTick(() => {
+    moveByIndex(from, to);
+    void nextTick(repaginate);
+  });
 });
 
 // Apply the selected primary theme color across the document. Wrapped
