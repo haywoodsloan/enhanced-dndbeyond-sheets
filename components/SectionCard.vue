@@ -126,6 +126,11 @@ defineProps<{
   min-height: 0;
 }
 
+/* The image speaks for itself — no need for a "Portrait" heading. */
+.card[data-section-key='portrait'] :deep(.p-card-caption) {
+  display: none;
+}
+
 .card__title {
   display: flex;
   align-items: center;
