@@ -18,13 +18,13 @@ describe('sectionSpan', () => {
 describe('sectionSpan dynamic height', () => {
   it('keeps base rows for small content-heavy sections', () => {
     expect(sectionSpan('actions', 3)).toEqual({ cols: 3, rows: 1 });
-    expect(sectionSpan('inventory', 4)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('inventory', 4)).toEqual({ cols: 3, rows: 2 });
   });
 
   it('grows rows as entries increase', () => {
     expect(sectionSpan('actions', 40).rows).toBe(3); // ceil(40/16)
     expect(sectionSpan('spells', 40).rows).toBe(4); // ceil(40/12)
-    expect(sectionSpan('inventory', 84).rows).toBe(3); // ceil(84/28)
+    expect(sectionSpan('inventory', 60).rows).toBe(3); // ceil(60/20)
     expect(sectionSpan('features', 39).rows).toBe(3); // ceil(39/13)
   });
 

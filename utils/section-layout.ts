@@ -24,7 +24,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   proficiencies: { cols: 2, rows: 1 },
   actions: { cols: 3, rows: 1 },
   spells: { cols: 3, rows: 1 },
-  inventory: { cols: 3, rows: 1 },
+  inventory: { cols: 3, rows: 2 },
   wealth: { cols: 1, rows: 1 },
   features: { cols: 3, rows: 2 },
   notes: { cols: 3, rows: 2 },
@@ -39,7 +39,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
 const DYNAMIC_ROWS: Partial<Record<SectionKey, { perRow: number; maxRows: number }>> = {
   actions: { perRow: 16, maxRows: 5 },
   spells: { perRow: 12, maxRows: 6 },
-  inventory: { perRow: 28, maxRows: 6 },
+  inventory: { perRow: 20, maxRows: 6 },
   features: { perRow: 13, maxRows: 6 },
 };
 
