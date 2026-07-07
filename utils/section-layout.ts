@@ -72,7 +72,7 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   ],
   proficiencies: [
     { label: 'Wide', cols: 2, rows: 1 },
-    { label: 'List', cols: 1, rows: 2 },
+    { label: 'List', cols: 1, rows: 1 },
   ],
   actions: [
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 5 } },
