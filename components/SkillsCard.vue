@@ -27,9 +27,11 @@ defineProps<{ skills: Skill[] }>();
 
 <style scoped>
 .skills {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 4px 20px;
+  /* Multi-column so a `column-rule` divides the columns (like the saves /
+     defences divider); `column-width` keeps it adapting to the card width. */
+  column-width: 200px;
+  column-gap: 32px;
+  column-rule: 1px solid var(--p-primary-300, #d4d4d8);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -39,7 +41,9 @@ defineProps<{ skills: Skill[] }>();
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 4px;
   font-size: 14px;
+  break-inside: avoid;
 }
 
 .skill__prof {
