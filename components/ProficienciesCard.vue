@@ -30,7 +30,7 @@ const columnGroups = computed(() => {
 </script>
 
 <template>
-  <div class="profs">
+  <div class="profs" :class="{ 'profs--stacked': stacked }">
     <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="profs__column">
       <div
         v-for="group in column"
@@ -71,6 +71,14 @@ const columnGroups = computed(() => {
      leave empty space at the bottom; `gap` is the minimum spacing. */
   justify-content: space-between;
   gap: 6px;
+}
+
+/* The stacked format's headings + item lists are taller, so distributing them
+   with space-between over-separates the categories; pack them from the top with
+   a small fixed gap (and keep the column tops aligned) instead. */
+.profs--stacked .profs__column {
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .profs__group {
