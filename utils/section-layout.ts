@@ -67,7 +67,6 @@ export interface LayoutOption {
 const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   skills: [
     { label: 'Wide', cols: 3, rows: 1 },
-    { label: 'Medium', cols: 2, rows: 2 },
     { label: 'List', cols: 1, rows: 3 },
   ],
   proficiencies: [
