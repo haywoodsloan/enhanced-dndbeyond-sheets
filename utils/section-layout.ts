@@ -24,7 +24,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   proficiencies: { cols: 2, rows: 1 },
   actions: { cols: 3, rows: 1 },
   spells: { cols: 3, rows: 1 },
-  inventory: { cols: 3, rows: 1 },
+  inventory: { cols: 3, rows: 2 },
   wealth: { cols: 1, rows: 1 },
   features: { cols: 3, rows: 2 },
   notes: { cols: 3, rows: 2 },
