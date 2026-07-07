@@ -22,7 +22,6 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
     </ul>
 
     <div v-if="defences.length" class="defences" data-defences>
-      <span class="defences__title">Defences</span>
       <ul class="defences__list">
         <li v-for="entry in defences" :key="entry" class="defences__item">
           {{ entry }}
@@ -85,12 +84,6 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
   min-width: 0;
   border-left: 1px solid var(--p-primary-300, #d4d4d8);
   padding-left: 16px;
-}
-
-.defences__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--p-text-muted-color, #888);
 }
 
 .defences__list {
