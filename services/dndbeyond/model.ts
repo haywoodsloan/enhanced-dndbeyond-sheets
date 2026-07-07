@@ -95,9 +95,14 @@ export interface CharacterProficiencies {
   tools: string[];
 }
 
+/** How an action is activated. Also the display order of the groups. */
+export type ActionCategory = 'action' | 'bonus' | 'reaction' | 'other';
+
 /** A named action, attack, reaction, or other activatable option. */
 export interface CharacterAction {
   name: string;
+  /** Activation category used to group and order actions. */
+  category: ActionCategory;
 }
 
 /** A known or prepared spell. */

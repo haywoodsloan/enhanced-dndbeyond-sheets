@@ -96,6 +96,7 @@ export interface RawClassSpellGroup {
 export interface RawAction {
   name?: string;
   displayAsAttack?: boolean | null;
+  activation?: { activationType?: number | null } | null;
 }
 
 /**

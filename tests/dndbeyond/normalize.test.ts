@@ -209,6 +209,14 @@ describe('normalizeCharacter', () => {
     expect(counts.actions).toBeGreaterThan(0);
   });
 
+  it('categorizes actions by activation type', () => {
+    const { actions } = normalizeCharacter(raw);
+    const categoryOf = new Map(actions.map((action) => [action.name, action.category]));
+    expect(categoryOf.get('Channel Divinity')).toBe('action');
+    expect(categoryOf.get('Channel Divinity: Path to the Grave')).toBe('bonus');
+    expect(categoryOf.get('Gathered Whispers: Unearthly Scream')).toBe('reaction');
+  });
+
   it('never flags an empty section that still has entries', () => {
     const character = normalizeCharacter(raw);
     for (const section of character.sections) {

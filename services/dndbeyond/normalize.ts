@@ -21,6 +21,7 @@ import type {
 } from './api-types';
 import type {
   AbilityScore,
+  ActionCategory,
   Character,
   CharacterAction,
   CharacterBasics,
@@ -335,16 +336,35 @@ function resolveProficiencies(raw: RawCharacter): CharacterProficiencies {
   return { languages, armor, weapons, tools };
 }
 
-/** Weapon attacks plus every listed action. */
+/** Map a D&D Beyond `activationType` to an action category. */
+function actionCategory(activationType: number | null | undefined): ActionCategory {
+  switch (activationType) {
+    case 1:
+      return 'action';
+    case 3:
+      return 'bonus';
+    case 4:
+      return 'reaction';
+    default:
+      return 'other';
+  }
+}
+
+/** Weapon attacks plus every listed action, tagged with its activation category. */
 function resolveActions(raw: RawCharacter): CharacterAction[] {
-  const attacks = asArray(raw.inventory)
+  const attacks: CharacterAction[] = asArray(raw.inventory)
     .filter((item) => item.displayAsAttack === true && item.definition?.name)
-    .map((item) => ({ name: item.definition!.name! }));
+    .map((item) => ({ name: item.definition!.name!, category: 'action' }));
   const actions: CharacterAction[] = [];
   if (raw.actions) {
     for (const group of Object.values(raw.actions)) {
       for (const action of asArray<RawAction>(group)) {
-        if (action.name) actions.push({ name: action.name });
+        if (action.name) {
+          actions.push({
+            name: action.name,
+            category: actionCategory(action.activation?.activationType),
+          });
+        }
       }
     }
   }
