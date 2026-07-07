@@ -45,18 +45,31 @@ const columns = computed(() => {
 <style scoped>
 .inventory {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .column {
   flex: 1;
   min-width: 0;
+  padding: 0 14px;
   display: grid;
   grid-template-columns: 1fr auto auto;
   column-gap: 8px;
-  row-gap: 4px;
+  row-gap: 3px;
   align-content: start;
+}
+
+.column:first-child {
+  padding-left: 0;
+}
+
+.column:last-child {
+  padding-right: 0;
+}
+
+/* A thin divider between columns so the three lists are easy to scan. */
+.column + .column {
+  border-left: 1px solid var(--p-primary-200, #d4d4d8);
 }
 
 .column__label {
