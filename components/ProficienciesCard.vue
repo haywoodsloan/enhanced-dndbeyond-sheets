@@ -33,7 +33,11 @@ const groups = computed(() =>
 .profs {
   display: flex;
   flex-direction: column;
+  /* Spread the groups down the full card height so the wider (2-col) layout
+     doesn't leave empty space at the bottom; `gap` is the minimum spacing. */
+  justify-content: space-between;
   gap: 6px;
+  height: 100%;
 }
 
 .profs__group {
