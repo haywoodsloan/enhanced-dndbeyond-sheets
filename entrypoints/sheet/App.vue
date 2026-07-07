@@ -340,28 +340,6 @@ body {
   break-inside: avoid;
 }
 
-/* Drag-reorder feedback (SortableJS). The placeholder slot dims to show where
-   the card will land; SortableJS's own fallback clone is hidden and we render a
-   mini preview (.card-drag-preview) that tracks the cursor exactly. */
-.sortable-ghost {
-  opacity: 0.3;
-}
-
-.sortable-fallback {
-  opacity: 0 !important;
-}
-
-.card-drag-preview {
-  position: fixed;
-  z-index: 100001;
-  margin: 0;
-  pointer-events: none;
-  opacity: 0.96;
-  transform: translate(-50%, -50%) scale(0.5);
-  transform-origin: center center;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-}
-
 @media print {
   body {
     background: var(--paper);
