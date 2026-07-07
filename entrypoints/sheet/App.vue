@@ -340,6 +340,12 @@ body {
   break-inside: avoid;
 }
 
+/* While dragging, hide the card in its original slot but keep its space so the
+   other cards reposition around it — only the cursor preview is rendered. */
+.sortable-ghost {
+  visibility: hidden;
+}
+
 @media print {
   body {
     background: var(--paper);
