@@ -1,12 +1,24 @@
 <script lang="ts" setup>
+import { computed } from 'vue';
 import type { AbilityScore } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/dnd5e';
 
-defineProps<{ abilities: AbilityScore[] }>();
+const props = defineProps<{ abilities: AbilityScore[]; rows?: number }>();
+
+// Arrange the tiles in `rows` rows (from the chosen layout) and stretch them to
+// fill the card: columns = ceil(count / rows), every track 1fr.
+const gridStyle = computed(() => {
+  const rows = Math.max(1, props.rows ?? 2);
+  const cols = Math.max(1, Math.ceil(props.abilities.length / rows));
+  return {
+    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+    gridTemplateRows: `repeat(${rows}, 1fr)`,
+  };
+});
 </script>
 
 <template>
-  <ul class="abilities">
+  <ul class="abilities" :style="gridStyle">
     <li
       v-for="ability in abilities"
       :key="ability.key"
@@ -23,10 +35,10 @@ defineProps<{ abilities: AbilityScore[] }>();
 <style scoped>
 .abilities {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  height: 100%;
   margin: 0;
-  padding: 0 0 6px;
+  padding: 0;
   list-style: none;
 }
 
@@ -34,6 +46,7 @@ defineProps<{ abilities: AbilityScore[] }>();
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 1px;
   padding: 6px 4px;
   border: 1px solid var(--p-content-border-color, #e5e5e5);

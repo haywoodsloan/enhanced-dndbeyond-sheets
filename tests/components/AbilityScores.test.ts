@@ -36,4 +36,22 @@ describe('AbilityScores', () => {
     expect(cha.text()).toContain('-1');
     expect(cha.text()).toContain('8');
   });
+
+  it('arranges the tiles into columns from the row count', () => {
+    // 6 tiles over 2 rows → 3 columns; over 1 row → 6 columns; over 3 → 2.
+    const twoRows = mount(AbilityScores, { props: { abilities, rows: 2 } });
+    expect(twoRows.get('.abilities').attributes('style')).toContain(
+      'grid-template-columns: repeat(3, 1fr)',
+    );
+
+    const oneRow = mount(AbilityScores, { props: { abilities, rows: 1 } });
+    expect(oneRow.get('.abilities').attributes('style')).toContain(
+      'grid-template-columns: repeat(6, 1fr)',
+    );
+
+    const threeRows = mount(AbilityScores, { props: { abilities, rows: 3 } });
+    expect(threeRows.get('.abilities').attributes('style')).toContain(
+      'grid-template-columns: repeat(2, 1fr)',
+    );
+  });
 });

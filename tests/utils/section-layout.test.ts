@@ -11,7 +11,7 @@ describe('sectionSpan', () => {
     expect(sectionSpan('features')).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('portrait')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('basics')).toEqual({ cols: 3, rows: 1 });
-    expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 1 });
+    expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 2 });
     expect(sectionSpan('savingThrows')).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('senses')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('proficiencies')).toEqual({ cols: 2, rows: 1 });
@@ -49,6 +49,7 @@ describe('section layout options', () => {
   it('reports how many curated layouts a section offers', () => {
     expect(sectionLayoutCount('inventory')).toBe(3);
     expect(sectionLayoutCount('skills')).toBe(2);
+    expect(sectionLayoutCount('attributes')).toBe(3);
     expect(sectionLayoutCount('proficiencies')).toBe(2);
     expect(sectionLayoutCount('portrait')).toBe(2);
     // Sections without curated options have a single fixed layout (no toggle).
@@ -83,6 +84,10 @@ describe('section layout options', () => {
     expect(sectionSpan('skills', 18, 1)).toEqual({ cols: 1, rows: 3 });
     // Out-of-range clamps to the last option.
     expect(sectionSpan('skills', 18, 9)).toEqual({ cols: 1, rows: 3 });
+    // Attributes: 2×2 / 3×1 / 1×3 footprints.
+    expect(sectionSpan('attributes', 6, 0)).toEqual({ cols: 2, rows: 2 });
+    expect(sectionSpan('attributes', 6, 1)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('attributes', 6, 2)).toEqual({ cols: 1, rows: 3 });
     // Portrait scales as a whole footprint.
     expect(sectionSpan('portrait', 0, 1)).toEqual({ cols: 2, rows: 2 });
   });
