@@ -193,7 +193,7 @@ onUnmounted(() => {
               v-for="section in orderedSections"
               :key="section.key"
               :section="section"
-              :span="sectionSpan(section.key)"
+              :span="sectionSpan(section.key, section.count)"
               :character="character"
             />
           </div>

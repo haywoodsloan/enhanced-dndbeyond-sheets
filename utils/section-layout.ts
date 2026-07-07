@@ -31,8 +31,33 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
 };
 
 /** The default footprint for a section. */
-export function sectionSpan(key: SectionKey): SectionSpan {
-  return SECTION_SPAN[key];
+/**
+ * Content-heavy sections grow taller with the number of entries they hold. Each
+ * config says roughly how many entries fill one row-unit of height (`perRow`)
+ * and caps the growth (`maxRows`); the floor is the section's base rows above.
+ */
+const DYNAMIC_ROWS: Partial<Record<SectionKey, { perRow: number; maxRows: number }>> = {
+  actions: { perRow: 16, maxRows: 5 },
+  spells: { perRow: 12, maxRows: 6 },
+  inventory: { perRow: 10, maxRows: 6 },
+  features: { perRow: 13, maxRows: 6 },
+};
+
+/**
+ * The card footprint for a section. For content-heavy sections (actions,
+ * spells, inventory, features) `rows` grows with `count` — the number of
+ * entries in the section — clamped between the section's base rows and its
+ * `maxRows`. All other sections ignore `count` and keep their fixed footprint.
+ */
+export function sectionSpan(key: SectionKey, count = 0): SectionSpan {
+  const base = SECTION_SPAN[key];
+  const dynamic = DYNAMIC_ROWS[key];
+  if (!dynamic) return base;
+  const rows = Math.min(
+    dynamic.maxRows,
+    Math.max(base.rows, Math.ceil(count / dynamic.perRow)),
+  );
+  return { cols: base.cols, rows };
 }
 
 /**

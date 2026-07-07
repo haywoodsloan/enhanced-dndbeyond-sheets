@@ -15,6 +15,30 @@ describe('sectionSpan', () => {
   });
 });
 
+describe('sectionSpan dynamic height', () => {
+  it('keeps base rows for small content-heavy sections', () => {
+    expect(sectionSpan('actions', 3)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('inventory', 4)).toEqual({ cols: 3, rows: 2 });
+  });
+
+  it('grows rows as entries increase', () => {
+    expect(sectionSpan('actions', 40).rows).toBe(3); // ceil(40/16)
+    expect(sectionSpan('spells', 40).rows).toBe(4); // ceil(40/12)
+    expect(sectionSpan('inventory', 24).rows).toBe(3); // ceil(24/10)
+    expect(sectionSpan('features', 39).rows).toBe(3); // ceil(39/13)
+  });
+
+  it('caps growth at each section maxRows', () => {
+    expect(sectionSpan('actions', 500).rows).toBe(5);
+    expect(sectionSpan('inventory', 500).rows).toBe(6);
+  });
+
+  it('ignores count for fixed sections', () => {
+    expect(sectionSpan('skills', 999)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('basics', 999)).toEqual({ cols: 3, rows: 1 });
+  });
+});
+
 describe('gridRowsPerPage', () => {
   it('matches rows:cols to the print-area aspect ratio', () => {
     // Letter print area ~7.5x10in => 720x960px, 3 cols => 4 rows.
