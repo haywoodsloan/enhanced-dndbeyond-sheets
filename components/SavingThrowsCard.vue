@@ -93,7 +93,7 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 }
 
 .defences__item {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.3;
 }
 
