@@ -58,14 +58,50 @@ export interface LayoutOption {
 /**
  * Curated layout options per section: a small, ordered set the user can toggle
  * between, each tuned to how that card presents its content. The FIRST option is
- * the default. Sections without an entry keep a single fixed footprint (no
- * toggle) driven by SECTION_SPAN / DYNAMIC_ROWS above.
+ * the default and matches SECTION_SPAN / DYNAMIC_ROWS so nothing changes until
+ * the user picks another. Sections without an entry keep a single fixed footprint
+ * (no toggle). All these cards reflow to the card width on their own (auto-fill
+ * grids, wrapping text, or a scaling image), so only the footprint is curated
+ * here — the narrower options carry more rows for the taller reflowed content.
  */
 const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
+  skills: [
+    { label: 'Wide', cols: 3, rows: 1 },
+    { label: 'Medium', cols: 2, rows: 2 },
+    { label: 'List', cols: 1, rows: 3 },
+  ],
+  proficiencies: [
+    { label: 'Wide', cols: 2, rows: 1 },
+    { label: 'List', cols: 1, rows: 2 },
+  ],
+  actions: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 5 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 8, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 5, maxRows: 6 } },
+  ],
+  spells: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 6 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 9, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 6, maxRows: 6 } },
+  ],
   inventory: [
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 20, maxRows: 6 } },
     { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 13, maxRows: 6 } },
     { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 7, maxRows: 6 } },
+  ],
+  features: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 13, maxRows: 6 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 9, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 5, maxRows: 6 } },
+  ],
+  notes: [
+    { label: 'Wide', cols: 3, rows: 2 },
+    { label: 'Medium', cols: 2, rows: 2 },
+    { label: 'List', cols: 1, rows: 3 },
+  ],
+  portrait: [
+    { label: 'Small', cols: 1, rows: 1 },
+    { label: 'Large', cols: 2, rows: 2 },
   ],
 };
 

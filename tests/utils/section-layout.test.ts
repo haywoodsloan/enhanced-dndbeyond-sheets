@@ -48,21 +48,26 @@ describe('sectionSpan dynamic height', () => {
 describe('section layout options', () => {
   it('reports how many curated layouts a section offers', () => {
     expect(sectionLayoutCount('inventory')).toBe(3);
+    expect(sectionLayoutCount('skills')).toBe(3);
+    expect(sectionLayoutCount('proficiencies')).toBe(2);
+    expect(sectionLayoutCount('portrait')).toBe(2);
     // Sections without curated options have a single fixed layout (no toggle).
-    expect(sectionLayoutCount('spells')).toBe(1);
     expect(sectionLayoutCount('basics')).toBe(1);
+    expect(sectionLayoutCount('wealth')).toBe(1);
+    expect(sectionLayoutCount('senses')).toBe(1);
   });
 
-  it('labels each inventory layout option', () => {
+  it('labels each layout option', () => {
     expect(sectionLayoutLabel('inventory', 0)).toBe('Wide');
     expect(sectionLayoutLabel('inventory', 1)).toBe('Medium');
     expect(sectionLayoutLabel('inventory', 2)).toBe('List');
+    expect(sectionLayoutLabel('portrait', 1)).toBe('Large');
     // Out-of-range clamps to the last option; no options → empty string.
     expect(sectionLayoutLabel('inventory', 9)).toBe('List');
-    expect(sectionLayoutLabel('spells', 0)).toBe('');
+    expect(sectionLayoutLabel('basics', 0)).toBe('');
   });
 
-  it('sizes the card from the chosen inventory layout', () => {
+  it('sizes content cards from the chosen layout, growing narrower ones taller', () => {
     expect(sectionSpan('inventory', 4, 0)).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('inventory', 4, 1)).toEqual({ cols: 2, rows: 2 });
     expect(sectionSpan('inventory', 4, 2)).toEqual({ cols: 1, rows: 2 });
@@ -71,6 +76,14 @@ describe('section layout options', () => {
     expect(sectionSpan('inventory', 21, 0).rows).toBe(2); // ceil(21/20)=2
     // An out-of-range index clamps to the last option.
     expect(sectionSpan('inventory', 4, 9)).toEqual({ cols: 1, rows: 2 });
+  });
+
+  it('sizes fixed-count cards per layout (skills has no dynamic growth)', () => {
+    expect(sectionSpan('skills', 18, 0)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('skills', 18, 1)).toEqual({ cols: 2, rows: 2 });
+    expect(sectionSpan('skills', 18, 2)).toEqual({ cols: 1, rows: 3 });
+    // Portrait scales as a whole footprint.
+    expect(sectionSpan('portrait', 0, 1)).toEqual({ cols: 2, rows: 2 });
   });
 });
 
