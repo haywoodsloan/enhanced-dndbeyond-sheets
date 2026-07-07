@@ -15,6 +15,7 @@ import FeaturesCard from '@/components/FeaturesCard.vue';
 import NotesCard from '@/components/NotesCard.vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import type { SectionSpan } from '@/utils/section-layout';
+import { characterSubtitle } from '@/utils/character-summary';
 import { computed } from 'vue';
 
 // `span` controls the card footprint (columns × row-units). A future `expanded`
@@ -45,6 +46,19 @@ const cardStyle = computed(() => {
     height: `calc(${props.span.rows} * var(--row-unit, 130px) + ${props.span.rows - 1} * var(--grid-gap, 12px))`,
   };
 });
+
+// The Basics card doubles as the sheet header: its title is the character name
+// and its subtitle the race / class line. Every other card keeps its section title.
+const cardTitle = computed(() =>
+  props.section.key === 'basics' && props.character
+    ? props.character.name
+    : props.section.title,
+);
+const cardSubtitle = computed(() =>
+  props.section.key === 'basics' && props.character
+    ? characterSubtitle(props.character)
+    : '',
+);
 </script>
 
 <template>
@@ -56,8 +70,11 @@ const cardStyle = computed(() => {
   >
     <template #title>
       <div class="card__title">
-        <span>{{ section.title }}</span>
+        <span>{{ cardTitle }}</span>
       </div>
+    </template>
+    <template v-if="cardSubtitle" #subtitle>
+      <span class="card__subtitle">{{ cardSubtitle }}</span>
     </template>
     <template #content>
       <span v-if="!hidden" class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
@@ -320,6 +337,13 @@ const cardStyle = computed(() => {
   gap: 8px;
   font-size: 15px;
   color: var(--p-primary-color);
+}
+
+/* Subtitle only appears on the Basics card (the race / class line). */
+.card__subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--p-primary-700, #6b7280);
 }
 
 .card__note {

@@ -29,17 +29,6 @@ const props = defineProps<{ characterId: number | null }>();
 
 const { character, status, error } = useCharacter(toRef(props, 'characterId'));
 
-const subtitle = computed(() => {
-  const loaded = character.value;
-  if (!loaded) return '';
-  const classes = loaded.classes
-    .map((cls) =>
-      cls.subclass ? `${cls.name} ${cls.level} (${cls.subclass})` : `${cls.name} ${cls.level}`,
-    )
-    .join(' / ');
-  return [loaded.race, classes].filter(Boolean).join(' · ');
-});
-
 const { sections: orderedSections, hiddenSections, layoutIndices, moveByIndex, cycleLayout, hide, show } =
   useSectionLayout(character);
 
@@ -223,11 +212,6 @@ onUnmounted(() => {
         </p>
 
         <template v-else-if="character">
-          <header class="sheet__header">
-            <h1>{{ character.name }}</h1>
-            <p>{{ subtitle }}</p>
-          </header>
-
           <div class="sheet__grid" ref="gridRef">
             <SectionCard
               v-for="section in orderedSections"
@@ -385,21 +369,6 @@ body {
   right: 0;
   background: var(--paper);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
-}
-
-.sheet__header {
-  margin-bottom: 16px;
-}
-
-.sheet__header h1 {
-  margin: 0 0 2px;
-  font-size: 22px;
-  color: var(--p-primary-color);
-}
-
-.sheet__header p {
-  margin: 0;
-  color: var(--p-primary-700, #666);
 }
 
 .sheet__grid {
