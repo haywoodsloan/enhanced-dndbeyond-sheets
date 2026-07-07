@@ -6,7 +6,7 @@ export default defineConfig({
   // Build Manifest V3 for all browsers (including Firefox).
   manifestVersion: 3,
   manifest: {
-    name: 'Beyond+: Print Enhanced Character Sheets',
+    name: 'Beyond+',
     // `contextMenus` (right-click entry), `activeTab` (the popup reads the active
     // tab's URL), `webRequest` (capture the user's Authorization header from D&D
     // Beyond's own request so private characters load), `storage` (hold that
