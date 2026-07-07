@@ -61,7 +61,17 @@ const cardStyle = computed(() => {
         :aria-label="hidden ? 'Show section' : 'Hide section'"
         @click="hidden ? emit('show', section.key) : emit('hide', section.key)"
       >
-        {{ hidden ? '+' : '×' }}
+        <svg v-if="hidden" class="card__toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2 8a10.645 10.645 0 0 0 20 0" />
+          <path d="m4 15 1.726-2.05" />
+          <path d="m9 18 .722-3.25" />
+          <path d="m15 18-.722-3.25" />
+          <path d="m20 15-1.726-2.05" />
+        </svg>
+        <svg v-else class="card__toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
       </button>
       <PortraitCard
         v-if="section.key === 'portrait' && character?.avatarUrl"
@@ -185,11 +195,20 @@ const cardStyle = computed(() => {
   border-radius: 999px;
   background: var(--p-primary-50, #fff);
   color: var(--p-primary-700, #6b7280);
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease;
+}
+
+.card__toggle-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .card:hover .card__toggle,
