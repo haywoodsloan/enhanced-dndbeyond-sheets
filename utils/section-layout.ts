@@ -23,7 +23,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   senses: { cols: 1, rows: 1 },
   proficiencies: { cols: 2, rows: 1 },
   actions: { cols: 3, rows: 2 },
-  spells: { cols: 3, rows: 1 },
+  spells: { cols: 3, rows: 2 },
   inventory: { cols: 3, rows: 2 },
   wealth: { cols: 1, rows: 1 },
   features: { cols: 3, rows: 2 },

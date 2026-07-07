@@ -18,6 +18,7 @@ describe('sectionSpan', () => {
 describe('sectionSpan dynamic height', () => {
   it('keeps base rows for small content-heavy sections', () => {
     expect(sectionSpan('actions', 3)).toEqual({ cols: 3, rows: 2 });
+    expect(sectionSpan('spells', 5)).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('inventory', 4)).toEqual({ cols: 3, rows: 2 });
   });
 
