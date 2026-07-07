@@ -94,12 +94,16 @@ const pageHeightPx = computed(() => pageMetrics.value.band);
 
 // Drag-and-drop reordering of the section cards. nextTick lets SortableJS
 // finish its DOM move before Vue re-renders from the reordered list; then we
-// persist (inside moveByIndex) and re-run pagination.
-useSortableGrid(gridRef, (from, to) => {
-  void nextTick(() => {
-    moveByIndex(from, to);
-    void nextTick(repaginate);
-  });
+// persist (inside moveByIndex) and re-run pagination. `onPreview` re-paginates
+// live during the drag so the make-space preview respects page breaks.
+useSortableGrid(gridRef, {
+  onReorder: (from, to) => {
+    void nextTick(() => {
+      moveByIndex(from, to);
+      void nextTick(repaginate);
+    });
+  },
+  onPreview: () => repaginate(),
 });
 
 // Apply the selected primary theme color across the document. Wrapped
@@ -337,17 +341,25 @@ body {
 }
 
 /* Drag-reorder feedback (SortableJS). The placeholder slot dims to show where
-   the card will land; the floating clone is shrunk to a clear "mini" preview. */
+   the card will land; SortableJS's own fallback clone is hidden and we render a
+   mini preview (.card-drag-preview) that tracks the cursor exactly. */
 .sortable-ghost {
-  opacity: 0.35;
+  opacity: 0.3;
 }
 
 .sortable-fallback {
-  transform: scale(0.5);
-  transform-origin: top left;
-  opacity: 0.95 !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  cursor: grabbing;
+  opacity: 0 !important;
+}
+
+.card-drag-preview {
+  position: fixed;
+  z-index: 100001;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.96;
+  transform: translate(-50%, -50%) scale(0.5);
+  transform-origin: center center;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
 }
 
 @media print {

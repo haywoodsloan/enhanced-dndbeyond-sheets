@@ -40,6 +40,7 @@ defineProps<{
       </div>
     </template>
     <template #content>
+      <span class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
       <PortraitCard
         v-if="section.key === 'portrait' && character?.avatarUrl"
         :avatar-url="character.avatarUrl"
@@ -101,10 +102,35 @@ defineProps<{
 
 <style scoped>
 .card {
-  cursor: grab;
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--p-primary-300, #d4d4d8);
   box-shadow: none;
+}
+
+/* Drag handle: a grip bar at the top-center that appears on hover; the only
+   place a card can be grabbed to reorder (SortableJS `handle`). */
+.card__drag-handle {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: 40px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--p-primary-300, #b8b8bd);
+  opacity: 0;
+  cursor: grab;
+  transition: opacity 0.12s ease;
+}
+
+.card:hover .card__drag-handle {
+  opacity: 0.9;
+}
+
+.card__drag-handle:active {
+  cursor: grabbing;
 }
 
 /* Let the portrait fill its card so the image can scale to fit without cropping. */
