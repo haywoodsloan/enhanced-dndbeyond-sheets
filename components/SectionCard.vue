@@ -125,6 +125,7 @@ const cardStyle = computed(() => {
       <ProficienciesCard
         v-else-if="section.key === 'proficiencies' && character"
         :proficiencies="character.proficiencies"
+        :columns="span.cols"
       />
       <ActionsCard
         v-else-if="section.key === 'actions' && character"

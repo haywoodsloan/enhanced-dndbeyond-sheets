@@ -18,4 +18,12 @@ describe('ProficienciesCard', () => {
     expect(wrapper.get('[data-group="Weapons"]').text()).toContain('Simple Weapons');
     expect(wrapper.find('[data-group="Tools"]').exists()).toBe(false);
   });
+
+  it('splits the groups into the requested number of columns', () => {
+    const wrapper = mount(ProficienciesCard, { props: { proficiencies, columns: 2 } });
+
+    expect(wrapper.findAll('.profs__column')).toHaveLength(2);
+    // The three non-empty groups still all render.
+    expect(wrapper.findAll('[data-group]')).toHaveLength(3);
+  });
 });
