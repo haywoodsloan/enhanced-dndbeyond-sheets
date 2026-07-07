@@ -104,6 +104,8 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   ],
   portrait: [
     { label: 'Small', cols: 1, rows: 1 },
+    { label: 'Tall', cols: 1, rows: 2 },
+    { label: 'Wide', cols: 2, rows: 1 },
     { label: 'Large', cols: 2, rows: 2 },
   ],
 };
