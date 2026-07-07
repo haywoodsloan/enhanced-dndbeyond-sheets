@@ -125,19 +125,25 @@ export function applySavedOrder(
 }
 
 /**
- * Move `source` so it takes `target`'s position in `keys` (dropping a dragged
- * card onto another). Returns a new array; a no-op when `source === target` or
- * `target` isn't present.
+ * Move the section at `from` to index `to` (drag-reorder). Returns a new array,
+ * or the same array for a no-op or an out-of-range index.
  */
-export function moveSectionKey(
-  keys: SectionKey[],
-  source: SectionKey,
-  target: SectionKey,
-): SectionKey[] {
-  if (source === target) return keys;
-  const without = keys.filter((key) => key !== source);
-  const targetIndex = without.indexOf(target);
-  if (targetIndex === -1) return keys;
-  without.splice(targetIndex, 0, source);
-  return without;
+export function moveSectionByIndex(
+  sections: CharacterSection[],
+  from: number,
+  to: number,
+): CharacterSection[] {
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= sections.length ||
+    to >= sections.length
+  ) {
+    return sections;
+  }
+  const result = [...sections];
+  const [moved] = result.splice(from, 1);
+  result.splice(to, 0, moved);
+  return result;
 }

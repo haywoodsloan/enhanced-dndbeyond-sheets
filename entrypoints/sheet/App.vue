@@ -5,6 +5,7 @@ import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { useSectionLayout } from '@/composables/useSectionLayout';
+import { useSortableGrid } from '@/composables/useSortableGrid';
 import { useStoredRef } from '@/composables/useStoredRef';
 import { GRID_GAP, gridRowsPerPage, sectionSpan } from '@/utils/section-layout';
 import {
@@ -16,7 +17,6 @@ import {
 } from '@/utils/page-format';
 import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
 import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/preferences';
-import type { SectionKey } from '@/services/dndbeyond/model';
 import SectionCard from '@/components/SectionCard.vue';
 
 const props = defineProps<{ characterId: number | null }>();
@@ -34,7 +34,7 @@ const subtitle = computed(() => {
   return [loaded.race, classes].filter(Boolean).join(' · ');
 });
 
-const { sections: orderedSections, moveSection } = useSectionLayout(character);
+const { sections: orderedSections, moveByIndex } = useSectionLayout(character);
 
 // Page layout settings (page type, margins, theme color), persisted locally.
 const formatId = useStoredRef(pageFormatPref, DEFAULT_FORMAT_ID);
@@ -92,41 +92,15 @@ const { pageCount, apply: repaginate } = useSheetPagination(
 const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
 const pageHeightPx = computed(() => pageMetrics.value.band);
 
-// Native drag-and-drop reordering of section cards (persists the new order).
-const draggingKey = ref<SectionKey | null>(null);
-
-function sectionKeyAt(event: DragEvent): SectionKey | null {
-  const el = (event.target as HTMLElement | null)?.closest?.('[data-section-key]');
-  const key = (el as HTMLElement | null)?.dataset.sectionKey;
-  return (key as SectionKey | undefined) ?? null;
-}
-
-function onCardDragStart(event: DragEvent) {
-  const key = sectionKeyAt(event);
-  if (!key) return;
-  draggingKey.value = key;
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', key);
-  }
-}
-
-function onCardDragOver(event: DragEvent) {
-  if (draggingKey.value && event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-}
-
-function onCardDrop(event: DragEvent) {
-  const target = sectionKeyAt(event);
-  const source = draggingKey.value;
-  draggingKey.value = null;
-  if (!source || !target || source === target) return;
-  moveSection(source, target);
-  void nextTick(repaginate);
-}
-
-function onCardDragEnd() {
-  draggingKey.value = null;
-}
+// Drag-and-drop reordering of the section cards. nextTick lets SortableJS
+// finish its DOM move before Vue re-renders from the reordered list; then we
+// persist (inside moveByIndex) and re-run pagination.
+useSortableGrid(gridRef, (from, to) => {
+  void nextTick(() => {
+    moveByIndex(from, to);
+    void nextTick(repaginate);
+  });
+});
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
@@ -225,14 +199,7 @@ onUnmounted(() => {
             <p>{{ subtitle }}</p>
           </header>
 
-          <div
-            class="sheet__grid"
-            ref="gridRef"
-            @dragstart="onCardDragStart"
-            @dragover.prevent="onCardDragOver"
-            @drop="onCardDrop"
-            @dragend="onCardDragEnd"
-          >
+          <div class="sheet__grid" ref="gridRef">
             <SectionCard
               v-for="section in orderedSections"
               :key="section.key"
@@ -367,6 +334,20 @@ body {
 /* Keep a card whole rather than letting it split across a page break. */
 .card {
   break-inside: avoid;
+}
+
+/* Drag-reorder feedback (SortableJS). The placeholder slot dims to show where
+   the card will land; the floating clone is shrunk to a clear "mini" preview. */
+.sortable-ghost {
+  opacity: 0.35;
+}
+
+.sortable-fallback {
+  transform: scale(0.5);
+  transform-origin: top left;
+  opacity: 0.95 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  cursor: grabbing;
 }
 
 @media print {

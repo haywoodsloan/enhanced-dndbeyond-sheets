@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applySavedOrder,
   defaultSectionOrder,
-  moveSectionKey,
+  moveSectionByIndex,
 } from '@/utils/section-order';
 import {
   SECTION_KEYS,
@@ -162,9 +162,20 @@ describe('applySavedOrder', () => {
   });
 });
 
-describe('moveSectionKey', () => {
-  it("moves the source into the target's slot", () => {
-    expect(moveSectionKey(['basics', 'skills', 'spells', 'notes'], 'notes', 'skills')).toEqual([
+describe('moveSectionByIndex', () => {
+  const base = asSections(['basics', 'skills', 'spells', 'notes']);
+
+  it('moves an item to a later index', () => {
+    expect(moveSectionByIndex(base, 0, 2).map((s) => s.key)).toEqual([
+      'skills',
+      'spells',
+      'basics',
+      'notes',
+    ]);
+  });
+
+  it('moves an item to an earlier index', () => {
+    expect(moveSectionByIndex(base, 3, 1).map((s) => s.key)).toEqual([
       'basics',
       'notes',
       'skills',
@@ -172,17 +183,9 @@ describe('moveSectionKey', () => {
     ]);
   });
 
-  it('is a no-op when source equals target', () => {
-    expect(moveSectionKey(['basics', 'skills'], 'skills', 'skills')).toEqual([
-      'basics',
-      'skills',
-    ]);
-  });
-
-  it('returns the input unchanged when the target is missing', () => {
-    expect(moveSectionKey(['basics', 'skills'], 'basics', 'wealth')).toEqual([
-      'basics',
-      'skills',
-    ]);
+  it('returns the same array for a no-op or out-of-range index', () => {
+    expect(moveSectionByIndex(base, 1, 1)).toBe(base);
+    expect(moveSectionByIndex(base, -1, 2)).toBe(base);
+    expect(moveSectionByIndex(base, 0, 9)).toBe(base);
   });
 });

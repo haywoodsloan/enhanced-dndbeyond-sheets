@@ -33,7 +33,6 @@ defineProps<{
       height: `calc(${span.rows} * var(--row-unit, 130px) + ${span.rows - 1} * var(--grid-gap, 12px))`,
     }"
     :data-section-key="section.key"
-    draggable="true"
   >
     <template #title>
       <div class="card__title">
