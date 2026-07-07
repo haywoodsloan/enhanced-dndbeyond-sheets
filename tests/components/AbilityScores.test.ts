@@ -38,15 +38,17 @@ describe('AbilityScores', () => {
   });
 
   it('arranges the tiles to stay square for the card aspect', () => {
-    // Wide (2×1 card) → 3 columns; Tall (1×2 card) → 2 columns.
+    // Wide (2×1 card) → 3 columns; a 1-col-wide card → one full-width list column.
     const wide = mount(AbilityScores, { props: { abilities, cols: 2, rows: 1 } });
     expect(wide.get('.abilities').attributes('style')).toContain(
       'grid-template-columns: repeat(3, 1fr)',
     );
+    expect(wide.find('.abilities--list').exists()).toBe(false);
 
     const tall = mount(AbilityScores, { props: { abilities, cols: 1, rows: 2 } });
     expect(tall.get('.abilities').attributes('style')).toContain(
-      'grid-template-columns: repeat(2, 1fr)',
+      'grid-template-columns: repeat(1, 1fr)',
     );
+    expect(tall.find('.abilities--list').exists()).toBe(true);
   });
 });

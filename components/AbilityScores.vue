@@ -5,26 +5,31 @@ import { formatModifier } from '@/utils/dnd5e';
 
 const props = defineProps<{ abilities: AbilityScore[]; cols?: number; rows?: number }>();
 
-// Arrange the tiles to stay roughly square for the card's aspect (its cols:rows)
-// and stretch to fill: tileCols ≈ sqrt(count · cols / rows), tileRows the rest.
-const gridStyle = computed(() => {
+// Arrange the tiles to stay roughly square for the card's aspect and stretch to
+// fill. A single-grid-column card lays them out as ONE full-width column (a
+// horizontal stat line each) so the narrow card fills instead of splitting into
+// cramped mini-columns.
+const grid = computed(() => {
   const cols = Math.max(1, props.cols ?? 2);
   const rows = Math.max(1, props.rows ?? 2);
   const count = props.abilities.length;
-  const tileCols = Math.min(
-    count,
-    Math.max(1, Math.round(Math.sqrt((count * cols) / rows))),
-  );
-  const tileRows = Math.ceil(count / tileCols);
-  return {
-    gridTemplateColumns: `repeat(${tileCols}, 1fr)`,
-    gridTemplateRows: `repeat(${tileRows}, 1fr)`,
-  };
+  const tileCols =
+    cols <= 1
+      ? 1
+      : Math.min(count, Math.max(1, Math.round(Math.sqrt((count * cols) / rows))));
+  return { tileCols, tileRows: Math.ceil(count / tileCols) };
 });
+
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${grid.value.tileCols}, 1fr)`,
+  gridTemplateRows: `repeat(${grid.value.tileRows}, 1fr)`,
+}));
+
+const isList = computed(() => grid.value.tileCols === 1);
 </script>
 
 <template>
-  <ul class="abilities" :style="gridStyle">
+  <ul class="abilities" :class="{ 'abilities--list': isList }" :style="gridStyle">
     <li
       v-for="ability in abilities"
       :key="ability.key"
@@ -57,6 +62,19 @@ const gridStyle = computed(() => {
   padding: 6px 4px;
   border: 1px solid var(--p-content-border-color, #e5e5e5);
   border-radius: 8px;
+}
+
+/* Single-column (narrow) layout: full-width rows with the name on the left and
+   the modifier + score on the right, so a tall narrow card fills cleanly. */
+.abilities--list .ability {
+  flex-direction: row;
+  gap: 10px;
+  padding: 6px 12px;
+}
+
+.abilities--list .ability__name {
+  flex: 1;
+  text-align: left;
 }
 
 .ability__name {
