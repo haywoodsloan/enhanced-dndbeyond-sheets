@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSectionOrder } from '@/utils/section-order';
+import {
+  applySavedOrder,
+  defaultSectionOrder,
+  moveSectionKey,
+} from '@/utils/section-order';
 import {
   SECTION_KEYS,
   type Character,
@@ -125,6 +129,60 @@ describe('defaultSectionOrder', () => {
       'inventory',
       'spells',
       'notes',
+    ]);
+  });
+});
+
+const asSections = (keys: SectionKey[]): CharacterSection[] =>
+  keys.map((key) => ({ key, title: key, count: 1, isEmpty: false }));
+
+describe('applySavedOrder', () => {
+  const base = asSections(['basics', 'skills', 'spells']);
+
+  it('returns the base order when nothing is saved', () => {
+    expect(applySavedOrder(base, []).map((s) => s.key)).toEqual([
+      'basics',
+      'skills',
+      'spells',
+    ]);
+  });
+
+  it('reorders to match a full saved order', () => {
+    expect(
+      applySavedOrder(base, ['spells', 'basics', 'skills']).map((s) => s.key),
+    ).toEqual(['spells', 'basics', 'skills']);
+  });
+
+  it('appends unsaved keys after the saved ones in base order', () => {
+    expect(applySavedOrder(base, ['spells']).map((s) => s.key)).toEqual([
+      'spells',
+      'basics',
+      'skills',
+    ]);
+  });
+});
+
+describe('moveSectionKey', () => {
+  it("moves the source into the target's slot", () => {
+    expect(moveSectionKey(['basics', 'skills', 'spells', 'notes'], 'notes', 'skills')).toEqual([
+      'basics',
+      'notes',
+      'skills',
+      'spells',
+    ]);
+  });
+
+  it('is a no-op when source equals target', () => {
+    expect(moveSectionKey(['basics', 'skills'], 'skills', 'skills')).toEqual([
+      'basics',
+      'skills',
+    ]);
+  });
+
+  it('returns the input unchanged when the target is missing', () => {
+    expect(moveSectionKey(['basics', 'skills'], 'basics', 'wealth')).toEqual([
+      'basics',
+      'skills',
     ]);
   });
 });

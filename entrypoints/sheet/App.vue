@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
+import { computed, nextTick, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
 import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
-import { defaultSectionOrder } from '@/utils/section-order';
+import { useSectionLayout } from '@/composables/useSectionLayout';
+import { useStoredRef } from '@/composables/useStoredRef';
 import { GRID_GAP, gridRowsPerPage, sectionSpan } from '@/utils/section-layout';
 import {
   DEFAULT_FORMAT_ID,
@@ -14,6 +15,8 @@ import {
   mmToPx,
 } from '@/utils/page-format';
 import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
+import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/preferences';
+import type { SectionKey } from '@/services/dndbeyond/model';
 import SectionCard from '@/components/SectionCard.vue';
 
 const props = defineProps<{ characterId: number | null }>();
@@ -31,14 +34,12 @@ const subtitle = computed(() => {
   return [loaded.race, classes].filter(Boolean).join(' · ');
 });
 
-const orderedSections = computed(() =>
-  character.value ? defaultSectionOrder(character.value) : [],
-);
+const { sections: orderedSections, moveSection } = useSectionLayout(character);
 
-// Page layout settings (page type, margins, theme color). In memory for now.
-const formatId = ref(DEFAULT_FORMAT_ID);
-const marginId = ref(DEFAULT_MARGIN_ID);
-const colorId = ref(DEFAULT_COLOR_ID);
+// Page layout settings (page type, margins, theme color), persisted locally.
+const formatId = useStoredRef(pageFormatPref, DEFAULT_FORMAT_ID);
+const marginId = useStoredRef(pageMarginPref, DEFAULT_MARGIN_ID);
+const colorId = useStoredRef(themeColorPref, DEFAULT_COLOR_ID);
 
 // PrimeVue Select needs mutable arrays; the source lists stay readonly.
 const formatOptions = [...PAGE_FORMATS];
@@ -80,7 +81,7 @@ const pageMetrics = computed(() => ({
 const sheetRef = ref<HTMLElement | null>(null);
 const gridRef = ref<HTMLElement | null>(null);
 
-const { pageCount } = useSheetPagination(
+const { pageCount, apply: repaginate } = useSheetPagination(
   sheetRef,
   gridRef,
   () => pageMetrics.value,
@@ -90,6 +91,42 @@ const { pageCount } = useSheetPagination(
 // Position of each page rectangle in the backdrop layer.
 const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
 const pageHeightPx = computed(() => pageMetrics.value.band);
+
+// Native drag-and-drop reordering of section cards (persists the new order).
+const draggingKey = ref<SectionKey | null>(null);
+
+function sectionKeyAt(event: DragEvent): SectionKey | null {
+  const el = (event.target as HTMLElement | null)?.closest?.('[data-section-key]');
+  const key = (el as HTMLElement | null)?.dataset.sectionKey;
+  return (key as SectionKey | undefined) ?? null;
+}
+
+function onCardDragStart(event: DragEvent) {
+  const key = sectionKeyAt(event);
+  if (!key) return;
+  draggingKey.value = key;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', key);
+  }
+}
+
+function onCardDragOver(event: DragEvent) {
+  if (draggingKey.value && event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function onCardDrop(event: DragEvent) {
+  const target = sectionKeyAt(event);
+  const source = draggingKey.value;
+  draggingKey.value = null;
+  if (!source || !target || source === target) return;
+  moveSection(source, target);
+  void nextTick(repaginate);
+}
+
+function onCardDragEnd() {
+  draggingKey.value = null;
+}
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
@@ -188,7 +225,14 @@ onUnmounted(() => {
             <p>{{ subtitle }}</p>
           </header>
 
-          <div class="sheet__grid" ref="gridRef">
+          <div
+            class="sheet__grid"
+            ref="gridRef"
+            @dragstart="onCardDragStart"
+            @dragover.prevent="onCardDragOver"
+            @drop="onCardDrop"
+            @dragend="onCardDragEnd"
+          >
             <SectionCard
               v-for="section in orderedSections"
               :key="section.key"

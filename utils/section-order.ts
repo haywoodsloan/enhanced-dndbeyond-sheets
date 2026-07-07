@@ -98,3 +98,46 @@ export function defaultSectionOrder(character: Character): CharacterSection[] {
   const empty = ranked.filter((section) => section.isEmpty);
   return [...nonEmpty, ...empty];
 }
+
+/**
+ * Reorder `base` to honor a user's saved section order. Keys listed in `saved`
+ * lead, in that order; any section not in `saved` keeps its relative position
+ * from `base`, appended after the saved ones. An empty `saved` returns `base`
+ * unchanged (fall back to the class-aware default).
+ */
+export function applySavedOrder(
+  base: CharacterSection[],
+  saved: SectionKey[],
+): CharacterSection[] {
+  if (saved.length === 0) return base;
+  const rank = new Map(saved.map((key, index) => [key, index]));
+  return base
+    .map((section, index) => ({ section, index }))
+    .sort((a, b) => {
+      const ra = rank.get(a.section.key);
+      const rb = rank.get(b.section.key);
+      if (ra !== undefined && rb !== undefined) return ra - rb;
+      if (ra !== undefined) return -1;
+      if (rb !== undefined) return 1;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.section);
+}
+
+/**
+ * Move `source` so it takes `target`'s position in `keys` (dropping a dragged
+ * card onto another). Returns a new array; a no-op when `source === target` or
+ * `target` isn't present.
+ */
+export function moveSectionKey(
+  keys: SectionKey[],
+  source: SectionKey,
+  target: SectionKey,
+): SectionKey[] {
+  if (source === target) return keys;
+  const without = keys.filter((key) => key !== source);
+  const targetIndex = without.indexOf(target);
+  if (targetIndex === -1) return keys;
+  without.splice(targetIndex, 0, source);
+  return without;
+}
