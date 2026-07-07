@@ -113,6 +113,11 @@ useSortableGrid(gridRef, {
   onDragMove: () => repaginate(),
 });
 
+// Re-paginate whenever the visible cards change (hiding/showing a section, a
+// reorder, or the character loading) so stale push-margins are cleared and the
+// reflowed cards are re-checked against the page breaks.
+watch(orderedSections, () => void nextTick(repaginate));
+
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
 watch(
