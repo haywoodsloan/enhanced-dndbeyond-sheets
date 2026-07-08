@@ -233,18 +233,6 @@ onUnmounted(() => {
       <div class="settings__actions">
         <button
           type="button"
-          class="settings__button settings__button--reset"
-          title="Reset layout to defaults"
-          aria-label="Reset layout to defaults"
-          @click="resetLayout"
-        >
-          <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-        </button>
-        <button
-          type="button"
           class="settings__button settings__button--print"
           @click="printSheet"
         >
@@ -256,6 +244,18 @@ onUnmounted(() => {
             <rect x="6" y="14" width="12" height="8" />
           </svg>
           <span>Print</span>
+        </button>
+        <button
+          type="button"
+          class="settings__button settings__button--reset"
+          title="Reset layout to defaults"
+          aria-label="Reset layout to defaults"
+          @click="resetLayout"
+        >
+          <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
         </button>
       </div>
     </aside>
