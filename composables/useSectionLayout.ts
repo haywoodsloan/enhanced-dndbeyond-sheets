@@ -100,6 +100,24 @@ export function useSectionLayout(character: Ref<Character | null>) {
     void sectionLayoutPref.set(layoutIndices.value);
   }
 
+  /** Restore the default layout — default order, nothing hidden, default card
+   * layouts — and clear the saved preferences. */
+  function reset() {
+    // Drop any pending debounced order save so it can't overwrite the reset.
+    if (orderTimer !== undefined) {
+      clearTimeout(orderTimer);
+      orderTimer = undefined;
+    }
+    pendingOrder = null;
+    savedOrder.value = [];
+    hiddenKeys.value = [];
+    layoutIndices.value = {};
+    rebuild();
+    void sectionOrderPref.set([]);
+    void hiddenSectionsPref.set([]);
+    void sectionLayoutPref.set({});
+  }
+
   // Persist any pending reorder before the composable tears down.
   onBeforeUnmount(flushOrder);
 
@@ -109,6 +127,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     layoutIndices,
     moveByIndex,
     cycleLayout,
+    reset,
     hide: (key: SectionKey) => setHidden(key, true),
     show: (key: SectionKey) => setHidden(key, false),
   };

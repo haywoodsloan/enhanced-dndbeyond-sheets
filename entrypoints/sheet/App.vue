@@ -34,7 +34,7 @@ const props = defineProps<{ characterId: number | null }>();
 
 const { character, status, error } = useCharacter(toRef(props, 'characterId'));
 
-const { sections: orderedSections, hiddenSections, layoutIndices, moveByIndex, cycleLayout, hide, show } =
+const { sections: orderedSections, hiddenSections, layoutIndices, moveByIndex, cycleLayout, hide, show, reset: resetLayout } =
   useSectionLayout(character);
 
 // Page layout settings (page type, margins, theme color), persisted locally.
@@ -155,6 +155,12 @@ useCardDrag(gridRef, {
 // reactively from the order, so no manual re-pagination is needed.
 useGridFlip(gridRef, orderedSections);
 
+/** Open the browser's print dialog; the print stylesheet hides the settings
+ * panel and desk so only the sheet prints. */
+function printSheet() {
+  window.print();
+}
+
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
 watch(
@@ -223,6 +229,35 @@ onUnmounted(() => {
           class="settings__control"
         />
       </label>
+
+      <div class="settings__actions">
+        <button
+          type="button"
+          class="settings__button settings__button--reset"
+          title="Reset layout to defaults"
+          aria-label="Reset layout to defaults"
+          @click="resetLayout"
+        >
+          <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="settings__button settings__button--print"
+          @click="printSheet"
+        >
+          <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="6 9 6 2 18 2 18 9" />
+            <path
+              d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+            />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          <span>Print</span>
+        </button>
+      </div>
     </aside>
 
     <div class="sheet-area">
@@ -345,6 +380,65 @@ body {
 
 .settings__control {
   width: 100%;
+}
+
+/* Print + reset row at the foot of the panel: the reset is a fixed square, the
+   print button flexes to fill the rest of the row. */
+.settings__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.settings__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.settings__button--reset {
+  flex: none;
+  width: 40px;
+  padding: 0;
+  background: var(--paper);
+  color: var(--p-primary-700, #6b7280);
+}
+
+.settings__button--reset:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+  color: var(--p-primary-color);
+}
+
+.settings__button--print {
+  flex: 1;
+  background: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+  color: #fff;
+}
+
+.settings__button--print:hover {
+  background: var(--p-primary-600);
+  border-color: var(--p-primary-600);
+}
+
+.settings__button-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .sheet-area {
