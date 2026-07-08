@@ -38,6 +38,7 @@ const isList = computed(() => grid.value.tileCols === 1);
     >
       <span class="ability__name">{{ ability.name }}</span>
       <span class="ability__mod">{{ formatModifier(ability.modifier) }}</span>
+      <span class="ability__sep" aria-hidden="true">|</span>
       <span class="ability__score">{{ ability.score }}</span>
     </li>
   </ul>
@@ -75,6 +76,18 @@ const isList = computed(() => grid.value.tileCols === 1);
 .abilities--list .ability__name {
   flex: 1;
   text-align: left;
+}
+
+/* A divider between the modifier and the total score, only in the list layout. */
+.ability__sep {
+  display: none;
+}
+
+.abilities--list .ability__sep {
+  display: inline;
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--p-primary-300, #cbd5e1);
 }
 
 .ability__name {
