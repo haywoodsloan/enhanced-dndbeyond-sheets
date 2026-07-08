@@ -11,14 +11,6 @@ const coins = computed(() => [
   { key: 'sp', label: 'SP', name: 'Silver', value: props.wealth.sp },
   { key: 'cp', label: 'CP', name: 'Copper', value: props.wealth.cp },
 ]);
-
-// Everything converted to gold, so the sheet shows total worth at a glance.
-const totalGp = computed(() => {
-  const { pp, gp, ep, sp, cp } = props.wealth;
-  const total = pp * 10 + gp + ep * 0.5 + sp * 0.1 + cp * 0.01;
-  const rounded = Math.round(total * 100) / 100;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toString();
-});
 </script>
 
 <template>
@@ -32,10 +24,9 @@ const totalGp = computed(() => {
         <span class="coin__value">{{ coin.value }}</span>
       </li>
     </ul>
-    <p class="wealth__total">
-      <span class="wealth__total-label">Total</span>
-      <span class="wealth__total-value">{{ totalGp }} gp</span>
-    </p>
+    <div class="wealth__gains">
+      <span class="wealth__gains-label">Gained since printing</span>
+    </div>
   </div>
 </template>
 
@@ -47,18 +38,15 @@ const totalGp = computed(() => {
 }
 
 .coins {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* Even bands so the five denominations fill the card height. */
 .coin {
-  flex: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -70,8 +58,8 @@ const totalGp = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border: 1.5px solid var(--p-primary-300, #d4d4d8);
   border-radius: 50%;
   font-size: 10px;
@@ -117,29 +105,20 @@ const totalGp = computed(() => {
   color: #1c1c1e;
 }
 
-/* Running total, set off with a stronger rule as the summary line. */
-.wealth__total {
+/* Blank space for the player to jot coins gained since the sheet was printed. */
+.wealth__gains {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 4px 0 0;
+  flex-direction: column;
+  margin-top: 10px;
   padding-top: 6px;
-  border-top: 2px solid var(--p-primary-300, #d4d4d8);
+  border-top: 1px solid var(--p-primary-200, #e5e7eb);
 }
 
-.wealth__total-label {
-  font-size: 12px;
+.wealth__gains-label {
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--p-primary-700, #6b7280);
-}
-
-.wealth__total-value {
-  font-size: 16px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #1c1c1e;
+  color: var(--p-text-muted-color, #888);
 }
 </style>
