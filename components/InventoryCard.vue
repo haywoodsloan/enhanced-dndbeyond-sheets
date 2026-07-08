@@ -20,8 +20,8 @@ const columnGroups = computed(() => {
   <div class="inventory">
     <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="column">
       <span class="column__spacer" aria-hidden="true"></span>
-      <span class="column__label">Equipped</span>
-      <span class="column__label">Attuned</span>
+      <span class="column__label" title="Equipped">Eq</span>
+      <span class="column__label" title="Attuned">At</span>
       <template v-for="(item, index) in column" :key="index">
         <span v-if="index > 0" class="item__divider" aria-hidden="true"></span>
         <span class="item__name" data-item>

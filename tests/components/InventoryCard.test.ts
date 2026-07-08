@@ -16,9 +16,12 @@ describe('InventoryCard', () => {
     expect(wrapper.findAll('[data-item]')).toHaveLength(2);
     expect(wrapper.text()).toContain('Plate');
     expect(wrapper.text()).toContain('×3');
-    // Circles are labeled once in the column header, not per item.
-    expect(wrapper.text()).toContain('Equipped');
-    expect(wrapper.text()).toContain('Attuned');
+    // Circles are labeled once in the column header (abbreviated; full word on hover).
+    const labels = wrapper.findAll('.column__label');
+    expect(labels[0].text()).toBe('Eq');
+    expect(labels[0].attributes('title')).toBe('Equipped');
+    expect(labels[1].text()).toBe('At');
+    expect(labels[1].attributes('title')).toBe('Attuned');
     // Only Plate is equipped → exactly one filled circle across both items.
     expect(wrapper.findAll('.item__dot--on')).toHaveLength(1);
   });
