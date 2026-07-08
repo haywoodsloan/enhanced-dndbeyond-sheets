@@ -114,6 +114,8 @@ watch(
   /* Fill the card height (SectionCard stretches the content) so the blank
      write-in rows can grow into the leftover space below the list. */
   height: 100%;
+  /* Nudge the columns up a touch to sit closer under the card title. */
+  margin-top: -6px;
 }
 
 .column {
