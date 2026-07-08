@@ -174,6 +174,20 @@ export function sectionSpan(
 }
 
 /**
+ * How many internal columns the inventory list renders. The wide (3-col) card
+ * prefers 2 wider columns for readability, dropping to 3 only when the items
+ * wouldn't fit two columns at the card's height; narrower cards keep their own
+ * column count. A two-column layout holds ~⅔ the items of the tuned three-column
+ * one at the same height.
+ */
+export function inventoryListColumns(count: number, span: SectionSpan): number {
+  if (span.cols < 3) return span.cols;
+  const perRow = SECTION_LAYOUTS.inventory?.[0]?.dynamic?.perRow ?? 20;
+  const twoColumnCapacity = Math.floor((perRow * 2 * span.rows) / 3);
+  return count <= twoColumnCapacity ? 2 : 3;
+}
+
+/**
  * How many row-units fit on one page so the rows:columns ratio best matches the
  * print area's height:width, clamped to a sensible single digit.
  */

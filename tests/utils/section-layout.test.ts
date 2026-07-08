@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   gridRowsPerPage,
+  inventoryListColumns,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
@@ -104,6 +105,20 @@ describe('section layout options', () => {
     expect(sectionSpan('notes', 0, 3, 5)).toEqual({ cols: 3, rows: 5 });
     // Falls back to the option's own rows when the page size isn't known.
     expect(sectionSpan('notes', 0, 3)).toEqual({ cols: 3, rows: 4 });
+  });
+});
+
+describe('inventoryListColumns', () => {
+  it('uses two columns in the wide card when the items fit, else three', () => {
+    // Wide is 3-wide; two columns hold ~2/3 of the tuned three-column capacity
+    // (perRow 20), so at 2 rows the cutoff is floor(20*2*2/3) = 26 items.
+    expect(inventoryListColumns(24, { cols: 3, rows: 2 })).toBe(2);
+    expect(inventoryListColumns(26, { cols: 3, rows: 2 })).toBe(2);
+    expect(inventoryListColumns(27, { cols: 3, rows: 2 })).toBe(3);
+    expect(inventoryListColumns(40, { cols: 3, rows: 2 })).toBe(3);
+    // Narrower cards keep their own column count.
+    expect(inventoryListColumns(24, { cols: 2, rows: 2 })).toBe(2);
+    expect(inventoryListColumns(24, { cols: 1, rows: 2 })).toBe(1);
   });
 });
 

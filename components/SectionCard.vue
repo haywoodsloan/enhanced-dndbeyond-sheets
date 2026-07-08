@@ -14,7 +14,7 @@ import WealthCard from '@/components/WealthCard.vue';
 import FeaturesCard from '@/components/FeaturesCard.vue';
 import NotesCard from '@/components/NotesCard.vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
-import type { SectionSpan } from '@/utils/section-layout';
+import { inventoryListColumns, type SectionSpan } from '@/utils/section-layout';
 import { characterSubtitle } from '@/utils/character-summary';
 import { computed } from 'vue';
 
@@ -158,7 +158,7 @@ const cardSubtitle = computed(() =>
       <InventoryCard
         v-else-if="section.key === 'inventory' && character"
         :inventory="character.inventory"
-        :columns="span.cols"
+        :columns="inventoryListColumns(section.count, span)"
       />
       <WealthCard
         v-else-if="section.key === 'wealth' && character"
