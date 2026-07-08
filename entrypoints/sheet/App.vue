@@ -6,6 +6,7 @@ import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import { useCardDrag } from '@/composables/useCardDrag';
+import { useGridFlip } from '@/composables/useGridFlip';
 import { useStoredRef } from '@/composables/useStoredRef';
 import {
   GRID_GAP,
@@ -110,6 +111,12 @@ useCardDrag(gridRef, {
   onReorder: (from, to) => moveByIndex(from, to),
   onDragMove: () => void nextTick(repaginate),
 });
+
+// Glide the cards to their new slots when the order changes (a drag-reorder or
+// hiding/showing a section) instead of snapping. Purely visual: the drag
+// hit-testing and pagination measure layout offsets, so the animation's
+// transform never perturbs where cards are computed to be.
+useGridFlip(gridRef, orderedSections);
 
 // Re-paginate whenever the visible cards change (hiding/showing a section, a
 // reorder, or the character loading) so stale push-margins are cleared and the

@@ -11,11 +11,21 @@ interface CardDragOptions {
 /** Distance (px) the pointer must travel before a grab becomes a drag. */
 const DRAG_THRESHOLD = 4;
 
-/** Bounding rects of the grid's card children, in document (model) order. */
+/**
+ * Bounding rects of the grid's card children, in document (model) order,
+ * measured from layout offsets instead of getBoundingClientRect. The cards glide
+ * to reordered slots via a CSS transform, and offsets ignore transforms, so the
+ * drop slot is always resolved against the cards' resting positions rather than
+ * their mid-animation ones (which would make the target oscillate).
+ */
 function cardRects(grid: HTMLElement): Rect[] {
-  return Array.from(grid.children).map((child) => {
-    const rect = child.getBoundingClientRect();
-    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+  const gridRect = grid.getBoundingClientRect();
+  const originLeft = gridRect.left - grid.offsetLeft;
+  const originTop = gridRect.top - grid.offsetTop;
+  return (Array.from(grid.children) as HTMLElement[]).map((child) => {
+    const left = originLeft + child.offsetLeft;
+    const top = originTop + child.offsetTop;
+    return { left, top, right: left + child.offsetWidth, bottom: top + child.offsetHeight };
   });
 }
 

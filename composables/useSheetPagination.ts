@@ -24,11 +24,10 @@ export function useSheetPagination(
     // Reset so the next measurement reflects the natural (unpushed) layout.
     for (const card of cards) card.style.marginTop = '';
 
-    const sheetTop = sheetEl.getBoundingClientRect().top;
-    const boxes = cards.map((card) => {
-      const rect = card.getBoundingClientRect();
-      return { top: rect.top - sheetTop, height: rect.height };
-    });
+    // Measure from layout offsets rather than getBoundingClientRect: cards glide
+    // to reordered slots via a CSS transform, and offsets ignore transforms, so
+    // pagination always sees the resting layout instead of a mid-glide card.
+    const boxes = cards.map((card) => ({ top: card.offsetTop, height: card.offsetHeight }));
 
     const layout = metrics();
     const offsets = paginate(boxes, layout);
@@ -43,7 +42,7 @@ export function useSheetPagination(
     const stride = layout.band + layout.gutter;
     let contentBottom = 0;
     for (const card of cards) {
-      contentBottom = Math.max(contentBottom, card.getBoundingClientRect().bottom - sheetTop);
+      contentBottom = Math.max(contentBottom, card.offsetTop + card.offsetHeight);
     }
     pageCount.value = Math.max(1, Math.ceil(contentBottom / stride));
   }
