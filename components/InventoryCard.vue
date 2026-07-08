@@ -4,6 +4,10 @@ import type { InventoryEntry } from '@/services/dndbeyond/model';
 
 const props = defineProps<{ inventory: InventoryEntry[]; columns?: number }>();
 
+/** Blank rows appended after the list so players can pencil in gear they pick
+ * up during play. */
+const WRITE_IN_ROWS = 2;
+
 // Split into N balanced columns (from the chosen layout) so each footprint uses
 // its full width; every column carries its own header so the circles stay
 // labeled. Empty trailing columns are dropped.
@@ -38,6 +42,17 @@ const columnGroups = computed(() => {
           :class="{ 'item__dot--on': item.attuned }"
           :title="item.attuned ? 'Attuned' : 'Not attuned'"
         ></span>
+      </template>
+      <!-- Blank write-in rows at the end of the last column for gear gained
+           during play; the dividers above and below act as the write-lines. -->
+      <template v-if="colIndex === columnGroups.length - 1">
+        <template v-for="n in WRITE_IN_ROWS" :key="`blank-${n}`">
+          <span class="item__divider" aria-hidden="true"></span>
+          <span class="item__name item__name--blank" data-item-blank></span>
+          <span class="item__dot"></span>
+          <span class="item__dot"></span>
+        </template>
+        <span class="item__divider" aria-hidden="true"></span>
       </template>
     </div>
   </div>
@@ -85,6 +100,12 @@ const columnGroups = computed(() => {
   min-width: 0;
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+/* Blank write-in rows: the row-gap plus the dividers above/below give the line
+   to write on, so the empty name cell just needs to reserve some height. */
+.item__name--blank {
+  min-height: 1.4em;
 }
 
 /* Subtle full-width rule between item rows (items carry no bullet marker). */

@@ -44,4 +44,18 @@ describe('InventoryCard', () => {
     const threeCol = mount(InventoryCard, { props: { inventory } });
     expect(threeCol.findAll('.column')).toHaveLength(3);
   });
+
+  it('appends blank write-in rows for gear gained during play', () => {
+    const wrapper = mount(InventoryCard, {
+      props: {
+        inventory: [{ name: 'Plate', quantity: 1, equipped: true, attuned: false }],
+      },
+    });
+
+    // Two blank rows are added (only in the last column) and don't count as
+    // real items or filled circles.
+    expect(wrapper.findAll('[data-item-blank]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-item]')).toHaveLength(1);
+    expect(wrapper.findAll('.item__dot--on')).toHaveLength(1);
+  });
 });
