@@ -1,20 +1,21 @@
 <script lang="ts" setup>
-import { computed, nextTick, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
+import { computed, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
 import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
-import { useSheetPagination } from '@/composables/useSheetPagination';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import { useCardDrag } from '@/composables/useCardDrag';
 import { useGridFlip } from '@/composables/useGridFlip';
 import { useStoredRef } from '@/composables/useStoredRef';
 import {
+  GRID_COLUMNS,
   GRID_GAP,
   gridRowsPerPage,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
 } from '@/utils/section-layout';
+import { packSections, placementStyle, sheetTemplateRows } from '@/utils/pack-sections';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -25,6 +26,9 @@ import {
 import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
 import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/preferences';
 import SectionCard from '@/components/SectionCard.vue';
+
+/** Desk-coloured gap between the painted page rectangles, in px. */
+const PAGE_GUTTER = 20;
 
 const props = defineProps<{ characterId: number | null }>();
 
@@ -74,27 +78,37 @@ const pageStyle = computed(() => ({
   '--page-margin': `${margin.value.mm}mm`,
   '--row-unit': `${rowUnit.value}px`,
   '--grid-gap': `${GRID_GAP}px`,
+  '--page-inter-gap': `${2 * mmToPx(margin.value.mm) + PAGE_GUTTER}px`,
 }));
 
-const pageMetrics = computed(() => ({
-  band: mmToPx(format.value.height),
-  gutter: 20,
-  margin: mmToPx(margin.value.mm),
-}));
-
-const sheetRef = ref<HTMLElement | null>(null);
 const gridRef = ref<HTMLElement | null>(null);
 
-const { pageCount, apply: repaginate } = useSheetPagination(
-  sheetRef,
-  gridRef,
-  () => pageMetrics.value,
-  () => character.value,
+// Footprint (columns × row-units) of each visible card, packed into the grid.
+// This replaces the margin-push paginator: cards are placed explicitly on real
+// multi-row tracks, so a tall card's shorter neighbours fill the space beside it
+// (no dead gaps) and a card that would straddle a page break is bumped whole to
+// the next page. Page count, the row template, and each card's grid position all
+// derive from this one pure computation, so a reorder reflows deterministically.
+const footprints = computed(() =>
+  orderedSections.value.map((section) =>
+    sectionSpan(
+      section.key,
+      section.count,
+      layoutIndices.value[section.key] ?? 0,
+      rowsPerPage.value,
+    ),
+  ),
 );
+const packed = computed(() => packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value));
+const pageCount = computed(() => packed.value.pages);
+const placeStyles = computed(() =>
+  packed.value.placements.map((placement) => placementStyle(placement, rowsPerPage.value)),
+);
+const gridTemplateRows = computed(() => sheetTemplateRows(pageCount.value, rowsPerPage.value));
 
 // Position of each page rectangle in the backdrop layer.
-const pageStride = computed(() => pageMetrics.value.band + pageMetrics.value.gutter);
-const pageHeightPx = computed(() => pageMetrics.value.band);
+const pageStride = computed(() => mmToPx(format.value.height) + PAGE_GUTTER);
+const pageHeightPx = computed(() => mmToPx(format.value.height));
 
 // Grow the paper to span all of its pages so a partly-filled last page still
 // shows as a full sheet and the hidden-sections tray sits cleanly below it
@@ -109,22 +123,13 @@ const sheetMinHeight = computed(
 // preview respects page breaks and cards never straddle a boundary mid-drag.
 useCardDrag(gridRef, {
   onReorder: (from, to) => moveByIndex(from, to),
-  onDragMove: () => void nextTick(repaginate),
 });
 
 // Glide the cards to their new slots when the order changes (a drag-reorder or
 // hiding/showing a section) instead of snapping. Purely visual: the drag
-// hit-testing and pagination measure layout offsets, so the animation's
-// transform never perturbs where cards are computed to be.
-useGridFlip(gridRef, orderedSections);
-
-// Re-paginate whenever the visible cards change (hiding/showing a section, a
-// reorder, or the character loading) so stale push-margins are cleared and the
-// reflowed cards are re-checked against the page breaks.
-watch(orderedSections, () => void nextTick(repaginate));
-
-// A layout change resizes one card in place (same order), so re-paginate too.
-watch(layoutIndices, () => void nextTick(repaginate), { deep: true });
+// hit-testing measures layout offsets, so the animation's transform never
+// perturbs where cards are computed to be. The packed placements recompute
+// reactively from the order, so no manual re-pagination is needed.
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
@@ -199,7 +204,6 @@ onUnmounted(() => {
     <div class="sheet-area">
       <main
         class="sheet"
-        ref="sheetRef"
         :style="[pageStyle, { '--sheet-min-height': `${sheetMinHeight}px` }]"
       >
         <div class="sheet__pages" aria-hidden="true">
@@ -222,12 +226,13 @@ onUnmounted(() => {
         </p>
 
         <template v-else-if="character">
-          <div class="sheet__grid" ref="gridRef">
+          <div class="sheet__grid" ref="gridRef" :style="{ gridTemplateRows }">
             <SectionCard
-              v-for="section in orderedSections"
+              v-for="(section, index) in orderedSections"
               :key="section.key"
               :section="section"
               :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0, rowsPerPage)"
+              :place="placeStyles[index]"
               :character="character"
               :layout-count="sectionLayoutCount(section.key)"
               :layout-label="sectionLayoutLabel(section.key, layoutIndices[section.key] ?? 0)"
@@ -384,9 +389,12 @@ body {
 .sheet__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-auto-flow: row;
-  gap: var(--grid-gap, 12px);
-  align-items: start;
+  /* Rows are explicit tracks (built by `sheetTemplateRows`) so the inter-page
+     gutter can differ from the in-row gap: row-gap is 0 and every gap lives in
+     the template. Cards stretch to fill their multi-row span. */
+  column-gap: var(--grid-gap, 12px);
+  row-gap: 0;
+  align-items: stretch;
 }
 
 /* Keep a card whole rather than letting it split across a page break. */

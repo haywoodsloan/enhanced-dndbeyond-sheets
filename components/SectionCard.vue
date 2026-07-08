@@ -26,6 +26,8 @@ import { computed } from 'vue';
 const props = defineProps<{
   section: CharacterSection;
   span: SectionSpan;
+  /** Explicit grid placement from the packer (`grid-column` / `grid-row`). */
+  place?: { gridColumn: string; gridRow: string };
   character?: Character | null;
   hidden?: boolean;
   layoutCount?: number;
@@ -39,10 +41,13 @@ const emit = defineEmits<{
 }>();
 
 const cardStyle = computed(() => {
-  const gridColumn = `span ${props.span.cols}`;
-  if (props.hidden) return { gridColumn };
+  if (props.hidden) return { gridColumn: `span ${props.span.cols}` };
+  // On the sheet the packer places the card explicitly; without a `place`
+  // (e.g. mounted in isolation) it falls back to spanning its columns at a
+  // fixed height so it still renders sensibly.
+  if (props.place) return props.place;
   return {
-    gridColumn,
+    gridColumn: `span ${props.span.cols}`,
     height: `calc(${props.span.rows} * var(--row-unit, 130px) + ${props.span.rows - 1} * var(--grid-gap, 12px))`,
   };
 });

@@ -15,10 +15,9 @@ const EPSILON = 0.5;
  * appears at the old spot (Invert), then transitioned away on the next frame
  * (Play).
  *
- * Only the CSS `transform` is animated. The drag hit-testing (`useCardDrag`) and
- * the pagination (`useSheetPagination`) both measure the cards from their layout
- * offsets, which a `transform` doesn't move — so an in-flight glide never skews
- * the drop slot or the page-break math.
+ * Only the CSS `transform` is animated, and the drag hit-testing (`useCardDrag`)
+ * measures the cards from their layout offsets, which a `transform` doesn't move
+ * — so an in-flight glide never skews the drop slot.
  *
  * Honors `prefers-reduced-motion`: when set, cards simply snap (no glide).
  */
