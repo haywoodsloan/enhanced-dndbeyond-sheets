@@ -563,6 +563,11 @@ body {
     padding: 0;
     background: var(--paper);
     box-shadow: none;
+    /* `@page` supplies the physical page margins in print, so the grid's
+       between-pages gutter must collapse to 0 — otherwise it accumulates down
+       the document and pushes each later page's content toward the middle.
+       `!important` beats the inline `--page-inter-gap` set for the screen. */
+    --page-inter-gap: 0 !important;
   }
 }
 </style>
