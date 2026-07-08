@@ -41,13 +41,13 @@ describe('AbilityScores', () => {
     // Wide (2×1 card) → 3 columns; a 1-col-wide card → one full-width list column.
     const wide = mount(AbilityScores, { props: { abilities, cols: 2, rows: 1 } });
     expect(wide.get('.abilities').attributes('style')).toContain(
-      'grid-template-columns: repeat(3, 1fr)',
+      'grid-template-columns: repeat(3, minmax(0, 1fr))',
     );
     expect(wide.find('.abilities--list').exists()).toBe(false);
 
     const tall = mount(AbilityScores, { props: { abilities, cols: 1, rows: 2 } });
     expect(tall.get('.abilities').attributes('style')).toContain(
-      'grid-template-columns: repeat(1, 1fr)',
+      'grid-template-columns: repeat(1, minmax(0, 1fr))',
     );
     expect(tall.find('.abilities--list').exists()).toBe(true);
   });
