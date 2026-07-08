@@ -53,6 +53,12 @@ export interface LayoutOption {
   rows: number;
   /** Grow rows with the entry count, capped at `maxRows` (like DYNAMIC_ROWS). */
   dynamic?: { perRow: number; maxRows: number };
+  /**
+   * Fill a whole printed page (full width, one page tall). The row count comes
+   * from the live page geometry passed to `sectionSpan`, falling back to `rows`
+   * when it isn't known.
+   */
+  fullPage?: boolean;
 }
 
 /**
@@ -101,6 +107,7 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
     { label: 'Wide', cols: 3, rows: 2 },
     { label: 'Medium', cols: 2, rows: 2 },
     { label: 'List', cols: 1, rows: 3 },
+    { label: 'Page', cols: 3, rows: 4, fullPage: true },
   ],
   portrait: [
     { label: 'Small', cols: 1, rows: 1 },
@@ -131,13 +138,22 @@ function clampIndex(index: number, length: number): number {
 /**
  * The card footprint for a section. When the section has curated `SECTION_LAYOUTS`
  * the chosen `layoutIndex` picks the option (its `cols` plus a floor/grown
- * `rows`); otherwise `rows` grows with `count` for content-heavy sections and all
- * others keep their fixed footprint.
+ * `rows`); a `fullPage` option instead spans `rowsPerPage` rows (one page tall).
+ * Otherwise `rows` grows with `count` for content-heavy sections and all others
+ * keep their fixed footprint.
  */
-export function sectionSpan(key: SectionKey, count = 0, layoutIndex = 0): SectionSpan {
+export function sectionSpan(
+  key: SectionKey,
+  count = 0,
+  layoutIndex = 0,
+  rowsPerPage?: number,
+): SectionSpan {
   const options = SECTION_LAYOUTS[key];
   if (options && options.length > 0) {
     const option = options[clampIndex(layoutIndex, options.length)];
+    if (option.fullPage) {
+      return { cols: option.cols, rows: rowsPerPage ?? option.rows };
+    }
     const rows = option.dynamic
       ? Math.min(
           option.dynamic.maxRows,

@@ -52,6 +52,7 @@ describe('section layout options', () => {
     expect(sectionLayoutCount('attributes')).toBe(2);
     expect(sectionLayoutCount('proficiencies')).toBe(2);
     expect(sectionLayoutCount('portrait')).toBe(4);
+    expect(sectionLayoutCount('notes')).toBe(4);
     // Sections without curated options have a single fixed layout (no toggle).
     expect(sectionLayoutCount('basics')).toBe(1);
     expect(sectionLayoutCount('wealth')).toBe(1);
@@ -92,6 +93,14 @@ describe('section layout options', () => {
     expect(sectionSpan('portrait', 0, 1)).toEqual({ cols: 1, rows: 2 });
     expect(sectionSpan('portrait', 0, 2)).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('portrait', 0, 3)).toEqual({ cols: 2, rows: 2 });
+  });
+
+  it('spans the notes Page layout to a whole page', () => {
+    expect(sectionLayoutLabel('notes', 3)).toBe('Page');
+    // The full-page option takes its row count from the live page geometry.
+    expect(sectionSpan('notes', 0, 3, 5)).toEqual({ cols: 3, rows: 5 });
+    // Falls back to the option's own rows when the page size isn't known.
+    expect(sectionSpan('notes', 0, 3)).toEqual({ cols: 3, rows: 4 });
   });
 });
 

@@ -49,13 +49,20 @@ const margin = computed(
   () => MARGIN_PRESETS.find((entry) => entry.id === marginId.value) ?? MARGIN_PRESETS[0],
 );
 
+// How many grid row-units fit on one printed page (varies with format/margin).
+const rowsPerPage = computed(() => {
+  const marginPx = mmToPx(margin.value.mm);
+  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  const printHeight = mmToPx(format.value.height) - 2 * marginPx;
+  return gridRowsPerPage(printWidth, printHeight);
+});
+
 // Row height chosen so the grid's rows:columns ratio matches the print area's
 // height:width (margins removed) — i.e. roughly square cells.
 const rowUnit = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
-  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
   const printHeight = mmToPx(format.value.height) - 2 * marginPx;
-  const rows = gridRowsPerPage(printWidth, printHeight);
+  const rows = rowsPerPage.value;
   return (printHeight - (rows - 1) * GRID_GAP) / rows;
 });
 
@@ -217,7 +224,7 @@ onUnmounted(() => {
               v-for="section in orderedSections"
               :key="section.key"
               :section="section"
-              :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0)"
+              :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0, rowsPerPage)"
               :character="character"
               :layout-count="sectionLayoutCount(section.key)"
               :layout-label="sectionLayoutLabel(section.key, layoutIndices[section.key] ?? 0)"
@@ -240,7 +247,7 @@ onUnmounted(() => {
             v-for="section in hiddenSections"
             :key="section.key"
             :section="section"
-            :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0)"
+            :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0, rowsPerPage)"
             :character="character"
             hidden
             @show="show"
