@@ -70,11 +70,14 @@ const cardSubtitle = computed(() =>
   >
     <template #title>
       <div class="card__title">
-        <span>{{ cardTitle }}</span>
+        <span class="card__heading">
+          <span class="card__name">{{ cardTitle }}</span>
+          <template v-if="cardSubtitle">
+            <span class="card__title-sep" aria-hidden="true">|</span>
+            <span class="card__subtitle">{{ cardSubtitle }}</span>
+          </template>
+        </span>
       </div>
-    </template>
-    <template v-if="cardSubtitle" #subtitle>
-      <span class="card__subtitle">{{ cardSubtitle }}</span>
     </template>
     <template #content>
       <span v-if="!hidden" class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
@@ -337,6 +340,19 @@ const cardSubtitle = computed(() =>
   gap: 8px;
   font-size: 15px;
   color: var(--p-primary-color);
+}
+
+/* The Basics card puts the name and the race / class line on one row. */
+.card__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.card__title-sep {
+  font-weight: 300;
+  color: var(--p-primary-300, #cbd5e1);
 }
 
 /* Subtitle only appears on the Basics card (the race / class line). */
