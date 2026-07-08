@@ -5,7 +5,7 @@ import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSheetPagination } from '@/composables/useSheetPagination';
 import { useSectionLayout } from '@/composables/useSectionLayout';
-import { useSortableGrid } from '@/composables/useSortableGrid';
+import { useCardDrag } from '@/composables/useCardDrag';
 import { useStoredRef } from '@/composables/useStoredRef';
 import {
   GRID_GAP,
@@ -102,17 +102,13 @@ const sheetMinHeight = computed(
   () => (pageCount.value - 1) * pageStride.value + pageHeightPx.value,
 );
 
-// Drag-and-drop reordering of the section cards. `onDragMove` re-paginates as
-// the preview shifts so cards never straddle a page boundary mid-drag; on drop,
-// nextTick lets SortableJS finish its DOM move before we persist + re-paginate.
-useSortableGrid(gridRef, {
-  onReorder: (from, to) => {
-    void nextTick(() => {
-      moveByIndex(from, to);
-      void nextTick(repaginate);
-    });
-  },
-  onDragMove: () => repaginate(),
+// Drag-and-drop reordering of the section cards. `onReorder` moves the card in
+// the model as the pointer passes each slot, so the grid reflows to preview the
+// drop live; `onDragMove` re-paginates (next tick, after the re-render) so the
+// preview respects page breaks and cards never straddle a boundary mid-drag.
+useCardDrag(gridRef, {
+  onReorder: (from, to) => moveByIndex(from, to),
+  onDragMove: () => void nextTick(repaginate),
 });
 
 // Re-paginate whenever the visible cards change (hiding/showing a section, a
@@ -391,10 +387,16 @@ body {
   break-inside: avoid;
 }
 
-/* While dragging, hide the card in its original slot but keep its space so the
-   other cards reposition around it — only the cursor preview is rendered. */
-.sortable-ghost {
-  visibility: hidden;
+/* While dragging, dim the card in its original slot but keep its space so the
+   other cards reflow around it to preview the drop; a floating clone (appended
+   to <body>) follows the cursor. */
+.card--drag-source {
+  opacity: 0.4;
+}
+
+.card--drag-clone {
+  cursor: grabbing;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
 }
 
 @media print {

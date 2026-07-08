@@ -187,7 +187,7 @@ const cardSubtitle = computed(() =>
 }
 
 /* Drag handle: a grip bar at the top-center that appears on hover; the only
-   place a card can be grabbed to reorder (SortableJS `handle`). */
+   place a card can be grabbed to reorder (the `useCardDrag` handle). */
 .card__drag-handle {
   position: absolute;
   top: 5px;
@@ -200,6 +200,7 @@ const cardSubtitle = computed(() =>
   background: var(--p-primary-300, #b8b8bd);
   opacity: 0;
   cursor: grab;
+  touch-action: none;
   transition: opacity 0.12s ease;
 }
 
