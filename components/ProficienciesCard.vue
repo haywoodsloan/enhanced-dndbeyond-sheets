@@ -58,13 +58,13 @@ const columnGroups = computed(() => {
 .profs {
   display: flex;
   align-items: stretch;
+  gap: 16px;
   height: 100%;
 }
 
 .profs__column {
   flex: 1;
   min-width: 0;
-  padding: 0 16px;
   display: flex;
   flex-direction: column;
   /* Spread the groups down the full card height so the wider layout doesn't
@@ -73,36 +73,10 @@ const columnGroups = computed(() => {
   gap: 6px;
 }
 
-.profs__column:first-child {
-  padding-left: 0;
-}
-
-.profs__column:last-child {
-  padding-right: 0;
-}
-
-/* A vertical rule between columns, like the skills / saves divider. */
-.profs__column + .profs__column {
-  border-left: 1px solid var(--p-primary-300, #d4d4d8);
-}
-
-/* Keep both stacked columns padded on their outer edge too, so each column's
-   content sits at the same offset and the headings + bullets line up across
-   the two columns (the 1-col List layout keeps its flush edges above). */
-.profs--stacked .profs__column:first-child {
-  padding-left: 16px;
-}
-
-.profs--stacked .profs__column:last-child {
-  padding-right: 16px;
-}
-
 /* The stacked format's headings + item lists are taller, so distributing them
    with space-between over-separates the categories; pack them from the top with
-   a small fixed gap (and keep the column tops aligned) instead. Content stays
-   left-aligned so the headings and bullets line up down each column. */
+   a small fixed gap (and keep the column tops aligned) instead. */
 .profs--stacked .profs__column {
-  align-items: flex-start;
   justify-content: flex-start;
   gap: 12px;
 }
