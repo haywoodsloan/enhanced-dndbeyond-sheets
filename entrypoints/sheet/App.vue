@@ -119,8 +119,8 @@ const sheetMinHeight = computed(
 
 // Drag-and-drop reordering of the section cards. `onReorder` moves the card in
 // the model as the pointer passes each slot, so the grid reflows to preview the
-// drop live; `onDragMove` re-paginates (next tick, after the re-render) so the
-// preview respects page breaks and cards never straddle a boundary mid-drag.
+// drop live; the packed placements recompute reactively from the new order, so
+// the preview respects page breaks and cards never straddle a boundary mid-drag.
 useCardDrag(gridRef, {
   onReorder: (from, to) => moveByIndex(from, to),
 });
@@ -130,6 +130,7 @@ useCardDrag(gridRef, {
 // hit-testing measures layout offsets, so the animation's transform never
 // perturbs where cards are computed to be. The packed placements recompute
 // reactively from the order, so no manual re-pagination is needed.
+useGridFlip(gridRef, orderedSections);
 
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
