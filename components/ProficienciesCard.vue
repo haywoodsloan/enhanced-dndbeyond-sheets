@@ -88,8 +88,11 @@ const columnGroups = computed(() => {
 
 /* The stacked format's headings + item lists are taller, so distributing them
    with space-between over-separates the categories; pack them from the top with
-   a small fixed gap (and keep the column tops aligned) instead. */
+   a small fixed gap (and keep the column tops aligned) instead. Centring each
+   column's content also balances it around the divider so the rule reads as
+   centred between the two lists. */
 .profs--stacked .profs__column {
+  align-items: center;
   justify-content: flex-start;
   gap: 12px;
 }
