@@ -78,7 +78,11 @@ const pageStyle = computed(() => ({
   '--page-margin': `${margin.value.mm}mm`,
   '--row-unit': `${rowUnit.value}px`,
   '--grid-gap': `${GRID_GAP}px`,
-  '--page-inter-gap': `${2 * mmToPx(margin.value.mm) + PAGE_GUTTER}px`,
+  // The between-pages track = the two facing page margins (2×) plus the on-screen
+  // desk gutter. Print keeps the margins but drops the gutter (`--page-gutter`
+  // is zeroed there) so consecutive printed pages sit flush.
+  '--page-gutter': `${PAGE_GUTTER}px`,
+  '--page-inter-gap': `calc(${2 * mmToPx(margin.value.mm)}px + var(--page-gutter))`,
 }));
 
 const gridRef = ref<HTMLElement | null>(null);
@@ -177,7 +181,11 @@ watch(
   { immediate: true },
 );
 
-// Keep the print @page rule in sync with the selection so print matches screen.
+// Drive the print @page size from the selection. Margin is 0 so the sheet's own
+// padding provides the printed margin — that keeps the app's Margins setting in
+// control no matter what the browser's print dialog margin is set to (Default
+// and None both defer to it; only Minimum/Custom, which force a physical margin,
+// can still shrink the page).
 let pageRule: HTMLStyleElement | null = null;
 watchEffect(() => {
   if (typeof document === 'undefined') return;
@@ -185,7 +193,7 @@ watchEffect(() => {
     pageRule = document.createElement('style');
     document.head.appendChild(pageRule);
   }
-  pageRule.textContent = `@page { size: ${format.value.width}mm ${format.value.height}mm; margin: ${margin.value.mm}mm; }`;
+  pageRule.textContent = `@page { size: ${format.value.width}mm ${format.value.height}mm; margin: 0; }`;
 });
 onUnmounted(() => {
   pageRule?.remove();
@@ -561,14 +569,16 @@ body {
   .sheet {
     width: auto;
     min-height: 0;
-    padding: 0;
     background: var(--paper);
     box-shadow: none;
-    /* `@page` supplies the physical page margins in print, so the grid's
-       between-pages gutter must collapse to 0 — otherwise it accumulates down
-       the document and pushes each later page's content toward the middle.
-       `!important` beats the inline `--page-inter-gap` set for the screen. */
-    --page-inter-gap: 0 !important;
+    /* Print with `@page { margin: 0 }` and let the sheet's own padding
+       (`var(--page-margin)`, kept from the base rule) supply the page margin,
+       so the app's Margins setting fully controls the printed margin whatever
+       the print dialog is set to. Only the on-screen desk gutter between pages
+       is dropped (`!important` beats the inline var); the two facing page
+       margins stay in the inter-page track so each page's content still sits
+       inset from the physical edge. */
+    --page-gutter: 0 !important;
   }
 }
 </style>
