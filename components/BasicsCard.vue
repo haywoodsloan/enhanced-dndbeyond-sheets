@@ -136,7 +136,8 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 /* Current HP is left blank for the player to fill in during play. */
 .basics__blank {
   display: inline-block;
-  min-width: 1.8em;
+  min-width: 1.6em;
+  vertical-align: -0.2em;
   border-bottom: 1.5px solid var(--p-text-muted-color, #888);
 }
 
