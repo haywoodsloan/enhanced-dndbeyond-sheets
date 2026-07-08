@@ -86,6 +86,17 @@ const columnGroups = computed(() => {
   border-left: 1px solid var(--p-primary-300, #d4d4d8);
 }
 
+/* Keep both stacked columns padded on their outer edge too, so each column's
+   content sits at the same offset and the headings + bullets line up across
+   the two columns (the 1-col List layout keeps its flush edges above). */
+.profs--stacked .profs__column:first-child {
+  padding-left: 16px;
+}
+
+.profs--stacked .profs__column:last-child {
+  padding-right: 16px;
+}
+
 /* The stacked format's headings + item lists are taller, so distributing them
    with space-between over-separates the categories; pack them from the top with
    a small fixed gap (and keep the column tops aligned) instead. Content stays
