@@ -58,19 +58,32 @@ const columnGroups = computed(() => {
 .profs {
   display: flex;
   align-items: stretch;
-  gap: 16px;
   height: 100%;
 }
 
 .profs__column {
   flex: 1;
   min-width: 0;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
   /* Spread the groups down the full card height so the wider layout doesn't
      leave empty space at the bottom; `gap` is the minimum spacing. */
   justify-content: space-between;
   gap: 6px;
+}
+
+.profs__column:first-child {
+  padding-left: 0;
+}
+
+.profs__column:last-child {
+  padding-right: 0;
+}
+
+/* A vertical rule between columns, like the skills / saves divider. */
+.profs__column + .profs__column {
+  border-left: 1px solid var(--p-primary-300, #d4d4d8);
 }
 
 /* The stacked format's headings + item lists are taller, so distributing them
