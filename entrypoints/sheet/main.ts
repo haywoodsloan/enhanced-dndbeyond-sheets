@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
+import Tooltip from 'primevue/tooltip';
 import App from './App.vue';
 import { parseSheetCharacterId } from '@/utils/sheet-url';
 import { debugLog } from '@/utils/debug';
@@ -18,4 +19,6 @@ createApp(App, { characterId })
     // ink-heavy dark surfaces the OS "dark mode" would otherwise trigger.
     theme: { preset: Aura, options: { darkModeSelector: false } },
   })
+  // Themed hover tooltips for the icon-only card and settings controls.
+  .directive('tooltip', Tooltip)
   .mount('#app');

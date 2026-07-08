@@ -85,12 +85,17 @@ const cardSubtitle = computed(() =>
       </div>
     </template>
     <template #content>
-      <span v-if="!hidden" class="card__drag-handle" aria-hidden="true" title="Drag to reorder"></span>
+      <span
+        v-if="!hidden"
+        v-tooltip.bottom="'Drag to reorder'"
+        class="card__drag-handle"
+        aria-hidden="true"
+      ></span>
       <button
         v-if="!hidden && (layoutCount ?? 1) > 1"
         type="button"
         class="card__layout"
-        :title="`Layout: ${layoutLabel} (click to change)`"
+        v-tooltip.bottom="`Layout: ${layoutLabel} (click to change)`"
         :aria-label="`Change layout (currently ${layoutLabel})`"
         @click="emit('cycleLayout', section.key)"
       >
@@ -103,7 +108,9 @@ const cardSubtitle = computed(() =>
       <button
         type="button"
         class="card__toggle"
-        :title="hidden ? 'Show section (add back to the page)' : 'Hide section (don’t print)'"
+        v-tooltip.bottom="
+          hidden ? 'Show section (add back to the page)' : 'Hide section (don’t print)'
+        "
         :aria-label="hidden ? 'Show section' : 'Hide section'"
         @click="hidden ? emit('show', section.key) : emit('hide', section.key)"
       >
