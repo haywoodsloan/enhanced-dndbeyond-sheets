@@ -6,18 +6,24 @@ const DURATION = 220;
 const EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 /** Ignore sub-pixel "moves" (rounding noise) so unmoved cards don't animate. */
 const EPSILON = 0.5;
+/** A size change beyond this (px) means the card's OWN layout changed — it snaps
+ * to the new size rather than gliding (FLIP can't tween size, and the layout
+ * swap itself shouldn't animate). */
+const SIZE_EPSILON = 1;
 
 /**
  * FLIP-animate the section cards so they glide to their new grid slots when the
- * order changes — during a drag-reorder or when a section is hidden/shown —
- * instead of snapping. Each card's position is recorded before Vue re-renders
- * the grid (First), the inverse offset is applied on the new layout so it still
- * appears at the old spot (Invert), then transitioned away on the next frame
- * (Play).
+ * layout changes — a drag-reorder, hiding/showing a section, or a card's layout
+ * toggle reflowing its neighbours — instead of snapping. Each card's position is
+ * recorded before Vue re-renders the grid (First), the inverse offset is applied
+ * on the new layout so it still appears at the old spot (Invert), then
+ * transitioned away on the next frame (Play).
  *
- * Only the CSS `transform` is animated, and the drag hit-testing (`useCardDrag`)
- * measures the cards from their layout offsets, which a `transform` doesn't move
- * — so an in-flight glide never skews the drop slot.
+ * A card whose OWN footprint resized (its layout toggled) snaps to its new size
+ * instead of gliding — only the cards that kept their size and merely moved are
+ * animated. Only the CSS `transform` is animated, and the drag hit-testing
+ * (`useCardDrag`) measures the cards from their layout offsets, which a
+ * `transform` doesn't move — so an in-flight glide never skews the drop slot.
  *
  * Honors `prefers-reduced-motion`: when set, cards simply snap (no glide).
  */
@@ -67,6 +73,12 @@ export function useGridFlip(grid: Ref<HTMLElement | null>, order: WatchSource) {
       if (!before) continue; // a card that just appeared — nothing to glide from
       const afterLeft = originLeft + child.offsetLeft;
       const afterTop = originTop + child.offsetTop;
+      // A card whose own footprint changed (its layout toggled) snaps to the new
+      // size instead of gliding; only same-size cards that moved are animated.
+      const resized =
+        Math.abs(before.width - child.offsetWidth) > SIZE_EPSILON ||
+        Math.abs(before.height - child.offsetHeight) > SIZE_EPSILON;
+      if (resized) continue;
       const dx = before.left - afterLeft;
       const dy = before.top - afterTop;
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) continue;
