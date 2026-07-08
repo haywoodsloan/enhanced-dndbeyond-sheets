@@ -34,6 +34,7 @@ import type {
   NoteEntry,
   SavingThrow,
   SectionKey,
+  SenseEntry,
   Skill,
   SpellEntry,
 } from './model';
@@ -533,12 +534,12 @@ const PASSIVE_SENSES: [string, string][] = [
 const SPECIAL_SENSES = ['darkvision', 'blindsight', 'tremorsense', 'truesight'];
 
 /** Passive skill scores (10 + modifier) plus special senses like Darkvision. */
-function resolveSenses(raw: RawCharacter, skills: Skill[]): string[] {
-  const senses: string[] = [];
+function resolveSenses(raw: RawCharacter, skills: Skill[]): SenseEntry[] {
+  const senses: SenseEntry[] = [];
   const modifierByKey = new Map(skills.map((skill) => [skill.key, skill.modifier]));
   for (const [key, label] of PASSIVE_SENSES) {
     const modifier = modifierByKey.get(key);
-    if (modifier !== undefined) senses.push(`${label} ${10 + modifier}`);
+    if (modifier !== undefined) senses.push({ label, value: String(10 + modifier) });
   }
 
   // Special senses come from `set-base` modifiers; keep the largest range each.
@@ -558,7 +559,7 @@ function resolveSenses(raw: RawCharacter, skills: Skill[]): string[] {
   }
   for (const sub of SPECIAL_SENSES) {
     const entry = bySubtype.get(sub);
-    if (entry) senses.push(`${entry.label} ${entry.range} ft.`);
+    if (entry) senses.push({ label: entry.label, value: `${entry.range} ft.` });
   }
 
   return senses;

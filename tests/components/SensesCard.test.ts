@@ -3,17 +3,21 @@ import { mount } from '@vue/test-utils';
 import SensesCard from '@/components/SensesCard.vue';
 
 describe('SensesCard', () => {
-  it('renders each sense as a list entry', () => {
+  it('renders each sense with its label and value', () => {
     const wrapper = mount(SensesCard, {
       props: {
-        senses: ['Passive Perception 16', 'Darkvision 120 ft.'],
+        senses: [
+          { label: 'Passive Perception', value: '16' },
+          { label: 'Darkvision', value: '120 ft.' },
+        ],
       },
     });
 
-    const items = wrapper.findAll('[data-senses] .senses__item');
+    const items = wrapper.findAll('[data-senses] [data-sense]');
     expect(items).toHaveLength(2);
-    expect(wrapper.text()).toContain('Passive Perception 16');
-    expect(wrapper.text()).toContain('Darkvision 120 ft.');
+    expect(items[0].get('.senses__label').text()).toBe('Passive Perception');
+    expect(items[0].get('.senses__value').text()).toBe('16');
+    expect(items[1].get('.senses__value').text()).toBe('120 ft.');
   });
 
   it('shows a placeholder when there are no senses', () => {

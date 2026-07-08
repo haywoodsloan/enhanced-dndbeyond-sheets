@@ -1,30 +1,61 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{ senses?: string[] }>(), {
+import type { SenseEntry } from '@/services/dndbeyond/model';
+
+withDefaults(defineProps<{ senses?: SenseEntry[] }>(), {
   senses: () => [],
 });
 </script>
 
 <template>
-  <ul v-if="senses.length" class="senses" data-senses>
-    <li v-for="entry in senses" :key="entry" class="senses__item">{{ entry }}</li>
-  </ul>
+  <dl v-if="senses.length" class="senses" data-senses>
+    <div v-for="entry in senses" :key="entry.label" class="senses__item" data-sense>
+      <dt class="senses__label">{{ entry.label }}</dt>
+      <dd class="senses__value">{{ entry.value }}</dd>
+    </div>
+  </dl>
   <p v-else class="senses__empty">No special senses.</p>
 </template>
 
 <style scoped>
 .senses {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  padding-left: 18px;
-  list-style: disc;
 }
 
 .senses__item {
-  font-size: 13px;
-  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
 }
 
 .senses__item + .senses__item {
-  margin-top: 4px;
+  border-top: 1px solid var(--p-primary-200);
+  padding-top: 6px;
+}
+
+.senses__label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #1c1c1e;
+}
+
+.senses__value {
+  flex: none;
+  margin: 0;
+  min-width: 34px;
+  padding: 2px 10px;
+  border: 1px solid var(--p-primary-200);
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: #1c1c1e;
 }
 
 .senses__empty {

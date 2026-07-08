@@ -170,8 +170,8 @@ describe('normalizeCharacter', () => {
 
   it('resolves senses with passive scores and darkvision', () => {
     const { senses } = normalizeCharacter(raw);
-    expect(senses).toContain('Darkvision 120 ft.');
-    expect(senses.some((entry) => entry.startsWith('Passive Perception'))).toBe(true);
+    expect(senses).toContainEqual({ label: 'Darkvision', value: '120 ft.' });
+    expect(senses.some((entry) => entry.label === 'Passive Perception')).toBe(true);
   });
 
   it('collects free-text notes but omits personal possessions', () => {

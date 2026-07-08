@@ -141,6 +141,13 @@ export interface NoteEntry {
   text: string;
 }
 
+/** A passive score or special sense, split into a label and its value. */
+export interface SenseEntry {
+  label: string;
+  /** The displayable value, e.g. "14" or "60 ft.". */
+  value: string;
+}
+
 export interface Character {
   id: number;
   name: string;
@@ -160,7 +167,7 @@ export interface Character {
   /** Defensive traits: resistances, immunities, and save advantages. */
   defences: string[];
   /** Passive skill scores and special senses (darkvision, etc.). */
-  senses: string[];
+  senses: SenseEntry[];
   /** The 18 skills in canonical order. */
   skills: Skill[];
   /** Language and training proficiencies. */
