@@ -341,6 +341,12 @@ const cardSubtitle = computed(() =>
   min-height: 0;
 }
 
+/* The inventory's write-in rows run to the bottom edge, so trim the card's
+   bottom padding to give them room for one more row. */
+.card[data-section-key='inventory'] :deep(.p-card-body) {
+  padding-bottom: 6px;
+}
+
 /* The image speaks for itself — no need for a "Portrait" heading. */
 .card[data-section-key='portrait'] :deep(.p-card-caption) {
   display: none;
