@@ -79,13 +79,18 @@ const isList = computed(() => grid.value.tileCols === 1);
   font-size: 14px;
 }
 
-/* The narrow list rows have room for slightly larger stat text. */
+/* The narrow list rows have room for slightly larger stat text; fixed widths +
+   right alignment line the modifier and score up as columns down the rows. */
 .abilities--list .ability__mod {
+  min-width: 2.2em;
   font-size: 22px;
+  text-align: right;
 }
 
 .abilities--list .ability__score {
+  min-width: 1.6em;
   font-size: 16px;
+  text-align: right;
 }
 
 /* A divider between the modifier and the total score, only in the list layout. */
