@@ -95,14 +95,15 @@ watch(
            column's leftover height. -->
       <span class="column__sentinel" aria-hidden="true"></span>
       <!-- Blank write-in rows for gear gained during play; grown to fill the
-           column's spare height. The dividers above/below act as write-lines. -->
+           column's spare height. Each row's divider is its write-line (a line
+           above it, like the item rows), so no trailing divider is needed — and
+           leaving it off keeps the fill an exact number of rows (no clipping). -->
       <template v-for="n in (blankCounts[colIndex] ?? baseRows)" :key="`blank-${n}`">
         <span class="item__divider" aria-hidden="true"></span>
         <span class="item__name item__name--blank" data-item-blank></span>
         <span class="item__dot"></span>
         <span class="item__dot"></span>
       </template>
-      <span class="item__divider" aria-hidden="true"></span>
     </div>
   </div>
 </template>
@@ -112,9 +113,10 @@ watch(
   display: flex;
   align-items: stretch;
   /* Fill the card height (SectionCard stretches the content) so the blank
-     write-in rows can grow into the leftover space below the list. */
-  height: 100%;
-  /* Nudge the columns up a touch to sit closer under the card title. */
+     write-in rows grow into the leftover space. The -6px nudges the columns up
+     under the title; the matching +6px height keeps the bottom at the card edge
+     so the last write-in row reaches it instead of being cut short. */
+  height: calc(100% + 6px);
   margin-top: -6px;
 }
 
