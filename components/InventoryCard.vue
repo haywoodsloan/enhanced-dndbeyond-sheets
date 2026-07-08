@@ -53,7 +53,10 @@ const columnGroups = computed(() => {
   min-width: 0;
   padding: 0 14px;
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  /* `minmax(0, 1fr)` (not `1fr`) lets the name track shrink below the name's
+     min-content width so long names truncate with an ellipsis in every layout,
+     including the single-column List mode. */
+  grid-template-columns: minmax(0, 1fr) auto auto;
   column-gap: 8px;
   row-gap: 3px;
   align-content: start;
