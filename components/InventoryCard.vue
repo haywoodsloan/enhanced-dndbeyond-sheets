@@ -34,8 +34,18 @@ function measure() {
   const next = Array.from(inv.querySelectorAll<HTMLElement>('.column')).map((column) => {
     const sentinel = column.querySelector<HTMLElement>('.column__sentinel');
     if (!sentinel) return base;
-    const spare = column.getBoundingClientRect().bottom - sentinel.getBoundingClientRect().bottom;
-    return Math.max(base, Math.floor(spare / BLANK_ROW_PX));
+    const sentinelBottom = sentinel.getBoundingClientRect().bottom;
+    const spare = column.getBoundingClientRect().bottom - sentinelBottom;
+    if (spare <= 0) return base;
+    // Measure the real per-row height from the blanks already on screen (they
+    // stack linearly down from the sentinel) rather than trusting the
+    // BLANK_ROW_PX estimate, so the count fills the leftover space exactly.
+    const blanks = column.querySelectorAll<HTMLElement>('.item__name--blank');
+    const rendered = blanks.length
+      ? blanks[blanks.length - 1].getBoundingClientRect().bottom - sentinelBottom
+      : 0;
+    const pitch = rendered > 0 ? rendered / blanks.length : BLANK_ROW_PX;
+    return Math.max(base, Math.floor(spare / pitch));
   });
   const changed =
     next.length !== blankCounts.value.length ||
