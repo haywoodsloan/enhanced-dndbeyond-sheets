@@ -70,6 +70,22 @@ const groups = computed(() =>
 }
 
 .actions__item {
+  position: relative;
+  padding-left: 14px;
   font-size: 14px;
+}
+
+/* A disc marker to match the bulleted lists on the other cards (the grid layout
+   suppresses native list markers, so draw one). */
+.actions__item::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.7em;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 </style>
