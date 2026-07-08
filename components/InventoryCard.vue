@@ -23,6 +23,7 @@ const columnGroups = computed(() => {
       <span class="column__label">Equipped</span>
       <span class="column__label">Attuned</span>
       <template v-for="(item, index) in column" :key="index">
+        <span v-if="index > 0" class="item__divider" aria-hidden="true"></span>
         <span class="item__name" data-item>
           {{ item.name }}
           <span v-if="item.quantity > 1" class="item__qty">×{{ item.quantity }}</span>
@@ -84,6 +85,13 @@ const columnGroups = computed(() => {
   min-width: 0;
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+/* Subtle full-width rule between item rows (items carry no bullet marker). */
+.item__divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--p-primary-200, #e5e7eb);
 }
 
 .item__qty {

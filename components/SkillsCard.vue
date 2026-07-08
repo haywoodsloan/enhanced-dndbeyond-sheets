@@ -50,10 +50,6 @@ const columnGroups = computed(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* Distribute the skills down the full height so a short column doesn't leave
-     empty space at the bottom; `gap` is the minimum spacing. */
-  justify-content: space-between;
-  gap: 4px;
   margin: 0;
   padding: 0 16px;
   list-style: none;
@@ -73,10 +69,17 @@ const columnGroups = computed(() => {
 }
 
 .skill {
+  /* Equal-height bands distribute the skills down the full card height. */
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
+}
+
+/* Subtle horizontal rule between skill rows (they carry no bullet marker). */
+.skill + .skill {
+  border-top: 1px solid var(--p-primary-200, #e5e7eb);
 }
 
 .skill__prof {

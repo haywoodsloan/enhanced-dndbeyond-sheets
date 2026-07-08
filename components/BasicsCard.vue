@@ -111,7 +111,7 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: 6px 4px;
+  padding: 12px 4px;
   border: 1px solid var(--p-content-border-color, #e5e5e5);
   border-radius: 8px;
 }
