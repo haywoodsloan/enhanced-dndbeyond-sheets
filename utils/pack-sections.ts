@@ -150,3 +150,85 @@ export function placementStyle(
     gridRow: `${startLine} / span ${rowSpan}`,
   };
 }
+
+/** A pointer position in viewport pixels. */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * Pixel geometry of the rendered sheet grid — enough to turn a packer placement
+ * back into a viewport rect: the grid's top-left and content width, the column
+ * count, and the row-unit / in-row gap / inter-page gap heights.
+ */
+export interface GridGeometry {
+  left: number;
+  top: number;
+  width: number;
+  columns: number;
+  rowsPerPage: number;
+  rowUnit: number;
+  gap: number;
+  interGap: number;
+}
+
+/** Array move: remove the item at `from` and re-insert it at `to`. */
+function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const next = items.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/** Top offset (px) of content-row `row`, including the taller inter-page gap. */
+function rowTop(row: number, g: GridGeometry): number {
+  const page = Math.floor(row / g.rowsPerPage);
+  const rowInPage = row % g.rowsPerPage;
+  return row * g.rowUnit + (page * (g.rowsPerPage - 1) + rowInPage) * g.gap + page * g.interGap;
+}
+
+/**
+ * The insertion index that would drop the card at `fromIndex` under `pointer`.
+ * For each candidate slot it re-packs the footprints with the card moved there,
+ * turns that card's resulting placement into a viewport rect, and keeps the slot
+ * whose rect holds the pointer (nearest centre breaks ties). Because it drives
+ * the REAL packer it lands the card in the empty cells beside a tall card that a
+ * plain reading-order scan of the rendered rects can't resolve. Returns -1 when
+ * the pointer maps back to the card's own slot, or to no landing slot at all.
+ */
+export function packedDropIndex(
+  pointer: Point,
+  footprints: CardFootprint[],
+  geometry: GridGeometry,
+  fromIndex: number,
+): number {
+  const count = footprints.length;
+  if (fromIndex < 0 || fromIndex >= count) return -1;
+  const colGap = geometry.gap;
+  const colWidth = (geometry.width - (geometry.columns - 1) * colGap) / geometry.columns;
+
+  let best = -1;
+  let bestDistance = Infinity;
+  for (let to = 0; to < count; to += 1) {
+    const { placements } = packSections(
+      moveItem(footprints, fromIndex, to),
+      geometry.columns,
+      geometry.rowsPerPage,
+    );
+    const placement = placements[to];
+    const left = geometry.left + placement.col * (colWidth + colGap);
+    const right = left + placement.cols * colWidth + (placement.cols - 1) * colGap;
+    const top = geometry.top + rowTop(placement.row, geometry);
+    const bottom = top + placement.rows * geometry.rowUnit + (placement.rows - 1) * geometry.gap;
+    if (pointer.x < left || pointer.x > right || pointer.y < top || pointer.y > bottom) continue;
+    const dx = pointer.x - (left + right) / 2;
+    const dy = pointer.y - (top + bottom) / 2;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = to;
+    }
+  }
+  return best === fromIndex ? -1 : best;
+}

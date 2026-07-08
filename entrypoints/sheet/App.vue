@@ -15,7 +15,7 @@ import {
   sectionLayoutLabel,
   sectionSpan,
 } from '@/utils/section-layout';
-import { packSections, placementStyle, sheetTemplateRows } from '@/utils/pack-sections';
+import { packedDropIndex, packSections, placementStyle, sheetTemplateRows } from '@/utils/pack-sections';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -123,6 +123,29 @@ const sheetMinHeight = computed(
 // the preview respects page breaks and cards never straddle a boundary mid-drag.
 useCardDrag(gridRef, {
   onReorder: (from, to) => moveByIndex(from, to),
+  // Resolve the drop slot by simulating the packer against the live footprints,
+  // so the dragged card lands wherever it would actually render — including the
+  // empty cells that a tall card leaves beside it.
+  resolveDrop: (pointer, from) => {
+    const grid = gridRef.value;
+    if (!grid) return -1;
+    const rect = grid.getBoundingClientRect();
+    return packedDropIndex(
+      pointer,
+      footprints.value,
+      {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        columns: GRID_COLUMNS,
+        rowsPerPage: rowsPerPage.value,
+        rowUnit: rowUnit.value,
+        gap: GRID_GAP,
+        interGap: 2 * mmToPx(margin.value.mm) + PAGE_GUTTER,
+      },
+      from,
+    );
+  },
 });
 
 // Glide the cards to their new slots when the order changes (a drag-reorder or

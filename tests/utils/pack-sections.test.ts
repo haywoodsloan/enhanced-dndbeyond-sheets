@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  packedDropIndex,
   packSections,
   placementStyle,
   sheetTemplateRows,
@@ -98,5 +99,38 @@ describe('placementStyle', () => {
       gridColumn: '3 / span 1',
       gridRow: '11 / span 3',
     });
+  });
+});
+
+describe('packedDropIndex', () => {
+  // Three 100px columns (no gaps) on a tall single page, so each row is 100px.
+  const geometry = {
+    left: 0,
+    top: 0,
+    width: 300,
+    columns: 3,
+    rowsPerPage: 6,
+    rowUnit: 100,
+    gap: 0,
+    interGap: 0,
+  };
+  // basics(3x1), attributes(1x2), portrait(1x1), skills(1x3), saves(2x1), senses(1x1).
+  // Skills is the tall column-2 card; the cell under the portrait (col 1, row 2)
+  // stays empty because Saves is 2-wide and wraps past it.
+  const footprints = [fp(3, 1), fp(1, 2), fp(1, 1), fp(1, 3), fp(2, 1), fp(1, 1)];
+
+  it('drops a card into the empty cell beside a tall neighbour', () => {
+    // The gap under the portrait is (col 1, row 2) → x∈[100,200], y∈[200,300].
+    // Dragging Senses (index 5) there inserts it right after Skills (index 4).
+    expect(packedDropIndex({ x: 150, y: 250 }, footprints, geometry, 5)).toBe(4);
+  });
+
+  it('is a no-op when the pointer maps back to the card’s own slot', () => {
+    // Senses currently packs to (col 0, row 4) → x∈[0,100], y∈[400,500].
+    expect(packedDropIndex({ x: 50, y: 450 }, footprints, geometry, 5)).toBe(-1);
+  });
+
+  it('is a no-op for an out-of-range source index', () => {
+    expect(packedDropIndex({ x: 150, y: 250 }, footprints, geometry, 9)).toBe(-1);
   });
 });

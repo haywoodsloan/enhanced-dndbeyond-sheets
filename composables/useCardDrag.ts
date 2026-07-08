@@ -1,33 +1,15 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue';
-import { dropTargetIndex, type Rect } from '@/utils/card-drop';
 
 interface CardDragOptions {
   /** Move the card at `fromIndex` to `toIndex` in the model (reflows the grid). */
   onReorder: (fromIndex: number, toIndex: number) => void;
-  /** Called after the preview order shifts (and on drop) to re-run pagination. */
-  onDragMove?: () => void;
+  /** Resolve the model index the dragged card should move to for the pointer's
+   * position (-1 for no change). */
+  resolveDrop: (pointer: { x: number; y: number }, fromIndex: number) => number;
 }
 
 /** Distance (px) the pointer must travel before a grab becomes a drag. */
 const DRAG_THRESHOLD = 4;
-
-/**
- * Bounding rects of the grid's card children, in document (model) order,
- * measured from layout offsets instead of getBoundingClientRect. The cards glide
- * to reordered slots via a CSS transform, and offsets ignore transforms, so the
- * drop slot is always resolved against the cards' resting positions rather than
- * their mid-animation ones (which would make the target oscillate).
- */
-function cardRects(grid: HTMLElement): Rect[] {
-  const gridRect = grid.getBoundingClientRect();
-  const originLeft = gridRect.left - grid.offsetLeft;
-  const originTop = gridRect.top - grid.offsetTop;
-  return (Array.from(grid.children) as HTMLElement[]).map((child) => {
-    const left = originLeft + child.offsetLeft;
-    const top = originTop + child.offsetTop;
-    return { left, top, right: left + child.offsetWidth, bottom: top + child.offsetHeight };
-  });
-}
 
 /**
  * Pointer-driven drag-reordering for the section-card grid — a hand-rolled
@@ -39,10 +21,11 @@ function cardRects(grid: HTMLElement): Rect[] {
  *
  * On grab (from a card's `.card__drag-handle`) a fixed-position clone follows
  * the cursor while the real card is dimmed in place as a placeholder. Each move
- * resolves the drop slot from pointer geometry (`dropTargetIndex`, shared with
- * the drop tests) and, when it changes, calls `onReorder` to move the card
- * there — Vue re-renders the keyed grid, so the model stays the single source of
- * truth (no DOM/model desync) and the preview IS the real, paginated layout.
+ * asks `resolveDrop` for the model index the card should take for the pointer's
+ * position (it simulates the packer, so it lands in the empty cells beside a
+ * tall card) and, when it changes, calls `onReorder` to move the card there —
+ * Vue re-renders the keyed grid, so the model stays the single source of truth
+ * (no DOM/model desync) and the preview IS the real, paginated layout.
  *
  * The grid renders only once the character loads, so the `pointerdown` listener
  * is (re)attached whenever the element ref becomes available.
@@ -99,25 +82,20 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
       }
       startDrag();
     }
-    const element = grid.value;
-    if (!dragging || !clone || !element) return;
+    if (!dragging || !clone) return;
 
     clone.style.left = `${event.clientX - grabX}px`;
     clone.style.top = `${event.clientY - grabY}px`;
 
-    const pointer = { x: event.clientX, y: event.clientY };
-    const to = dropTargetIndex(pointer, cardRects(element), dragIndex);
+    const to = options.resolveDrop({ x: event.clientX, y: event.clientY }, dragIndex);
     if (to >= 0 && to !== dragIndex) {
       options.onReorder(dragIndex, to);
       dragIndex = to;
-      options.onDragMove?.();
     }
   }
 
   function onPointerUp() {
-    const wasDragging = dragging;
     reset();
-    if (wasDragging) options.onDragMove?.();
   }
 
   function onPointerDown(event: PointerEvent) {
