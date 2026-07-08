@@ -64,11 +64,6 @@ const totalGp = computed(() => {
   gap: 10px;
 }
 
-/* Subtle rule between coin rows (matches the skills / inventory dividers). */
-.coin + .coin {
-  border-top: 1px solid var(--p-primary-200, #e5e7eb);
-}
-
 /* A little coin token, tinted to its metal (border + text only, no fill). */
 .coin__disc {
   flex: none;
