@@ -17,7 +17,8 @@ describe('BasicsCard', () => {
     const wrapper = mount(BasicsCard, { props: { basics } });
 
     expect(wrapper.find('[data-stat="ac"]').text()).toContain('20');
-    expect(wrapper.find('[data-stat="hp"]').text()).toContain('4');
+    // Current HP is a writable blank; only the max is printed.
+    expect(wrapper.find('[data-stat="hp"] .basics__blank').exists()).toBe(true);
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
     expect(wrapper.find('[data-stat="initiative"]').text()).toContain('+0');
     expect(wrapper.find('[data-stat="speed"]').text()).toContain('30');

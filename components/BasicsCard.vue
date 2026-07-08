@@ -20,9 +20,8 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 
       <div class="basics__stat" data-stat="hp">
         <span class="basics__value">
-          {{ basics.hitPoints.current }}<span class="basics__sep">/</span>{{
-            basics.hitPoints.max
-          }}
+          <span class="basics__blank" aria-hidden="true"></span
+          ><span class="basics__sep">/</span>{{ basics.hitPoints.max }}
         </span>
         <span class="basics__label">
           Hit Points<template v-if="basics.hitPoints.temp > 0">
@@ -132,6 +131,13 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   margin: 0 1px;
   color: var(--p-text-muted-color, #888);
   font-weight: 400;
+}
+
+/* Current HP is left blank for the player to fill in during play. */
+.basics__blank {
+  display: inline-block;
+  min-width: 1.8em;
+  border-bottom: 1.5px solid var(--p-text-muted-color, #888);
 }
 
 .basics__label {

@@ -81,7 +81,8 @@ describe('SectionCard', () => {
     });
 
     expect(wrapper.find('[data-stat="ac"]').text()).toContain('20');
-    expect(wrapper.find('[data-stat="hp"]').text()).toContain('4');
+    // Current HP is a writable blank; only the max is printed.
+    expect(wrapper.find('[data-stat="hp"] .basics__blank').exists()).toBe(true);
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
     expect(
       wrapper.findAll('[data-stat="conditions"] input[type="checkbox"]'),
