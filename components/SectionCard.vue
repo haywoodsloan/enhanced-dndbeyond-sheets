@@ -305,7 +305,8 @@ const cardSubtitle = computed(() =>
 .card[data-section-key='portrait'],
 .card[data-section-key='skills'],
 .card[data-section-key='proficiencies'],
-.card[data-section-key='attributes'] {
+.card[data-section-key='attributes'],
+.card[data-section-key='wealth'] {
   display: flex;
   flex-direction: column;
 }
@@ -313,7 +314,8 @@ const cardSubtitle = computed(() =>
 .card[data-section-key='portrait'] :deep(.p-card-body),
 .card[data-section-key='skills'] :deep(.p-card-body),
 .card[data-section-key='proficiencies'] :deep(.p-card-body),
-.card[data-section-key='attributes'] :deep(.p-card-body) {
+.card[data-section-key='attributes'] :deep(.p-card-body),
+.card[data-section-key='wealth'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -323,7 +325,8 @@ const cardSubtitle = computed(() =>
 .card[data-section-key='portrait'] :deep(.p-card-content),
 .card[data-section-key='skills'] :deep(.p-card-content),
 .card[data-section-key='proficiencies'] :deep(.p-card-content),
-.card[data-section-key='attributes'] :deep(.p-card-content) {
+.card[data-section-key='attributes'] :deep(.p-card-content),
+.card[data-section-key='wealth'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
 }
