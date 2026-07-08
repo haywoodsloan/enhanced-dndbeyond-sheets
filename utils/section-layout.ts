@@ -91,7 +91,7 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   spells: [
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 6 } },
     { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 9, maxRows: 6 } },
-    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 8, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 10, maxRows: 6 } },
   ],
   inventory: [
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 20, maxRows: 6 } },
