@@ -305,13 +305,15 @@ const cardSubtitle = computed(() =>
   opacity: 1;
 }
 
-/* Let the portrait image, skills columns, proficiency groups, and ability tiles
-   fill the card height (the image scales to fit without cropping; the other
-   content distributes / stretches down the height instead of leaving space). */
+/* Let the portrait image, skills columns, proficiency groups, ability tiles,
+   inventory list, and wealth rows fill the card height (the image scales to fit
+   without cropping; the other content distributes / stretches down the height
+   instead of leaving space). */
 .card[data-section-key='portrait'],
 .card[data-section-key='skills'],
 .card[data-section-key='proficiencies'],
 .card[data-section-key='attributes'],
+.card[data-section-key='inventory'],
 .card[data-section-key='wealth'] {
   display: flex;
   flex-direction: column;
@@ -321,6 +323,7 @@ const cardSubtitle = computed(() =>
 .card[data-section-key='skills'] :deep(.p-card-body),
 .card[data-section-key='proficiencies'] :deep(.p-card-body),
 .card[data-section-key='attributes'] :deep(.p-card-body),
+.card[data-section-key='inventory'] :deep(.p-card-body),
 .card[data-section-key='wealth'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
@@ -332,6 +335,7 @@ const cardSubtitle = computed(() =>
 .card[data-section-key='skills'] :deep(.p-card-content),
 .card[data-section-key='proficiencies'] :deep(.p-card-content),
 .card[data-section-key='attributes'] :deep(.p-card-content),
+.card[data-section-key='inventory'] :deep(.p-card-content),
 .card[data-section-key='wealth'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;

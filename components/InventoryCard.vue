@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { InventoryEntry } from '@/services/dndbeyond/model';
 
 const props = defineProps<{ inventory: InventoryEntry[]; columns?: number }>();
@@ -15,14 +15,61 @@ const columnGroups = computed(() => {
   ).filter((column) => column.length > 0);
 });
 
-// Blank write-in rows at the foot of each column for gear gained during play.
-// Fewer per column once the list splits three ways (narrower columns) so the
-// added height stays modest — 1 each at three columns, 2 each otherwise.
-const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
+// Minimum blank write-in rows per column (before measuring): fewer once the list
+// splits three ways so the narrower columns don't get too tall on their own.
+const baseRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
+
+// Approx height (px) of one blank row — name 18 + divider 1 + two 3px grid gaps.
+const BLANK_ROW_PX = 25;
+
+const inventoryRef = ref<HTMLElement | null>(null);
+// Blank rows per column, grown past `baseRows` to fill each column's spare
+// height so the write-in area reaches the bottom of the card.
+const blankCounts = ref<number[]>([]);
+
+function measure() {
+  const inv = inventoryRef.value;
+  if (!inv) return;
+  const base = baseRows.value;
+  const next = Array.from(inv.querySelectorAll<HTMLElement>('.column')).map((column) => {
+    const sentinel = column.querySelector<HTMLElement>('.column__sentinel');
+    if (!sentinel) return base;
+    const spare = column.getBoundingClientRect().bottom - sentinel.getBoundingClientRect().bottom;
+    return Math.max(base, Math.floor(spare / BLANK_ROW_PX));
+  });
+  const changed =
+    next.length !== blankCounts.value.length ||
+    next.some((value, index) => value !== blankCounts.value[index]);
+  if (changed) blankCounts.value = next;
+}
+
+let observer: ResizeObserver | null = null;
+onMounted(() => {
+  void nextTick(measure);
+  // Re-fit once webfonts settle (they can change the item heights).
+  if (typeof document !== 'undefined') void document.fonts?.ready?.then(() => measure());
+  if (typeof ResizeObserver !== 'undefined' && inventoryRef.value) {
+    observer = new ResizeObserver(() => measure());
+    observer.observe(inventoryRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+});
+// Re-fit when the item count or column split changes (card resizes are caught by
+// the ResizeObserver). Clear first so stale per-column counts don't flash.
+watch(
+  () => [props.columns, props.inventory.length],
+  () => {
+    blankCounts.value = [];
+    void nextTick(measure);
+  },
+);
 </script>
 
 <template>
-  <div class="inventory">
+  <div class="inventory" ref="inventoryRef">
     <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="column">
       <span class="column__spacer" aria-hidden="true"></span>
       <span class="column__label" title="Equipped">Equip</span>
@@ -44,9 +91,12 @@ const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
           :title="item.attuned ? 'Attuned' : 'Not attuned'"
         ></span>
       </template>
-      <!-- Blank write-in rows at the foot of every column for gear gained during
-           play; the dividers above and below act as the write-lines. -->
-      <template v-for="n in writeInRows" :key="`blank-${n}`">
+      <!-- Marks where the items end so the blank rows below can measure the
+           column's leftover height. -->
+      <span class="column__sentinel" aria-hidden="true"></span>
+      <!-- Blank write-in rows for gear gained during play; grown to fill the
+           column's spare height. The dividers above/below act as write-lines. -->
+      <template v-for="n in (blankCounts[colIndex] ?? baseRows)" :key="`blank-${n}`">
         <span class="item__divider" aria-hidden="true"></span>
         <span class="item__name item__name--blank" data-item-blank></span>
         <span class="item__dot"></span>
@@ -61,6 +111,9 @@ const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
 .inventory {
   display: flex;
   align-items: stretch;
+  /* Fill the card height (SectionCard stretches the content) so the blank
+     write-in rows can grow into the leftover space below the list. */
+  height: 100%;
 }
 
 .column {
@@ -72,6 +125,8 @@ const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
   column-gap: 8px;
   row-gap: 3px;
   align-content: start;
+  /* Clip any blank row that overshoots the measured leftover height. */
+  overflow: hidden;
 }
 
 .column:first-child {
@@ -101,10 +156,17 @@ const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
   overflow-wrap: anywhere;
 }
 
-/* Blank write-in rows: the row-gap plus the dividers above/below give the line
-   to write on, so the empty name cell just needs to reserve some height. */
+/* Zero-height marker after the last item; the blank rows measure the gap
+   between it and the column's bottom to know how many will fit. */
+.column__sentinel {
+  grid-column: 1 / -1;
+  height: 0;
+}
+
+/* Blank write-in rows: the dividers above/below give the line to write on; a
+   fixed height keeps the fill math (how many fit the leftover space) stable. */
 .item__name--blank {
-  min-height: 1.4em;
+  height: 18px;
 }
 
 /* Subtle full-width rule between item rows (items carry no bullet marker). */
