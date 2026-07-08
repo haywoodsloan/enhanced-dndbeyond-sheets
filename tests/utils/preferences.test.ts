@@ -43,4 +43,10 @@ describe('preferences', () => {
     await sectionLayoutPref.set({ inventory: 2 });
     expect(await sectionLayoutPref.get({})).toEqual({ inventory: 2 });
   });
+
+  it('reads a value saved locally before syncing was enabled', async () => {
+    // Existing users' settings live in storage.local; they should still load.
+    await fakeBrowser.storage.local.set({ 'pref-theme-color': 'violet' });
+    expect(await themeColorPref.get('blue')).toBe('violet');
+  });
 });

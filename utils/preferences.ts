@@ -1,8 +1,11 @@
 /**
  * Persisted user preferences for the sheet: page format, margins, theme color,
- * and the custom section order. Stored in `browser.storage.local` (survives
- * across browser sessions). Only PREFERENCES live here — never character data
- * (the auth token keeps its own `storage.session`).
+ * and the custom section order / hidden sections / per-card layout. Stored in
+ * `browser.storage.sync` so they follow the user across devices when they're
+ * signed in to the browser (and still persist locally when they aren't). Values
+ * saved before syncing was added are migrated from `storage.local` on first
+ * read. Only PREFERENCES live here — never character data (the auth token keeps
+ * its own `storage.session`).
  */
 import type { SectionKey } from '@/services/dndbeyond/model';
 
@@ -16,12 +19,18 @@ export interface Preference<T> {
 
 async function read<T>(key: string, fallback: T): Promise<T> {
   try {
-    const stored = await browser.storage.local.get(key);
-    const value = stored[key] as T | undefined;
+    let value = (await browser.storage.sync.get(key))[key] as T | undefined;
+    let migrated = false;
+    if (value == null) {
+      // Carry over a value saved before syncing was enabled.
+      value = (await browser.storage.local.get(key))[key] as T | undefined;
+      migrated = value != null;
+    }
     if (value == null) return fallback;
     // If the caller expects an array, a legacy/corrupted object value (e.g. an
     // array once serialized as `{0:..,1:..}`) falls back rather than crashing.
     if (Array.isArray(fallback) && !Array.isArray(value)) return fallback;
+    if (migrated) void write(key, value);
     return value;
   } catch {
     return fallback;
@@ -33,9 +42,9 @@ async function write<T>(key: string, value: T): Promise<void> {
     // Normalize away Vue reactive proxies (and other wrappers) so an array is
     // stored as an array — a proxied array can otherwise serialize to an object.
     const plain = JSON.parse(JSON.stringify(value)) as T;
-    await browser.storage.local.set({ [key]: plain });
+    await browser.storage.sync.set({ [key]: plain });
   } catch {
-    // Storage unavailable (e.g. some test contexts) — preferences are best-effort.
+    // Storage unavailable / sync quota hit — preferences are best-effort.
   }
 }
 

@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch, type Ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import {
   applySavedOrder,
@@ -11,6 +11,13 @@ import {
   sectionLayoutPref,
   sectionOrderPref,
 } from '@/utils/preferences';
+
+/**
+ * Debounce (ms) before a reorder is saved. A live drag calls `moveByIndex` many
+ * times a second; `storage.sync` rate-limits writes, so we coalesce the save to
+ * fire once the reorder settles.
+ */
+const ORDER_PERSIST_DELAY = 500;
 
 /**
  * Reactive section layout for the sheet. Starts from the class-aware default
@@ -48,6 +55,22 @@ export function useSectionLayout(character: Ref<Character | null>) {
     sections.value.filter((section) => hiddenSet.value.has(section.key)),
   );
 
+  // A live drag calls `moveByIndex` many times a second; persisting on each one
+  // would blow `storage.sync`'s write-rate limit, so the save is debounced to
+  // fire once the reorder settles (and flushed on unmount).
+  let orderTimer: ReturnType<typeof setTimeout> | undefined;
+  let pendingOrder: SectionKey[] | null = null;
+  function flushOrder() {
+    if (orderTimer !== undefined) {
+      clearTimeout(orderTimer);
+      orderTimer = undefined;
+    }
+    if (pendingOrder) {
+      void sectionOrderPref.set(pendingOrder);
+      pendingOrder = null;
+    }
+  }
+
   /** Move the visible card at `from` to `to`, then persist the new order. */
   function moveByIndex(from: number, to: number) {
     const next = moveVisibleByIndex(sections.value, hiddenKeys.value, from, to);
@@ -55,7 +78,9 @@ export function useSectionLayout(character: Ref<Character | null>) {
     sections.value = next;
     const keys = next.map((section) => section.key);
     savedOrder.value = keys;
-    void sectionOrderPref.set(keys);
+    pendingOrder = keys;
+    if (orderTimer !== undefined) clearTimeout(orderTimer);
+    orderTimer = setTimeout(flushOrder, ORDER_PERSIST_DELAY);
   }
 
   function setHidden(key: SectionKey, hidden: boolean) {
@@ -74,6 +99,9 @@ export function useSectionLayout(character: Ref<Character | null>) {
     layoutIndices.value = { ...layoutIndices.value, [key]: next };
     void sectionLayoutPref.set(layoutIndices.value);
   }
+
+  // Persist any pending reorder before the composable tears down.
+  onBeforeUnmount(flushOrder);
 
   return {
     sections: visibleSections,
