@@ -76,6 +76,9 @@ describe('section layout options', () => {
     // The List layout (perRow 7) grows sooner than Wide (perRow 20).
     expect(sectionSpan('inventory', 21, 2).rows).toBe(3); // ceil(21/7)
     expect(sectionSpan('inventory', 21, 0).rows).toBe(2); // ceil(21/20)=2
+    // Spells stay at 2 rows in the List layout until the count exceeds perRow*2.
+    expect(sectionSpan('spells', 16, 2)).toEqual({ cols: 1, rows: 2 }); // ceil(16/8)=2
+    expect(sectionSpan('spells', 17, 2).rows).toBe(3); // ceil(17/8)=3
     // An out-of-range index clamps to the last option.
     expect(sectionSpan('inventory', 4, 9)).toEqual({ cols: 1, rows: 2 });
   });
