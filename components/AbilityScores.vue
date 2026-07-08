@@ -76,6 +76,16 @@ const isList = computed(() => grid.value.tileCols === 1);
 .abilities--list .ability__name {
   flex: 1;
   text-align: left;
+  font-size: 14px;
+}
+
+/* The narrow list rows have room for slightly larger stat text. */
+.abilities--list .ability__mod {
+  font-size: 22px;
+}
+
+.abilities--list .ability__score {
+  font-size: 16px;
 }
 
 /* A divider between the modifier and the total score, only in the list layout. */
@@ -85,7 +95,7 @@ const isList = computed(() => grid.value.tileCols === 1);
 
 .abilities--list .ability__sep {
   display: inline;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 300;
   color: var(--p-primary-300, #cbd5e1);
 }
