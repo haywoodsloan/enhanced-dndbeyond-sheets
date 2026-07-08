@@ -4,10 +4,6 @@ import type { InventoryEntry } from '@/services/dndbeyond/model';
 
 const props = defineProps<{ inventory: InventoryEntry[]; columns?: number }>();
 
-/** Blank rows appended after the list so players can pencil in gear they pick
- * up during play. */
-const WRITE_IN_ROWS = 2;
-
 // Split into N balanced columns (from the chosen layout) so each footprint uses
 // its full width; every column carries its own header so the circles stay
 // labeled. Empty trailing columns are dropped.
@@ -18,6 +14,11 @@ const columnGroups = computed(() => {
     props.inventory.slice(index * size, (index + 1) * size),
   ).filter((column) => column.length > 0);
 });
+
+// Blank write-in rows at the foot of each column for gear gained during play.
+// Fewer per column once the list splits three ways (narrower columns) so the
+// added height stays modest — 1 each at three columns, 2 each otherwise.
+const writeInRows = computed(() => (columnGroups.value.length >= 3 ? 1 : 2));
 </script>
 
 <template>
@@ -43,17 +44,15 @@ const columnGroups = computed(() => {
           :title="item.attuned ? 'Attuned' : 'Not attuned'"
         ></span>
       </template>
-      <!-- Blank write-in rows at the end of the last column for gear gained
-           during play; the dividers above and below act as the write-lines. -->
-      <template v-if="colIndex === columnGroups.length - 1">
-        <template v-for="n in WRITE_IN_ROWS" :key="`blank-${n}`">
-          <span class="item__divider" aria-hidden="true"></span>
-          <span class="item__name item__name--blank" data-item-blank></span>
-          <span class="item__dot"></span>
-          <span class="item__dot"></span>
-        </template>
+      <!-- Blank write-in rows at the foot of every column for gear gained during
+           play; the dividers above and below act as the write-lines. -->
+      <template v-for="n in writeInRows" :key="`blank-${n}`">
         <span class="item__divider" aria-hidden="true"></span>
+        <span class="item__name item__name--blank" data-item-blank></span>
+        <span class="item__dot"></span>
+        <span class="item__dot"></span>
       </template>
+      <span class="item__divider" aria-hidden="true"></span>
     </div>
   </div>
 </template>

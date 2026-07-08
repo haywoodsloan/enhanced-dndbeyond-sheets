@@ -45,17 +45,32 @@ describe('InventoryCard', () => {
     expect(threeCol.findAll('.column')).toHaveLength(3);
   });
 
-  it('appends blank write-in rows for gear gained during play', () => {
+  it('adds blank write-in rows without counting them as items or filled circles', () => {
     const wrapper = mount(InventoryCard, {
       props: {
         inventory: [{ name: 'Plate', quantity: 1, equipped: true, attuned: false }],
       },
     });
 
-    // Two blank rows are added (only in the last column) and don't count as
-    // real items or filled circles.
+    // A single-column list gets two blank rows; they aren't real items or dots.
     expect(wrapper.findAll('[data-item-blank]')).toHaveLength(2);
     expect(wrapper.findAll('[data-item]')).toHaveLength(1);
     expect(wrapper.findAll('.item__dot--on')).toHaveLength(1);
+  });
+
+  it('splits write-in rows across columns, fewer per column at three columns', () => {
+    const inventory = Array.from({ length: 6 }, (_, index) => ({
+      name: `Item ${index}`,
+      quantity: 1,
+      equipped: false,
+      attuned: false,
+    }));
+
+    // Two columns → 2 blank rows each (4 total); three columns → 1 each (3).
+    const twoCol = mount(InventoryCard, { props: { inventory, columns: 2 } });
+    expect(twoCol.findAll('[data-item-blank]')).toHaveLength(4);
+
+    const threeCol = mount(InventoryCard, { props: { inventory, columns: 3 } });
+    expect(threeCol.findAll('[data-item-blank]')).toHaveLength(3);
   });
 });
