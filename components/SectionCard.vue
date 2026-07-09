@@ -95,7 +95,7 @@ const cardSubtitle = computed(() =>
         v-if="!hidden && (layoutCount ?? 1) > 1"
         type="button"
         class="card__layout"
-        v-tooltip.bottom="{ value: `Layout: ${layoutLabel} (click to change)`, showDelay: 500 }"
+        v-tooltip.bottom="{ value: `Layout: ${layoutLabel}`, showDelay: 500 }"
         :aria-label="`Change layout (currently ${layoutLabel})`"
         @click="emit('cycleLayout', section.key)"
       >
@@ -108,10 +108,7 @@ const cardSubtitle = computed(() =>
       <button
         type="button"
         class="card__toggle"
-        v-tooltip.bottom="{
-          value: hidden ? 'Show section (add back to the page)' : 'Hide section (don’t print)',
-          showDelay: 500,
-        }"
+        v-tooltip.bottom="{ value: hidden ? 'Show section' : 'Hide section', showDelay: 500 }"
         :aria-label="hidden ? 'Show section' : 'Hide section'"
         @click="hidden ? emit('show', section.key) : emit('hide', section.key)"
       >
