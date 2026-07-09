@@ -563,12 +563,22 @@ body {
   }
 
   .sheet-area {
+    /* Drop the on-screen flex centering: with `align-items: center` a sheet
+       without a definite width sizes to its content, letting the grid's `1fr`
+       columns balloon to their max-content width. A plain block keeps the
+       sheet at exactly one page wide. */
+    display: block;
     padding: 0;
   }
 
   .sheet {
-    width: auto;
+    /* Pin to the page width. `auto` let the grid columns grow past the page in
+       the flex-centered parent, so the browser scaled the whole sheet down to
+       fit — the "squished into the top" look. A definite width keeps the fixed
+       row-units at the size the pagination was computed for. */
+    width: var(--page-width);
     min-height: 0;
+    margin: 0;
     background: var(--paper);
     box-shadow: none;
     /* Print with `@page { margin: 0 }` and let the sheet's own padding
