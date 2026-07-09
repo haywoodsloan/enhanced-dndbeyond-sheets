@@ -152,13 +152,13 @@ useCardDrag(gridRef, {
   },
 });
 
-// Glide cards to their new slots when the layout changes — a drag-reorder,
-// hiding/showing a section, or a card's layout toggle reflowing its neighbours
-// — instead of snapping. The card whose layout toggled snaps to its new size;
-// only the cards it displaces glide. Purely visual: the drag hit-testing
-// measures layout offsets, so the animation's transform never perturbs where
-// cards are computed to be.
-useGridFlip(gridRef, () => [orderedSections.value, layoutIndices.value]);
+// Glide cards to their new slots when the order changes — a drag-reorder or
+// hiding/showing a section — instead of snapping. A card's own layout toggle is
+// deliberately not animated: the toggled card would resize instantly while its
+// neighbours glided, which looks disjointed, so a layout change reflows all at
+// once. Purely visual: the drag hit-testing measures layout offsets, so the
+// animation's transform never perturbs where cards are computed to be.
+useGridFlip(gridRef, orderedSections);
 
 /** Open the browser's print dialog; the print stylesheet hides the settings
  * panel and desk so only the sheet prints. */
