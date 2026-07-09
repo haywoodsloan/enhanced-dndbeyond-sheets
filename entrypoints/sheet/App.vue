@@ -310,6 +310,21 @@ onUnmounted(() => {
               @hide="hide"
               @cycle-layout="cycleLayout"
             />
+            <!-- Occupy each inter-page gutter track so the print engine keeps it.
+                 Chrome drops EMPTY grid tracks when it fragments the grid across
+                 printed pages, which collapsed the between-pages spacing (the
+                 gap is `2×margin`, so the loss grew with the margin); a placed,
+                 breakable child stops the track from being discarded. -->
+            <div
+              v-for="p in pageCount - 1"
+              :key="`page-gap-${p}`"
+              class="sheet__page-gap"
+              aria-hidden="true"
+              :style="{
+                gridColumn: '1 / -1',
+                gridRow: `${(p - 1) * (rowsPerPage + 1) + rowsPerPage + 1} / span 1`,
+              }"
+            ></div>
           </div>
         </template>
       </main>
@@ -532,6 +547,14 @@ body {
 /* Keep a card whole rather than letting it split across a page break. */
 .card {
   break-inside: avoid;
+}
+
+/* Transparent filler that occupies each inter-page gutter track (placed by
+   `gridRow`). Its only job is to keep the track non-empty so the print engine
+   doesn't discard it while fragmenting the grid across pages. Left breakable so
+   the page break passes cleanly through it. */
+.sheet__page-gap {
+  pointer-events: none;
 }
 
 /* While dragging, dim the card in its original slot but keep its space so the
