@@ -257,7 +257,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="settings__button settings__button--reset"
-          v-tooltip.top="'Reset layout to defaults'"
+          v-tooltip.top="{ value: 'Reset layout to defaults', showDelay: 500 }"
           aria-label="Reset layout to defaults"
           @click="resetLayout"
         >
