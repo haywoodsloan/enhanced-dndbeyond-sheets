@@ -109,47 +109,32 @@ export function packSections(
   return { placements, pages };
 }
 
-/**
- * The `grid-template-rows` value for a sheet of `pages` pages, each `rowsPerPage`
- * row-units tall. The in-row gaps come from the grid's `row-gap` (a real gap,
- * which the print engine honours the same way it does `column-gap`); only the
- * taller between-pages gutter is an explicit `--page-inter-gap` track, so the
- * page separation can still differ from the in-row gap while cards align to the
- * painted page rectangles. (An earlier version used empty `--grid-gap` tracks
- * for the in-row gaps too, but Chrome drops empty gap tracks when it fragments
- * the grid across printed pages, so the rows printed with no vertical gap.)
- */
-export function sheetTemplateRows(pages: number, rowsPerPage: number): string {
-  const pageCount = Math.max(1, Math.floor(pages));
+/** Which page (0-based) a placement lands on. */
+export function placementPage(placement: CardPlacement, rowsPerPage: number): number {
   const perPage = Math.max(1, Math.floor(rowsPerPage));
-  const tracks: string[] = [];
-  for (let p = 0; p < pageCount; p += 1) {
-    for (let r = 0; r < perPage; r += 1) {
-      tracks.push('var(--row-unit)');
-    }
-    if (p < pageCount - 1) tracks.push('var(--page-inter-gap)');
-  }
-  return tracks.join(' ');
+  return Math.floor(placement.row / perPage);
 }
 
 /**
- * The `grid-column` / `grid-row` for a placement, translated onto the track list
- * built by {@link sheetTemplateRows}. Each page contributes `rowsPerPage`
- * row-unit tracks plus one inter-page gutter track, and a card spanning `rows`
- * row-units covers `rows` tracks (the `row-gap` between them is drawn inside the
- * span automatically).
+ * The `grid-column` / `grid-row` for a placement inside its OWN page's grid.
+ * Each printed page renders as a separate container with its own
+ * `rowsPerPage`-tall grid (`repeat(rowsPerPage, var(--row-unit))`), so a card
+ * maps onto the row WITHIN its page (`row % rowsPerPage`); a card spanning `rows`
+ * row-units covers that many tracks (the `row-gap` between them is drawn inside
+ * the span). Giving each page its own grid — rather than one tall grid the print
+ * engine has to fragment across pages — is what keeps the printed margins exact:
+ * no page ever splits a grid, so there is no cross-page gap/track for the engine
+ * to drift or drop, and every page's margin is just its container's padding.
  */
 export function placementStyle(
   placement: CardPlacement,
   rowsPerPage: number,
 ): { gridColumn: string; gridRow: string } {
   const perPage = Math.max(1, Math.floor(rowsPerPage));
-  const page = Math.floor(placement.row / perPage);
   const rowInPage = placement.row % perPage;
-  const startLine = page * (perPage + 1) + rowInPage + 1;
   return {
     gridColumn: `${placement.col + 1} / span ${placement.cols}`,
-    gridRow: `${startLine} / span ${placement.rows}`,
+    gridRow: `${rowInPage + 1} / span ${placement.rows}`,
   };
 }
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   packedDropIndex,
   packSections,
+  placementPage,
   placementStyle,
-  sheetTemplateRows,
   type CardFootprint,
 } from '@/utils/pack-sections';
 
@@ -65,16 +65,12 @@ describe('packSections', () => {
   });
 });
 
-describe('sheetTemplateRows', () => {
-  it('lists one row-unit track per row on a single page', () => {
-    expect(sheetTemplateRows(1, 2)).toBe('var(--row-unit) var(--row-unit)');
-  });
-
-  it('separates pages with the inter-page gutter track', () => {
-    expect(sheetTemplateRows(2, 2)).toBe(
-      'var(--row-unit) var(--row-unit) var(--page-inter-gap) ' +
-        'var(--row-unit) var(--row-unit)',
-    );
+describe('placementPage', () => {
+  it('maps a row to its 0-based page by rowsPerPage', () => {
+    expect(placementPage({ col: 0, row: 0, cols: 1, rows: 1 }, 4)).toBe(0);
+    expect(placementPage({ col: 0, row: 3, cols: 1, rows: 1 }, 4)).toBe(0);
+    expect(placementPage({ col: 0, row: 4, cols: 1, rows: 1 }, 4)).toBe(1);
+    expect(placementPage({ col: 0, row: 9, cols: 1, rows: 1 }, 4)).toBe(2);
   });
 });
 
@@ -93,11 +89,11 @@ describe('placementStyle', () => {
     });
   });
 
-  it('offsets a card on a later page past the gutter track', () => {
-    // Page 1 (rowsPerPage 4), row-in-page 1 → line 1*5 + 1 + 1 = 7.
+  it('places a later-page card at its row WITHIN the page', () => {
+    // Row 5 with rowsPerPage 4 → page 1, row-in-page 1 → grid row 2.
     expect(placementStyle({ col: 2, row: 5, cols: 1, rows: 2 }, 4)).toEqual({
       gridColumn: '3 / span 1',
-      gridRow: '7 / span 2',
+      gridRow: '2 / span 2',
     });
   });
 });

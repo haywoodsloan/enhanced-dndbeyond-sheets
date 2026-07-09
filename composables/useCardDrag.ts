@@ -106,7 +106,10 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     if (!handle) return;
     const card = handle.closest('.card') as HTMLElement | null;
     if (!card) return;
-    const index = Array.from(element.children).indexOf(card);
+    // The cards live in per-page grid containers, so find the model index among
+    // all cards in the sheet (DOM order == model order) rather than among direct
+    // children of one grid.
+    const index = Array.from(element.querySelectorAll('[data-section-key]')).indexOf(card);
     if (index < 0) return;
 
     event.preventDefault();

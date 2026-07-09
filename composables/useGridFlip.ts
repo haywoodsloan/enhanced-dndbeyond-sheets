@@ -8,30 +8,39 @@ const EASING = 'cubic-bezier(0.2, 0, 0, 1)';
 const EPSILON = 0.5;
 
 /**
- * FLIP-animate the section cards so they glide to their new grid slots when the
- * order changes — a drag-reorder or hiding/showing a section — instead of
- * snapping. Each card's position is recorded before Vue re-renders the grid
- * (First), the inverse offset is applied on the new layout so it still appears
- * at the old spot (Invert), then transitioned away on the next frame (Play).
+ * FLIP-animate the section cards so they glide to their new slots when the order
+ * changes — a drag-reorder or hiding/showing a section — instead of snapping.
+ * Each card's position is recorded before Vue re-renders (First), the inverse
+ * offset is applied on the new layout so it still appears at the old spot
+ * (Invert), then transitioned away on the next frame (Play).
  *
- * A card's own layout toggle is deliberately NOT animated (it isn't part of the
- * `order` source): the resized card would snap while its neighbours glided,
- * which looks disjointed, so the whole reflow from a layout change is instant.
- * Only the CSS `transform` is animated, and the drag hit-testing
- * (`useCardDrag`) measures the cards from their layout offsets, which a
- * `transform` doesn't move — so an in-flight glide never skews the drop slot.
+ * `container` is the wrapper that holds every page's grid; the cards are found
+ * by querying `.card` descendants, so a card gliding from one page container to
+ * another still animates (positions are read in viewport coordinates, which are
+ * container-agnostic). A card's own layout toggle is deliberately NOT animated
+ * (it isn't part of the `order` source): the resized card would snap while its
+ * neighbours glided, which looks disjointed, so a layout change reflows at once.
+ *
+ * Only the CSS `transform` is animated, and the drag hit-testing (`useCardDrag`)
+ * computes drop slots from the packer geometry, not from the cards' live rects,
+ * so an in-flight glide never skews the drop target.
  *
  * Honors `prefers-reduced-motion`: when set, cards simply snap (no glide).
  */
-export function useGridFlip(grid: Ref<HTMLElement | null>, order: WatchSource) {
+export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSource) {
   const reduceMotion =
     typeof window !== 'undefined' &&
     !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-  // Positions captured just before the grid re-renders, keyed by the card
-  // element (Vue reuses the keyed elements across a reorder, so they match up).
+  // Positions captured just before the re-render, keyed by the card element
+  // (Vue reuses the keyed elements across a reorder, so they match up).
   let first: Map<Element, DOMRect> | null = null;
   const wired = new WeakSet<Element>();
+
+  function cards(): HTMLElement[] {
+    const element = container.value;
+    return element ? Array.from(element.querySelectorAll<HTMLElement>('.card')) : [];
+  }
 
   function clearOnEnd(event: Event) {
     const card = event.currentTarget as HTMLElement;
@@ -40,54 +49,53 @@ export function useGridFlip(grid: Ref<HTMLElement | null>, order: WatchSource) {
   }
 
   function capture() {
-    const element = grid.value;
-    if (!element || reduceMotion) return;
+    if (reduceMotion) return;
     const rects = new Map<Element, DOMRect>();
-    for (const child of Array.from(element.children)) {
-      // getBoundingClientRect (visual) so a card interrupted mid-glide starts
-      // its next glide from where it currently appears, not where it will rest.
-      rects.set(child, child.getBoundingClientRect());
-    }
+    // getBoundingClientRect (visual) so a card interrupted mid-glide starts its
+    // next glide from where it currently appears, not where it will rest.
+    for (const card of cards()) rects.set(card, card.getBoundingClientRect());
     first = rects;
   }
 
   function play() {
-    const element = grid.value;
-    if (!element || !first) return;
-    const previous = first;
+    if (!first) return;
+    const before = first;
     first = null;
+    const list = cards();
 
-    // The grid never carries a transform, so its rect is a stable origin from
-    // which each child's resting viewport position can be rebuilt from offsets.
-    const gridRect = element.getBoundingClientRect();
-    const originLeft = gridRect.left - element.offsetLeft;
-    const originTop = gridRect.top - element.offsetTop;
+    // Clear any in-flight transform and read each card's RESTING rect, so the
+    // glide is measured against the true new layout (not a mid-animation offset)
+    // and works even when a card moved between page containers.
+    const after = new Map<Element, DOMRect>();
+    for (const card of list) {
+      card.style.transition = 'none';
+      card.style.transform = '';
+      after.set(card, card.getBoundingClientRect());
+    }
 
     const moved: HTMLElement[] = [];
-    for (const child of Array.from(element.children) as HTMLElement[]) {
-      const before = previous.get(child);
-      if (!before) continue; // a card that just appeared — nothing to glide from
-      const afterLeft = originLeft + child.offsetLeft;
-      const afterTop = originTop + child.offsetTop;
-      const dx = before.left - afterLeft;
-      const dy = before.top - afterTop;
+    for (const card of list) {
+      const from = before.get(card);
+      if (!from) continue; // a card that just appeared — nothing to glide from
+      const to = after.get(card)!;
+      const dx = from.left - to.left;
+      const dy = from.top - to.top;
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) continue;
       // Invert: place the card back at its old spot with no transition.
-      child.style.transition = 'none';
-      child.style.transform = `translate(${dx}px, ${dy}px)`;
-      moved.push(child);
+      card.style.transform = `translate(${dx}px, ${dy}px)`;
+      moved.push(card);
     }
     if (!moved.length) return;
 
     // Play: on the next frame, transition the inverse offset back to zero.
     requestAnimationFrame(() => {
-      for (const child of moved) {
-        if (!wired.has(child)) {
-          child.addEventListener('transitionend', clearOnEnd);
-          wired.add(child);
+      for (const card of moved) {
+        if (!wired.has(card)) {
+          card.addEventListener('transitionend', clearOnEnd);
+          wired.add(card);
         }
-        child.style.transition = `transform ${DURATION}ms ${EASING}`;
-        child.style.transform = '';
+        card.style.transition = `transform ${DURATION}ms ${EASING}`;
+        card.style.transform = '';
       }
     });
   }
@@ -97,10 +105,6 @@ export function useGridFlip(grid: Ref<HTMLElement | null>, order: WatchSource) {
   watch(order, play, { flush: 'post' });
 
   onBeforeUnmount(() => {
-    const element = grid.value;
-    if (!element) return;
-    for (const child of Array.from(element.children)) {
-      child.removeEventListener('transitionend', clearOnEnd);
-    }
+    for (const card of cards()) card.removeEventListener('transitionend', clearOnEnd);
   });
 }

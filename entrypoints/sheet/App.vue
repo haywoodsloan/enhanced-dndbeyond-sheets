@@ -14,8 +14,10 @@ import {
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
+  type SectionSpan,
 } from '@/utils/section-layout';
-import { packedDropIndex, packSections, placementStyle, sheetTemplateRows } from '@/utils/pack-sections';
+import { packedDropIndex, packSections, placementPage, placementStyle } from '@/utils/pack-sections';
+import type { CharacterSection } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -27,8 +29,16 @@ import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
 import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/preferences';
 import SectionCard from '@/components/SectionCard.vue';
 
-/** Desk-coloured gap between the painted page rectangles, in px. */
+/** Desk-coloured gap shown between the page sheets on screen, in px. */
 const PAGE_GUTTER = 20;
+
+/** One card placed on a specific page's grid, ready to render. */
+interface PageEntry {
+  section: CharacterSection;
+  index: number;
+  span: SectionSpan;
+  place: { gridColumn: string; gridRow: string };
+}
 
 const props = defineProps<{ characterId: number | null }>();
 
@@ -81,14 +91,12 @@ const pageStyle = computed(() => ({
   // The between-pages track = the two facing page margins (2×) plus the on-screen
   // desk gutter. Print keeps the margins but drops the gutter (`--page-gutter`
   // is zeroed there) so consecutive printed pages sit flush.
+  // Desk-coloured space shown between the page sheets on screen (dropped in
+  // print, where each page becomes its own physical sheet).
   '--page-gutter': `${PAGE_GUTTER}px`,
-  // The in-row gaps are the grid's `row-gap` (var(--grid-gap)); the browser
-  // draws one on each side of this inter-page track, so subtract those two to
-  // keep the page-to-page separation exactly `2*margin + gutter`.
-  '--page-inter-gap': `calc(${2 * mmToPx(margin.value.mm)}px + var(--page-gutter) - ${2 * GRID_GAP}px)`,
 }));
 
-const gridRef = ref<HTMLElement | null>(null);
+const sheetRef = ref<HTMLElement | null>(null);
 
 // Footprint (columns × row-units) of each visible card, packed into the grid.
 // This replaces the margin-push paginator: cards are placed explicitly on real
@@ -108,33 +116,44 @@ const footprints = computed(() =>
 );
 const packed = computed(() => packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value));
 const pageCount = computed(() => packed.value.pages);
-const placeStyles = computed(() =>
-  packed.value.placements.map((placement) => placementStyle(placement, rowsPerPage.value)),
-);
-const gridTemplateRows = computed(() => sheetTemplateRows(pageCount.value, rowsPerPage.value));
 
-// Position of each page rectangle in the backdrop layer.
-const pageStride = computed(() => mmToPx(format.value.height) + PAGE_GUTTER);
-const pageHeightPx = computed(() => mmToPx(format.value.height));
+// Group the packed cards by the page they land on. Each page then renders as its
+// OWN grid container (a real, separate sheet) rather than all cards living in one
+// tall grid the print engine has to fragment across pages. That is the crux of
+// the reliable print layout: because no grid ever spans a page break, the engine
+// can't drift the row tracks or drop the between-pages spacing, and every page's
+// margin comes straight from its own container padding.
+const pages = computed<PageEntry[][]>(() => {
+  const perPage = rowsPerPage.value;
+  const grouped: PageEntry[][] = Array.from({ length: pageCount.value }, () => []);
+  packed.value.placements.forEach((placement, index) => {
+    grouped[placementPage(placement, perPage)].push({
+      section: orderedSections.value[index],
+      index,
+      span: footprints.value[index],
+      place: placementStyle(placement, perPage),
+    });
+  });
+  return grouped;
+});
 
-// Grow the paper to span all of its pages so a partly-filled last page still
-// shows as a full sheet and the hidden-sections tray sits cleanly below it
-// (rather than overlapping the last page rectangle that overhangs the content).
-const sheetMinHeight = computed(
-  () => (pageCount.value - 1) * pageStride.value + pageHeightPx.value,
-);
+// One page's grid is exactly `rowsPerPage` row-unit tracks tall (its in-row
+// `row-gap`s make them sum to the page's printable height).
+const pageGridRows = computed(() => `repeat(${rowsPerPage.value}, var(--row-unit))`);
 
 // Drag-and-drop reordering of the section cards. `onReorder` moves the card in
 // the model as the pointer passes each slot, so the grid reflows to preview the
 // drop live; the packed placements recompute reactively from the new order, so
 // the preview respects page breaks and cards never straddle a boundary mid-drag.
-useCardDrag(gridRef, {
+useCardDrag(sheetRef, {
   onReorder: (from, to) => moveByIndex(from, to),
   // Resolve the drop slot by simulating the packer against the live footprints,
   // so the dragged card lands wherever it would actually render — including the
   // empty cells that a tall card leaves beside it.
   resolveDrop: (pointer, from) => {
-    const grid = gridRef.value;
+    // Anchor the packer geometry to the FIRST page's grid: its top-left is where
+    // content row 0 begins and its width is the printable content width.
+    const grid = sheetRef.value?.querySelector('.page__grid');
     if (!grid) return -1;
     const rect = grid.getBoundingClientRect();
     return packedDropIndex(
@@ -161,7 +180,7 @@ useCardDrag(gridRef, {
 // neighbours glided, which looks disjointed, so a layout change reflows all at
 // once. Purely visual: the drag hit-testing measures layout offsets, so the
 // animation's transform never perturbs where cards are computed to be.
-useGridFlip(gridRef, orderedSections);
+useGridFlip(sheetRef, orderedSections);
 
 /** Open the browser's print dialog; the print stylesheet hides the settings
  * panel and desk so only the sheet prints. */
@@ -273,59 +292,39 @@ onUnmounted(() => {
     </aside>
 
     <div class="sheet-area">
-      <main
-        class="sheet"
-        :style="[pageStyle, { '--sheet-min-height': `${sheetMinHeight}px` }]"
-      >
-        <div class="sheet__pages" aria-hidden="true">
-          <div
-            v-for="page in pageCount"
-            :key="page"
-            class="sheet__page"
-            :style="{ top: `${(page - 1) * pageStride}px`, height: `${pageHeightPx}px` }"
-          ></div>
-        </div>
-
-        <p v-if="characterId == null">
+      <main class="sheet" ref="sheetRef" :style="pageStyle">
+        <p v-if="characterId == null" class="sheet__message">
           No character selected. Open this from a D&amp;D Beyond character page.
         </p>
 
-        <p v-else-if="status === 'idle' || status === 'loading'">Loading character…</p>
+        <p v-else-if="status === 'idle' || status === 'loading'" class="sheet__message">
+          Loading character…
+        </p>
 
-        <p v-else-if="status === 'error'" role="alert">
+        <p v-else-if="status === 'error'" class="sheet__message" role="alert">
           Could not load character: {{ error }}
         </p>
 
         <template v-else-if="character">
-          <div class="sheet__grid" ref="gridRef" :style="{ gridTemplateRows }">
-            <SectionCard
-              v-for="(section, index) in orderedSections"
-              :key="section.key"
-              :section="section"
-              :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0, rowsPerPage)"
-              :place="placeStyles[index]"
-              :character="character"
-              :layout-count="sectionLayoutCount(section.key)"
-              :layout-label="sectionLayoutLabel(section.key, layoutIndices[section.key] ?? 0)"
-              @hide="hide"
-              @cycle-layout="cycleLayout"
-            />
-            <!-- Occupy each inter-page gutter track so the print engine keeps it.
-                 Chrome drops EMPTY grid tracks when it fragments the grid across
-                 printed pages, which collapsed the between-pages spacing (the
-                 gap is `2×margin`, so the loss grew with the margin); a placed,
-                 breakable child stops the track from being discarded. -->
-            <div
-              v-for="p in pageCount - 1"
-              :key="`page-gap-${p}`"
-              class="sheet__page-gap"
-              aria-hidden="true"
-              :style="{
-                gridColumn: '1 / -1',
-                gridRow: `${(p - 1) * (rowsPerPage + 1) + rowsPerPage + 1} / span 1`,
-              }"
-            ></div>
-          </div>
+          <!-- Each page is its own sheet-sized container holding a one-page-tall
+               grid; a `break-after: page` (in print) puts each on its own
+               physical sheet, so no grid is ever split across a page break. -->
+          <section v-for="(pageCards, p) in pages" :key="`page-${p}`" class="page">
+            <div class="page__grid" :style="{ gridTemplateRows: pageGridRows }">
+              <SectionCard
+                v-for="entry in pageCards"
+                :key="entry.section.key"
+                :section="entry.section"
+                :span="entry.span"
+                :place="entry.place"
+                :character="character"
+                :layout-count="sectionLayoutCount(entry.section.key)"
+                :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
+                @hide="hide"
+                @cycle-layout="cycleLayout"
+              />
+            </div>
+          </section>
         </template>
       </main>
 
@@ -502,12 +501,8 @@ body {
 }
 
 .sheet {
-  position: relative;
-  isolation: isolate;
   box-sizing: border-box;
   width: var(--page-width);
-  min-height: var(--sheet-min-height, var(--page-height));
-  padding: var(--page-margin);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
   /* Tie borders and secondary text to the theme (lighter/darker shades). */
@@ -515,46 +510,44 @@ body {
   --p-text-muted-color: var(--p-primary-700, #6b7280);
 }
 
-/* WYSIWYG paper: one shadowed white page per printed page, behind the content. */
-.sheet__pages {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+.sheet__message {
+  margin: 0;
+  padding: var(--page-margin);
 }
 
-.sheet__page {
-  position: absolute;
-  left: 0;
-  right: 0;
+/* One WYSIWYG paper sheet per printed page: a real, self-contained container
+   with its own one-page grid. Its padding IS the page margin, so the printed
+   margin is exact and identical on every page (no fragmented-grid drift). */
+.page {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--page-height);
+  padding: var(--page-margin);
+  overflow: hidden;
   background: var(--paper);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
 }
 
-.sheet__grid {
+.page:not(:last-child) {
+  /* Desk-coloured gap between the sheets on screen (removed in print). */
+  margin-bottom: var(--page-gutter, 20px);
+}
+
+.page__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  /* Row-units are explicit tracks (built by `sheetTemplateRows`); the in-row
-     gaps are a real `row-gap` (not empty tracks) because Chrome drops empty gap
-     tracks when it fragments the grid across printed pages, which left the rows
-     touching in print. Only the taller between-pages gutter stays an explicit
-     `--page-inter-gap` track. Cards stretch to fill their multi-row span. */
+  /* Row-units are explicit tracks; the in-row gaps are a real `row-gap`. Because
+     each page is its OWN grid (never fragmented across a page break), there is no
+     page-boundary gap to special-case. Cards stretch to fill their span. */
   column-gap: var(--grid-gap, 12px);
   row-gap: var(--grid-gap, 12px);
   align-items: stretch;
+  height: 100%;
 }
 
 /* Keep a card whole rather than letting it split across a page break. */
 .card {
   break-inside: avoid;
-}
-
-/* Transparent filler that occupies each inter-page gutter track (placed by
-   `gridRow`). Its only job is to keep the track non-empty so the print engine
-   doesn't discard it while fragmenting the grid across pages. Left breakable so
-   the page break passes cleanly through it. */
-.sheet__page-gap {
-  pointer-events: none;
 }
 
 /* While dragging, dim the card in its original slot but keep its space so the
@@ -570,10 +563,6 @@ body {
 }
 
 @media print {
-  body {
-    background: var(--paper);
-  }
-
   .workspace {
     display: block;
   }
@@ -582,41 +571,34 @@ body {
     display: none;
   }
 
-  .sheet__pages {
-    display: none;
-  }
-
   .hidden-tray {
     display: none;
   }
 
   .sheet-area {
-    /* Drop the on-screen flex centering: with `align-items: center` a sheet
-       without a definite width sizes to its content, letting the grid's `1fr`
-       columns balloon to their max-content width. A plain block keeps the
-       sheet at exactly one page wide. */
+    /* Drop the on-screen flex centering so the sheet sits at the page origin. */
     display: block;
     padding: 0;
   }
 
   .sheet {
-    /* Pin to the page width. `auto` let the grid columns grow past the page in
-       the flex-centered parent, so the browser scaled the whole sheet down to
-       fit — the "squished into the top" look. A definite width keeps the fixed
-       row-units at the size the pagination was computed for. */
     width: var(--page-width);
-    min-height: 0;
     margin: 0;
-    background: var(--paper);
+  }
+
+  .page {
+    /* `@page { margin: 0 }` makes each physical page the full paper size, and
+       each `.page` is one paper tall with its own `--page-margin` padding, so
+       the printed margins are exact and equal on every page. `break-after: page`
+       puts each container on its own sheet — no grid is fragmented, so nothing
+       drifts between pages. */
     box-shadow: none;
-    /* Print with `@page { margin: 0 }` and let the sheet's own padding
-       (`var(--page-margin)`, kept from the base rule) supply the page margin,
-       so the app's Margins setting fully controls the printed margin whatever
-       the print dialog is set to. Only the on-screen desk gutter between pages
-       is dropped (`!important` beats the inline var); the two facing page
-       margins stay in the inter-page track so each page's content still sits
-       inset from the physical edge. */
-    --page-gutter: 0 !important;
+    margin: 0;
+    break-after: page;
+  }
+
+  .page:last-child {
+    break-after: auto;
   }
 }
 </style>
