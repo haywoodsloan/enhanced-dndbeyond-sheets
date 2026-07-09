@@ -82,7 +82,10 @@ const pageStyle = computed(() => ({
   // desk gutter. Print keeps the margins but drops the gutter (`--page-gutter`
   // is zeroed there) so consecutive printed pages sit flush.
   '--page-gutter': `${PAGE_GUTTER}px`,
-  '--page-inter-gap': `calc(${2 * mmToPx(margin.value.mm)}px + var(--page-gutter))`,
+  // The in-row gaps are the grid's `row-gap` (var(--grid-gap)); the browser
+  // draws one on each side of this inter-page track, so subtract those two to
+  // keep the page-to-page separation exactly `2*margin + gutter`.
+  '--page-inter-gap': `calc(${2 * mmToPx(margin.value.mm)}px + var(--page-gutter) - ${2 * GRID_GAP}px)`,
 }));
 
 const gridRef = ref<HTMLElement | null>(null);
@@ -516,11 +519,13 @@ body {
 .sheet__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  /* Rows are explicit tracks (built by `sheetTemplateRows`) so the inter-page
-     gutter can differ from the in-row gap: row-gap is 0 and every gap lives in
-     the template. Cards stretch to fill their multi-row span. */
+  /* Row-units are explicit tracks (built by `sheetTemplateRows`); the in-row
+     gaps are a real `row-gap` (not empty tracks) because Chrome drops empty gap
+     tracks when it fragments the grid across printed pages, which left the rows
+     touching in print. Only the taller between-pages gutter stays an explicit
+     `--page-inter-gap` track. Cards stretch to fill their multi-row span. */
   column-gap: var(--grid-gap, 12px);
-  row-gap: 0;
+  row-gap: var(--grid-gap, 12px);
   align-items: stretch;
 }
 

@@ -111,9 +111,13 @@ export function packSections(
 
 /**
  * The `grid-template-rows` value for a sheet of `pages` pages, each `rowsPerPage`
- * row-units tall. Row-gap is 0 and every gap is an explicit track, so the gutter
- * between pages (`--page-inter-gap`) can differ from the in-page gap
- * (`--grid-gap`) while cards still align to the painted page rectangles.
+ * row-units tall. The in-row gaps come from the grid's `row-gap` (a real gap,
+ * which the print engine honours the same way it does `column-gap`); only the
+ * taller between-pages gutter is an explicit `--page-inter-gap` track, so the
+ * page separation can still differ from the in-row gap while cards align to the
+ * painted page rectangles. (An earlier version used empty `--grid-gap` tracks
+ * for the in-row gaps too, but Chrome drops empty gap tracks when it fragments
+ * the grid across printed pages, so the rows printed with no vertical gap.)
  */
 export function sheetTemplateRows(pages: number, rowsPerPage: number): string {
   const pageCount = Math.max(1, Math.floor(pages));
@@ -122,7 +126,6 @@ export function sheetTemplateRows(pages: number, rowsPerPage: number): string {
   for (let p = 0; p < pageCount; p += 1) {
     for (let r = 0; r < perPage; r += 1) {
       tracks.push('var(--row-unit)');
-      if (r < perPage - 1) tracks.push('var(--grid-gap)');
     }
     if (p < pageCount - 1) tracks.push('var(--page-inter-gap)');
   }
@@ -130,11 +133,11 @@ export function sheetTemplateRows(pages: number, rowsPerPage: number): string {
 }
 
 /**
- * The `grid-column` / `grid-row` for a placement, translated onto the explicit
- * track list built by {@link sheetTemplateRows}. Each page contributes
- * `2 * rowsPerPage` tracks (row-units interleaved with gap tracks, plus the
- * inter-page gutter track), and a card spanning `rows` row-units covers
- * `2 * rows - 1` tracks (its inner gap tracks included).
+ * The `grid-column` / `grid-row` for a placement, translated onto the track list
+ * built by {@link sheetTemplateRows}. Each page contributes `rowsPerPage`
+ * row-unit tracks plus one inter-page gutter track, and a card spanning `rows`
+ * row-units covers `rows` tracks (the `row-gap` between them is drawn inside the
+ * span automatically).
  */
 export function placementStyle(
   placement: CardPlacement,
@@ -143,11 +146,10 @@ export function placementStyle(
   const perPage = Math.max(1, Math.floor(rowsPerPage));
   const page = Math.floor(placement.row / perPage);
   const rowInPage = placement.row % perPage;
-  const startLine = page * 2 * perPage + 2 * rowInPage + 1;
-  const rowSpan = 2 * placement.rows - 1;
+  const startLine = page * (perPage + 1) + rowInPage + 1;
   return {
     gridColumn: `${placement.col + 1} / span ${placement.cols}`,
-    gridRow: `${startLine} / span ${rowSpan}`,
+    gridRow: `${startLine} / span ${placement.rows}`,
   };
 }
 

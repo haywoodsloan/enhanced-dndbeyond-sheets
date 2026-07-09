@@ -66,14 +66,14 @@ describe('packSections', () => {
 });
 
 describe('sheetTemplateRows', () => {
-  it('interleaves row-units with in-page gaps on a single page', () => {
-    expect(sheetTemplateRows(1, 2)).toBe('var(--row-unit) var(--grid-gap) var(--row-unit)');
+  it('lists one row-unit track per row on a single page', () => {
+    expect(sheetTemplateRows(1, 2)).toBe('var(--row-unit) var(--row-unit)');
   });
 
   it('separates pages with the inter-page gutter track', () => {
     expect(sheetTemplateRows(2, 2)).toBe(
-      'var(--row-unit) var(--grid-gap) var(--row-unit) var(--page-inter-gap) ' +
-        'var(--row-unit) var(--grid-gap) var(--row-unit)',
+      'var(--row-unit) var(--row-unit) var(--page-inter-gap) ' +
+        'var(--row-unit) var(--row-unit)',
     );
   });
 });
@@ -86,18 +86,18 @@ describe('placementStyle', () => {
     });
   });
 
-  it('spans a card across its row-units and inner gap tracks', () => {
+  it('spans a card across its row-unit tracks', () => {
     expect(placementStyle({ col: 1, row: 0, cols: 1, rows: 2 }, 4)).toEqual({
       gridColumn: '2 / span 1',
-      gridRow: '1 / span 3',
+      gridRow: '1 / span 2',
     });
   });
 
   it('offsets a card on a later page past the gutter track', () => {
-    // Page 1 (rowsPerPage 4), row-in-page 1 → line 1*8 + 2 + 1 = 11.
+    // Page 1 (rowsPerPage 4), row-in-page 1 → line 1*5 + 1 + 1 = 7.
     expect(placementStyle({ col: 2, row: 5, cols: 1, rows: 2 }, 4)).toEqual({
       gridColumn: '3 / span 1',
-      gridRow: '11 / span 3',
+      gridRow: '7 / span 2',
     });
   });
 });
