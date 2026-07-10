@@ -612,7 +612,6 @@ body {
   width: 100%;
   height: var(--page-height);
   padding: var(--page-margin);
-  overflow: hidden;
   background: var(--paper);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
 }
@@ -680,9 +679,12 @@ body {
        each `.page` is one paper tall with its own `--page-margin` padding, so
        the printed margins are exact and equal on every page. `break-after: page`
        puts each container on its own sheet — no grid is fragmented, so nothing
-       drifts between pages. */
+       drifts between pages. `overflow: hidden` clips any sub-pixel spill so a
+       page can't bleed onto the next sheet (screen keeps it visible so a card
+       gliding in from another page isn't clipped mid-animation). */
     box-shadow: none;
     margin: 0;
+    overflow: hidden;
     break-after: page;
   }
 

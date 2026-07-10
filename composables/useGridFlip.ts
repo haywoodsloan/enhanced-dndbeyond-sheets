@@ -32,9 +32,11 @@ export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSour
     typeof window !== 'undefined' &&
     !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-  // Positions captured just before the re-render, keyed by the card element
-  // (Vue reuses the keyed elements across a reorder, so they match up).
-  let first: Map<Element, DOMRect> | null = null;
+  // Positions captured just before the re-render, keyed by the card's stable
+  // section key (NOT the element): a card that moves to another page's grid is
+  // unmounted+remounted as a NEW element, so matching by element would miss it —
+  // the section key pairs the old position with the new element.
+  let first: Map<string, DOMRect> | null = null;
   const wired = new WeakSet<Element>();
 
   function cards(): HTMLElement[] {
@@ -50,10 +52,13 @@ export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSour
 
   function capture() {
     if (reduceMotion) return;
-    const rects = new Map<Element, DOMRect>();
+    const rects = new Map<string, DOMRect>();
     // getBoundingClientRect (visual) so a card interrupted mid-glide starts its
     // next glide from where it currently appears, not where it will rest.
-    for (const card of cards()) rects.set(card, card.getBoundingClientRect());
+    for (const card of cards()) {
+      const key = card.dataset.sectionKey;
+      if (key) rects.set(key, card.getBoundingClientRect());
+    }
     first = rects;
   }
 
@@ -75,7 +80,8 @@ export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSour
 
     const moved: HTMLElement[] = [];
     for (const card of list) {
-      const from = before.get(card);
+      const key = card.dataset.sectionKey;
+      const from = key ? before.get(key) : undefined;
       if (!from) continue; // a card that just appeared — nothing to glide from
       const to = after.get(card)!;
       const dx = from.left - to.left;
