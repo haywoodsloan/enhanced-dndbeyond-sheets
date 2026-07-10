@@ -3,9 +3,17 @@ import { onBeforeUnmount, watch, type Ref } from 'vue';
 interface CardDragOptions {
   /** Move the card at `fromIndex` to `toIndex` in the model (reflows the grid). */
   onReorder: (fromIndex: number, toIndex: number) => void;
+  /** Pin the card at `fromIndex` to a specific cell (manual placement). */
+  onPlace?: (fromIndex: number, cell: { page: number; col: number; row: number }) => void;
   /** Resolve the model index the dragged card should move to for the pointer's
-   * position (-1 for no change). */
+   * position (-1 for no reorder slot). */
   resolveDrop: (pointer: { x: number; y: number }, fromIndex: number) => number;
+  /** Resolve a manual-placement cell when there's no reorder slot under the
+   * pointer (null = leave as-is). */
+  resolvePlace?: (
+    pointer: { x: number; y: number },
+    fromIndex: number,
+  ) => { page: number; col: number; row: number } | null;
 }
 
 /** Distance (px) the pointer must travel before a grab becomes a drag. */
@@ -87,10 +95,15 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     clone.style.left = `${event.clientX - grabX}px`;
     clone.style.top = `${event.clientY - grabY}px`;
 
-    const to = options.resolveDrop({ x: event.clientX, y: event.clientY }, dragIndex);
+    const pointer = { x: event.clientX, y: event.clientY };
+    const to = options.resolveDrop(pointer, dragIndex);
     if (to >= 0 && to !== dragIndex) {
       options.onReorder(dragIndex, to);
       dragIndex = to;
+    } else if (to < 0 && options.resolvePlace && options.onPlace) {
+      // No reorder slot under the pointer — try a manual placement into a cell.
+      const cell = options.resolvePlace(pointer, dragIndex);
+      if (cell) options.onPlace(dragIndex, cell);
     }
   }
 

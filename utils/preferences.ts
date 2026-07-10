@@ -62,3 +62,7 @@ export const sectionOrderPref = definePreference<SectionKey[]>('pref-section-ord
 export const hiddenSectionsPref = definePreference<SectionKey[]>('pref-hidden-sections');
 /** Per-section chosen layout-option index (section key → index). */
 export const sectionLayoutPref = definePreference<Record<string, number>>('pref-section-layout');
+/** Per-section manual placement (section key → pinned cell: page, col, row-in-page). */
+export const sectionAnchorsPref = definePreference<
+  Record<string, { page: number; col: number; row: number }>
+>('pref-section-anchors');

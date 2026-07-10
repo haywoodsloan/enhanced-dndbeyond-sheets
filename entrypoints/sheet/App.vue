@@ -16,7 +16,13 @@ import {
   sectionSpan,
   type SectionSpan,
 } from '@/utils/section-layout';
-import { packedDropIndex, packSections, placementPage, placementStyle } from '@/utils/pack-sections';
+import {
+  cellAtPoint,
+  packedDropIndex,
+  packSections,
+  placementPage,
+  placementStyle,
+} from '@/utils/pack-sections';
 import type { CharacterSection } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
@@ -44,8 +50,19 @@ const props = defineProps<{ characterId: number | null }>();
 
 const { character, status, error } = useCharacter(toRef(props, 'characterId'));
 
-const { sections: orderedSections, hiddenSections, layoutIndices, moveByIndex, cycleLayout, hide, show, reset: resetLayout } =
-  useSectionLayout(character);
+const {
+  sections: orderedSections,
+  hiddenSections,
+  layoutIndices,
+  anchors,
+  moveByIndex,
+  placeCard,
+  clearAnchor,
+  cycleLayout,
+  hide,
+  show,
+  reset: resetLayout,
+} = useSectionLayout(character);
 
 // Page layout settings (page type, margins, theme color), persisted locally.
 const formatId = useStoredRef(pageFormatPref, DEFAULT_FORMAT_ID);
@@ -114,7 +131,22 @@ const footprints = computed(() =>
     ),
   ),
 );
-const packed = computed(() => packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value));
+// Fold each card's manual placement (if any) into its footprint as an absolute
+// `anchor` cell, so the packer pins it there and flows the rest around it.
+const anchoredFootprints = computed(() =>
+  orderedSections.value.map((section, index) => {
+    const base = footprints.value[index];
+    const anchor = anchors.value[section.key];
+    if (!anchor) return base;
+    return {
+      ...base,
+      anchor: { col: anchor.col, row: anchor.page * rowsPerPage.value + anchor.row },
+    };
+  }),
+);
+const packed = computed(() =>
+  packSections(anchoredFootprints.value, GRID_COLUMNS, rowsPerPage.value),
+);
 const pageCount = computed(() => packed.value.pages);
 
 // Group the packed cards by the page they land on. Each page then renders as its
@@ -145,32 +177,79 @@ const pageGridRows = computed(() => `repeat(${rowsPerPage.value}, var(--row-unit
 // the model as the pointer passes each slot, so the grid reflows to preview the
 // drop live; the packed placements recompute reactively from the new order, so
 // the preview respects page breaks and cards never straddle a boundary mid-drag.
+// Geometry of the first page's grid, anchoring the packer coordinates: its
+// top-left is where content row 0 begins and its width is the content width.
+function dragGeometry() {
+  const grid = sheetRef.value?.querySelector('.page__grid');
+  if (!grid) return null;
+  const rect = grid.getBoundingClientRect();
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    columns: GRID_COLUMNS,
+    rowsPerPage: rowsPerPage.value,
+    rowUnit: rowUnit.value,
+    gap: GRID_GAP,
+    interGap: 2 * mmToPx(margin.value.mm) + PAGE_GUTTER,
+  };
+}
+
 useCardDrag(sheetRef, {
-  onReorder: (from, to) => moveByIndex(from, to),
-  // Resolve the drop slot by simulating the packer against the live footprints,
-  // so the dragged card lands wherever it would actually render — including the
-  // empty cells that a tall card leaves beside it.
+  // Reordering a card drops any manual placement it had — it rejoins the flow.
+  onReorder: (from, to) => {
+    const key = orderedSections.value[from]?.key;
+    if (key) clearAnchor(key);
+    moveByIndex(from, to);
+  },
+  // Pin the card to the cell the pointer is over (manual placement).
+  onPlace: (from, cell) => {
+    const key = orderedSections.value[from]?.key;
+    if (key) placeCard(key, cell);
+  },
+  // A reorder slot: simulate the packer with the dragged card UN-anchored so it
+  // flows, landing wherever it would actually render — including the empty cells
+  // a tall card leaves beside it. The OTHER cards keep their anchors.
   resolveDrop: (pointer, from) => {
-    // Anchor the packer geometry to the FIRST page's grid: its top-left is where
-    // content row 0 begins and its width is the printable content width.
-    const grid = sheetRef.value?.querySelector('.page__grid');
-    if (!grid) return -1;
-    const rect = grid.getBoundingClientRect();
-    return packedDropIndex(
-      pointer,
-      footprints.value,
-      {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        columns: GRID_COLUMNS,
-        rowsPerPage: rowsPerPage.value,
-        rowUnit: rowUnit.value,
-        gap: GRID_GAP,
-        interGap: 2 * mmToPx(margin.value.mm) + PAGE_GUTTER,
-      },
-      from,
+    const geometry = dragGeometry();
+    if (!geometry) return -1;
+    const footprintsForDrag = anchoredFootprints.value.map((footprint, index) =>
+      index === from ? { cols: footprint.cols, rows: footprint.rows } : footprint,
     );
+    return packedDropIndex(pointer, footprintsForDrag, geometry, from);
+  },
+  // No reorder slot under the pointer → offer a manual placement when the pointer
+  // is over a genuinely empty cell the card fits in (earlier cells stay open).
+  resolvePlace: (pointer, from) => {
+    const geometry = dragGeometry();
+    if (!geometry) return null;
+    const perPage = rowsPerPage.value;
+    const cell = cellAtPoint(pointer, geometry);
+    const footprint = footprints.value[from];
+    if (!footprint) return null;
+    const w = Math.min(Math.max(1, footprint.cols), GRID_COLUMNS);
+    const h = Math.min(Math.max(1, footprint.rows), perPage);
+    const col = Math.min(Math.max(0, cell.col), GRID_COLUMNS - w);
+    // Keep placements within the existing pages (don't spawn a blank page by
+    // dropping into the desk below the last sheet).
+    const page = Math.min(Math.floor(cell.row / perPage), Math.max(0, pageCount.value - 1));
+    const rowInPage = Math.min(Math.max(0, cell.row % perPage), perPage - h);
+    const row = page * perPage + rowInPage;
+    // Reject if the (clamped) region overlaps another card, or is already where
+    // the dragged card sits (a no-op).
+    const clash = packed.value.placements.some(
+      (placement, index) =>
+        index !== from &&
+        placement &&
+        col < placement.col + placement.cols &&
+        col + w > placement.col &&
+        row < placement.row + placement.rows &&
+        row + h > placement.row,
+    );
+    if (clash) return null;
+    const current = packed.value.placements[from];
+    if (current && current.col === col && current.row === row) return null;
+    return { page, col, row: rowInPage };
   },
 });
 

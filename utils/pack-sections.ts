@@ -10,10 +10,14 @@
  * the drag hit-testing that reads the rendered rects — the drop targeting.
  */
 
-/** A card's grid footprint: how many columns and row-units it spans. */
+/** A card's grid footprint: how many columns and row-units it spans, plus an
+ * optional manual `anchor` cell it is pinned to. */
 export interface CardFootprint {
   cols: number;
   rows: number;
+  /** Manual placement: pin the card at this cell (absolute `row`, `col`) instead
+   * of letting it flow. Ignored (the card flows) when it no longer fits there. */
+  anchor?: { col: number; row: number };
 }
 
 /** Where a card sits on the grid. `row` is an absolute content-row index that
@@ -32,11 +36,14 @@ export interface PackedLayout {
 
 /**
  * Place `footprints` (in order) on a `columns`-wide grid whose pages are
- * `rowsPerPage` row-units tall. Uses sparse first-fit (a forward-only cursor,
- * matching CSS `grid-auto-flow: row`) so the visual order tracks the list order
- * for hit-testing, while still filling the cells beside a tall card. A card
- * taller than a page is capped to a page; one that would cross a page break
- * starts fresh on the next page.
+ * `rowsPerPage` row-units tall. Cards carrying an `anchor` are pinned to that
+ * cell first (pass 1); the rest then flow in order with a sparse first-fit
+ * forward-only cursor (matching CSS `grid-auto-flow: row`) around the pinned
+ * cards (pass 2), so the flowing cards' visual order still tracks the list order
+ * for hit-testing while the pinned cards sit exactly where the user dropped them
+ * (earlier cells left empty). An anchor that no longer fits (off-grid, straddles
+ * a page, or overlaps) is dropped and that card simply flows. A card taller than
+ * a page is capped; one that would cross a page break starts on the next page.
  */
 export function packSections(
   footprints: CardFootprint[],
@@ -66,13 +73,47 @@ export function packSections(
     }
   };
 
-  const placements: CardPlacement[] = [];
+  const placements: CardPlacement[] = new Array(footprints.length);
+  const clampW = (footprint: CardFootprint) => Math.min(Math.max(1, Math.floor(footprint.cols)), cols);
+  const clampH = (footprint: CardFootprint) => Math.min(Math.max(1, Math.floor(footprint.rows)), perPage);
+
+  // Pass 1: pin each anchored card at its cell. An anchor that no longer fits
+  // (off-grid, straddles a page, or overlaps an already-placed card) is deferred
+  // to the flow, so a manual placement degrades gracefully to normal flow.
+  const flow: number[] = [];
+  footprints.forEach((footprint, index) => {
+    const anchor = footprint.anchor;
+    if (!anchor) {
+      flow.push(index);
+      return;
+    }
+    const w = clampW(footprint);
+    const h = clampH(footprint);
+    const col = Math.floor(anchor.col);
+    const row = Math.floor(anchor.row);
+    const pageStart = Math.floor(row / perPage) * perPage;
+    const fits =
+      col >= 0 &&
+      col + w <= cols &&
+      row >= 0 &&
+      row + h <= pageStart + perPage &&
+      isFree(row, col, w, h);
+    if (fits) {
+      occupy(row, col, w, h);
+      placements[index] = { col, row, cols: w, rows: h };
+    } else {
+      flow.push(index);
+    }
+  });
+
+  // Pass 2: flow the remaining cards with a forward-only first-fit cursor,
+  // skipping the cells the anchored cards took.
   let cursorRow = 0;
   let cursorCol = 0;
-
-  for (const footprint of footprints) {
-    const w = Math.min(Math.max(1, Math.floor(footprint.cols)), cols);
-    const h = Math.min(Math.max(1, Math.floor(footprint.rows)), perPage);
+  for (const index of flow) {
+    const footprint = footprints[index];
+    const w = clampW(footprint);
+    const h = clampH(footprint);
 
     let row = cursorRow;
     let col = cursorCol;
@@ -94,7 +135,7 @@ export function packSections(
     }
 
     occupy(row, col, w, h);
-    placements.push({ col, row, cols: w, rows: h });
+    placements[index] = { col, row, cols: w, rows: h };
 
     // Advance the cursor just past this card (forward-only — no back-filling).
     cursorRow = row;
@@ -218,4 +259,25 @@ export function packedDropIndex(
     }
   }
   return best === fromIndex ? -1 : best;
+}
+
+/**
+ * The grid cell (absolute `row` + `col`) a pointer is over — the inverse of the
+ * geometry `rowTop` uses. Drives manual placement: dropping a card on an empty
+ * cell pins it there. Row/col are clamped into the grid; the caller decides
+ * whether the cell is free and whether the card fits.
+ */
+export function cellAtPoint(pointer: Point, geometry: GridGeometry): { col: number; row: number } {
+  const { left, top, width, columns, rowsPerPage, rowUnit, gap, interGap } = geometry;
+  const colWidth = (width - (columns - 1) * gap) / columns;
+  const relX = pointer.x - left;
+  const col = Math.min(columns - 1, Math.max(0, Math.floor(relX / (colWidth + gap))));
+
+  const printHeight = rowsPerPage * rowUnit + (rowsPerPage - 1) * gap;
+  const pageStride = printHeight + interGap;
+  const relY = pointer.y - top;
+  const page = Math.max(0, Math.floor(relY / pageStride));
+  const yInPage = relY - page * pageStride;
+  const rowInPage = Math.min(rowsPerPage - 1, Math.max(0, Math.floor(yInPage / (rowUnit + gap))));
+  return { col, row: page * rowsPerPage + rowInPage };
 }

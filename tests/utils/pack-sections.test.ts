@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cellAtPoint,
   packedDropIndex,
   packSections,
   placementPage,
@@ -128,5 +129,75 @@ describe('packedDropIndex', () => {
 
   it('is a no-op for an out-of-range source index', () => {
     expect(packedDropIndex({ x: 150, y: 250 }, footprints, geometry, 9)).toBe(-1);
+  });
+});
+
+describe('packSections anchors', () => {
+  it('pins an anchored card at its cell and flows the rest around it', () => {
+    const { placements } = packSections(
+      [fp(1, 1), { cols: 1, rows: 1, anchor: { col: 2, row: 0 } }, fp(1, 1)],
+      3,
+      4,
+    );
+    expect(placements[1]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(placements[2]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+  });
+
+  it('leaves earlier cells empty when a card is pinned to a later cell', () => {
+    const { placements } = packSections(
+      [{ cols: 1, rows: 1, anchor: { col: 2, row: 1 } }],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
+  });
+
+  it('falls back to flow when the anchor overlaps an already-placed card', () => {
+    const { placements } = packSections(
+      [
+        { cols: 1, rows: 1, anchor: { col: 0, row: 0 } },
+        { cols: 1, rows: 1, anchor: { col: 0, row: 0 } },
+      ],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(placements[1]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+  });
+
+  it('falls back to flow when the anchor is off the grid', () => {
+    const { placements } = packSections(
+      [{ cols: 1, rows: 1, anchor: { col: 3, row: 0 } }],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+  });
+});
+
+describe('cellAtPoint', () => {
+  const geometry = {
+    left: 0,
+    top: 0,
+    width: 300,
+    columns: 3,
+    rowsPerPage: 6,
+    rowUnit: 100,
+    gap: 0,
+    interGap: 0,
+  };
+
+  it('maps a pointer to its column and absolute row', () => {
+    expect(cellAtPoint({ x: 150, y: 250 }, geometry)).toEqual({ col: 1, row: 2 });
+    expect(cellAtPoint({ x: 250, y: 50 }, geometry)).toEqual({ col: 2, row: 0 });
+  });
+
+  it('maps rows on a later page to their absolute row', () => {
+    expect(cellAtPoint({ x: 50, y: 650 }, geometry)).toEqual({ col: 0, row: 6 });
+  });
+
+  it('clamps a pointer past the edges back into the grid', () => {
+    expect(cellAtPoint({ x: 999, y: -10 }, geometry)).toEqual({ col: 2, row: 0 });
   });
 });

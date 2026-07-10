@@ -8,6 +8,7 @@ import {
 import { sectionLayoutCount } from '@/utils/section-layout';
 import {
   hiddenSectionsPref,
+  sectionAnchorsPref,
   sectionLayoutPref,
   sectionOrderPref,
 } from '@/utils/preferences';
@@ -30,6 +31,8 @@ export function useSectionLayout(character: Ref<Character | null>) {
   const savedOrder = ref<SectionKey[]>([]);
   const hiddenKeys = ref<SectionKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
+  /** Manual placements: section key → pinned cell (page, col, row-in-page). */
+  const anchors = ref<Record<string, { page: number; col: number; row: number }>>({});
 
   function rebuild() {
     sections.value = character.value
@@ -41,6 +44,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     savedOrder.value = await sectionOrderPref.get([]);
     hiddenKeys.value = await hiddenSectionsPref.get([]);
     layoutIndices.value = await sectionLayoutPref.get({});
+    anchors.value = await sectionAnchorsPref.get({});
     rebuild();
   });
   watch(character, rebuild);
@@ -89,6 +93,9 @@ export function useSectionLayout(character: Ref<Character | null>) {
       ? [...hiddenKeys.value, key]
       : hiddenKeys.value.filter((candidate) => candidate !== key);
     void hiddenSectionsPref.set(hiddenKeys.value);
+    // A hidden card shouldn't keep a stale placement; it re-joins the flow when
+    // shown again.
+    if (hidden) clearAnchor(key);
   }
 
   /** Advance a section to its next curated layout option, then persist it. */
@@ -100,32 +107,89 @@ export function useSectionLayout(character: Ref<Character | null>) {
     void sectionLayoutPref.set(layoutIndices.value);
   }
 
+  // Manual placements are set live during a drag (like reorder), so their save
+  // is debounced too, to respect the storage.sync write-rate limit.
+  let anchorTimer: ReturnType<typeof setTimeout> | undefined;
+  let pendingAnchors: Record<string, { page: number; col: number; row: number }> | null = null;
+  function flushAnchors() {
+    if (anchorTimer !== undefined) {
+      clearTimeout(anchorTimer);
+      anchorTimer = undefined;
+    }
+    if (pendingAnchors) {
+      void sectionAnchorsPref.set(pendingAnchors);
+      pendingAnchors = null;
+    }
+  }
+  function persistAnchors() {
+    pendingAnchors = anchors.value;
+    if (anchorTimer !== undefined) clearTimeout(anchorTimer);
+    anchorTimer = setTimeout(flushAnchors, ORDER_PERSIST_DELAY);
+  }
+
+  /** Pin the visible card to a specific cell (page, col, row-in-page). */
+  function placeCard(key: SectionKey, cell: { page: number; col: number; row: number }) {
+    const current = anchors.value[key];
+    if (
+      current &&
+      current.page === cell.page &&
+      current.col === cell.col &&
+      current.row === cell.row
+    ) {
+      return;
+    }
+    anchors.value = { ...anchors.value, [key]: { page: cell.page, col: cell.col, row: cell.row } };
+    persistAnchors();
+  }
+
+  /** Drop a card's manual placement so it rejoins the normal flow. */
+  function clearAnchor(key: SectionKey) {
+    if (!(key in anchors.value)) return;
+    const next = { ...anchors.value };
+    delete next[key];
+    anchors.value = next;
+    persistAnchors();
+  }
+
   /** Restore the default layout — default order, nothing hidden, default card
    * layouts — and clear the saved preferences. */
   function reset() {
-    // Drop any pending debounced order save so it can't overwrite the reset.
+    // Drop any pending debounced saves so they can't overwrite the reset.
     if (orderTimer !== undefined) {
       clearTimeout(orderTimer);
       orderTimer = undefined;
     }
     pendingOrder = null;
+    if (anchorTimer !== undefined) {
+      clearTimeout(anchorTimer);
+      anchorTimer = undefined;
+    }
+    pendingAnchors = null;
     savedOrder.value = [];
     hiddenKeys.value = [];
     layoutIndices.value = {};
+    anchors.value = {};
     rebuild();
     void sectionOrderPref.set([]);
     void hiddenSectionsPref.set([]);
     void sectionLayoutPref.set({});
+    void sectionAnchorsPref.set({});
   }
 
-  // Persist any pending reorder before the composable tears down.
-  onBeforeUnmount(flushOrder);
+  // Persist any pending reorder / placement before the composable tears down.
+  onBeforeUnmount(() => {
+    flushOrder();
+    flushAnchors();
+  });
 
   return {
     sections: visibleSections,
     hiddenSections,
     layoutIndices,
+    anchors,
     moveByIndex,
+    placeCard,
+    clearAnchor,
     cycleLayout,
     reset,
     hide: (key: SectionKey) => setHidden(key, true),
