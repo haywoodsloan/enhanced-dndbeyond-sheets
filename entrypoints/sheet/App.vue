@@ -202,10 +202,29 @@ useCardDrag(sheetRef, {
     if (key) clearAnchor(key);
     moveByIndex(from, to);
   },
-  // Pin the card to the cell the pointer is over (manual placement).
+  // Pin the card to the cell the pointer is over. Any OTHER manually-placed card
+  // the new spot lands on is un-pinned so it flows out of the way — the rest of
+  // the flow then cascades to fill in around the new placement automatically.
   onPlace: (from, cell) => {
     const key = orderedSections.value[from]?.key;
-    if (key) placeCard(key, cell);
+    if (!key) return;
+    const perPage = rowsPerPage.value;
+    const footprint = footprints.value[from];
+    const w = Math.min(Math.max(1, footprint?.cols ?? 1), GRID_COLUMNS);
+    const h = Math.min(Math.max(1, footprint?.rows ?? 1), perPage);
+    const absRow = cell.page * perPage + cell.row;
+    packed.value.placements.forEach((placement, index) => {
+      if (index === from || !placement) return;
+      const otherKey = orderedSections.value[index]?.key;
+      if (!otherKey || !(otherKey in anchors.value)) return; // only bump pinned cards
+      const overlaps =
+        cell.col < placement.col + placement.cols &&
+        cell.col + w > placement.col &&
+        absRow < placement.row + placement.rows &&
+        absRow + h > placement.row;
+      if (overlaps) clearAnchor(otherKey);
+    });
+    placeCard(key, cell);
   },
   // A reorder slot: simulate the packer with the dragged card UN-anchored so it
   // flows, landing wherever it would actually render — including the empty cells
@@ -218,8 +237,9 @@ useCardDrag(sheetRef, {
     );
     return packedDropIndex(pointer, footprintsForDrag, geometry, from);
   },
-  // No reorder slot under the pointer → offer a manual placement when the pointer
-  // is over a genuinely empty cell the card fits in (earlier cells stay open).
+  // No reorder slot under the pointer → place the card at the pointed cell. Any
+  // card already there flows out of the way, so a placement is valid anywhere on
+  // the grid; only skip it when the dragged card already sits at this exact cell.
   resolvePlace: (pointer, from) => {
     const geometry = dragGeometry();
     if (!geometry) return null;
@@ -235,18 +255,6 @@ useCardDrag(sheetRef, {
     const page = Math.min(Math.floor(cell.row / perPage), Math.max(0, pageCount.value - 1));
     const rowInPage = Math.min(Math.max(0, cell.row % perPage), perPage - h);
     const row = page * perPage + rowInPage;
-    // Reject if the (clamped) region overlaps another card, or is already where
-    // the dragged card sits (a no-op).
-    const clash = packed.value.placements.some(
-      (placement, index) =>
-        index !== from &&
-        placement &&
-        col < placement.col + placement.cols &&
-        col + w > placement.col &&
-        row < placement.row + placement.rows &&
-        row + h > placement.row,
-    );
-    if (clash) return null;
     const current = packed.value.placements[from];
     if (current && current.col === col && current.row === row) return null;
     return { page, col, row: rowInPage };
