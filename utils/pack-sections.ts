@@ -20,6 +20,18 @@ export interface CardFootprint {
   anchor?: { col: number; row: number };
 }
 
+/** A footprint with a target cell + placement priority, for {@link packPositioned}. */
+export interface PositionedFootprint {
+  cols: number;
+  rows: number;
+  /** Preferred cell (absolute `row`): placed here if free, else the first free
+   * cell forward of it. */
+  home: { col: number; row: number };
+  /** Higher priority is placed first, so it wins a contested cell — the loser
+   * flows forward from its own home (and returns to it when unblocked). */
+  priority: number;
+}
+
 /** Where a card sits on the grid. `row` is an absolute content-row index that
  * counts continuously across pages (page = floor(row / rowsPerPage)). */
 export interface CardPlacement {
@@ -144,6 +156,80 @@ export function packSections(
       cursorRow = row + 1;
       cursorCol = 0;
     }
+  }
+
+  const pages = Math.max(1, Math.ceil(occupied.length / perPage));
+  return { placements, pages };
+}
+
+/**
+ * Place every card at its own `home` cell (fully positional — no separate flow):
+ * cards are laid down in PRIORITY order (highest first), each at its home if
+ * free, else the first free cell forward of it. So the highest-priority card
+ * wins a contested cell and lower-priority cards flow forward around it (and
+ * snap back to their home once it's free again). Free placement and intentional
+ * blanks fall out naturally — a home that skips earlier cells leaves them empty.
+ * A card taller than a page is capped; one that would cross a page break starts
+ * on the next page.
+ */
+export function packPositioned(
+  cards: PositionedFootprint[],
+  columns: number,
+  rowsPerPage: number,
+): PackedLayout {
+  const cols = Math.max(1, Math.floor(columns));
+  const perPage = Math.max(1, Math.floor(rowsPerPage));
+  const occupied: boolean[][] = [];
+
+  const ensureRow = (row: number) => {
+    while (occupied.length <= row) occupied.push(new Array<boolean>(cols).fill(false));
+  };
+  const isFree = (row: number, col: number, w: number, h: number): boolean => {
+    for (let r = row; r < row + h; r += 1) {
+      ensureRow(r);
+      for (let c = col; c < col + w; c += 1) {
+        if (occupied[r][c]) return false;
+      }
+    }
+    return true;
+  };
+  const occupy = (row: number, col: number, w: number, h: number) => {
+    for (let r = row; r < row + h; r += 1) {
+      ensureRow(r);
+      for (let c = col; c < col + w; c += 1) occupied[r][c] = true;
+    }
+  };
+
+  const placements: CardPlacement[] = new Array(cards.length);
+  // Highest priority first; ties keep the input (reading) order.
+  const order = cards.map((_, index) => index).sort((a, b) => cards[b].priority - cards[a].priority || a - b);
+
+  for (const index of order) {
+    const card = cards[index];
+    const w = Math.min(Math.max(1, Math.floor(card.cols)), cols);
+    const h = Math.min(Math.max(1, Math.floor(card.rows)), perPage);
+
+    // Start at the home cell (clamped so the card fits), then scan forward.
+    let col = Math.min(Math.max(0, Math.floor(card.home.col)), cols - w);
+    let row = Math.max(0, Math.floor(card.home.row));
+    for (;;) {
+      if (col + w > cols) {
+        row += 1;
+        col = 0;
+        continue;
+      }
+      const pageStart = Math.floor(row / perPage) * perPage;
+      if (row + h > pageStart + perPage) {
+        row = pageStart + perPage;
+        col = 0;
+        continue;
+      }
+      if (isFree(row, col, w, h)) break;
+      col += 1;
+    }
+
+    occupy(row, col, w, h);
+    placements[index] = { col, row, cols: w, rows: h };
   }
 
   const pages = Math.max(1, Math.ceil(occupied.length / perPage));

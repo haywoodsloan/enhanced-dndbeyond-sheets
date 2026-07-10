@@ -1,18 +1,13 @@
 import { onBeforeUnmount, watch, type Ref } from 'vue';
 
 interface CardDragOptions {
-  /** Move the card at `fromIndex` to `toIndex` in the model (reflows the grid). */
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  /** Pin the card at `fromIndex` to a specific cell (manual placement). */
-  onPlace?: (fromIndex: number, cell: { page: number; col: number; row: number }) => void;
-  /** Resolve the model index the dragged card should move to for the pointer's
-   * position (-1 for no reorder slot). */
-  resolveDrop: (pointer: { x: number; y: number }, fromIndex: number) => number;
-  /** Resolve a manual-placement cell when there's no reorder slot under the
-   * pointer (null = leave as-is). */
-  resolvePlace?: (
+  /** Place the dragged card (by section key) at a specific cell. */
+  onPlace: (key: string, cell: { page: number; col: number; row: number }) => void;
+  /** Resolve the cell the dragged card should move to for the pointer's position
+   * (null = no change, e.g. it already sits there). */
+  resolveCell: (
     pointer: { x: number; y: number },
-    fromIndex: number,
+    key: string,
   ) => { page: number; col: number; row: number } | null;
 }
 
@@ -20,20 +15,17 @@ interface CardDragOptions {
 const DRAG_THRESHOLD = 4;
 
 /**
- * Pointer-driven drag-reordering for the section-card grid — a hand-rolled
- * replacement for SortableJS. It reorders the model LIVE as the pointer moves,
- * so the cards reflow to preview the drop even over the empty cells a partial
- * row leaves behind (which SortableJS can't target — it only swaps with a
- * sibling element directly under the pointer, so dropping beside a wider card
- * registered nothing and the card snapped back).
+ * Pointer-driven drag PLACEMENT for the section-card grid — a hand-rolled
+ * replacement for SortableJS. Every card has a cell, and dragging moves the
+ * card's cell LIVE as the pointer moves, so the layout reflows to preview the
+ * drop even over empty cells (which SortableJS can't target — it only swaps with
+ * a sibling directly under the pointer).
  *
  * On grab (from a card's `.card__drag-handle`) a fixed-position clone follows
- * the cursor while the real card is dimmed in place as a placeholder. Each move
- * asks `resolveDrop` for the model index the card should take for the pointer's
- * position (it simulates the packer, so it lands in the empty cells beside a
- * tall card) and, when it changes, calls `onReorder` to move the card there —
- * Vue re-renders the keyed grid, so the model stays the single source of truth
- * (no DOM/model desync) and the preview IS the real, paginated layout.
+ * the cursor while the real card is dimmed in place. Each move asks `resolveCell`
+ * for the cell under the pointer and, when it changes, calls `onPlace(key, cell)`
+ * to move that card there — Vue re-renders the keyed grid, so the model stays the
+ * single source of truth and the preview IS the real, paginated layout.
  *
  * The grid renders only once the character loads, so the `pointerdown` listener
  * is (re)attached whenever the element ref becomes available.
@@ -41,7 +33,7 @@ const DRAG_THRESHOLD = 4;
 export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOptions) {
   let source: HTMLElement | null = null;
   let clone: HTMLElement | null = null;
-  let dragIndex = -1;
+  let draggedKey: string | null = null;
   let grabX = 0;
   let grabY = 0;
   let startX = 0;
@@ -57,7 +49,7 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     clone = null;
     source?.classList.remove('card--drag-source');
     source = null;
-    dragIndex = -1;
+    draggedKey = null;
     armed = false;
     dragging = false;
   }
@@ -95,16 +87,9 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     clone.style.left = `${event.clientX - grabX}px`;
     clone.style.top = `${event.clientY - grabY}px`;
 
-    const pointer = { x: event.clientX, y: event.clientY };
-    const to = options.resolveDrop(pointer, dragIndex);
-    if (to >= 0 && to !== dragIndex) {
-      options.onReorder(dragIndex, to);
-      dragIndex = to;
-    } else if (to < 0 && options.resolvePlace && options.onPlace) {
-      // No reorder slot under the pointer — try a manual placement into a cell.
-      const cell = options.resolvePlace(pointer, dragIndex);
-      if (cell) options.onPlace(dragIndex, cell);
-    }
+    if (!draggedKey) return;
+    const cell = options.resolveCell({ x: event.clientX, y: event.clientY }, draggedKey);
+    if (cell) options.onPlace(draggedKey, cell);
   }
 
   function onPointerUp() {
@@ -119,15 +104,12 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     if (!handle) return;
     const card = handle.closest('.card') as HTMLElement | null;
     if (!card) return;
-    // The cards live in per-page grid containers, so find the model index among
-    // all cards in the sheet (DOM order == model order) rather than among direct
-    // children of one grid.
-    const index = Array.from(element.querySelectorAll('[data-section-key]')).indexOf(card);
-    if (index < 0) return;
+    const key = card.dataset.sectionKey;
+    if (!key) return;
 
     event.preventDefault();
     source = card;
-    dragIndex = index;
+    draggedKey = key;
     const rect = card.getBoundingClientRect();
     grabX = event.clientX - rect.left;
     grabY = event.clientY - rect.top;

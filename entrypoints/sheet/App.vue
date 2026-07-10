@@ -18,12 +18,13 @@ import {
 } from '@/utils/section-layout';
 import {
   cellAtPoint,
-  packedDropIndex,
+  packPositioned,
   packSections,
   placementPage,
   placementStyle,
+  type PositionedFootprint,
 } from '@/utils/pack-sections';
-import type { CharacterSection } from '@/services/dndbeyond/model';
+import type { CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -55,9 +56,7 @@ const {
   hiddenSections,
   layoutIndices,
   anchors,
-  moveByIndex,
   placeCard,
-  clearAnchor,
   cycleLayout,
   hide,
   show,
@@ -131,21 +130,39 @@ const footprints = computed(() =>
     ),
   ),
 );
-// Fold each card's manual placement (if any) into its footprint as an absolute
-// `anchor` cell, so the packer pins it there and flows the rest around it.
-const anchoredFootprints = computed(() =>
-  orderedSections.value.map((section, index) => {
+// Every card has a cell. A card the user has moved uses its saved cell as its
+// `home` (with the placement's recency as priority, so the newest move wins a
+// contested cell); a card left alone falls back to where the plain reading-order
+// flow would put it, so untouched cards still auto-arrange. The positional packer
+// then seats each card at (or just after) its home, so free placement and the
+// blanks a moved card leaves behind both fall out naturally.
+const defaultPlacements = computed(() =>
+  packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value),
+);
+const positionedFootprints = computed<PositionedFootprint[]>(() => {
+  const perPage = rowsPerPage.value;
+  return orderedSections.value.map((section, index) => {
     const base = footprints.value[index];
     const anchor = anchors.value[section.key];
-    if (!anchor) return base;
+    if (anchor) {
+      return {
+        cols: base.cols,
+        rows: base.rows,
+        home: { col: anchor.col, row: anchor.page * perPage + anchor.row },
+        priority: anchor.seq,
+      };
+    }
+    const fallback = defaultPlacements.value.placements[index];
     return {
-      ...base,
-      anchor: { col: anchor.col, row: anchor.page * rowsPerPage.value + anchor.row },
+      cols: base.cols,
+      rows: base.rows,
+      home: { col: fallback.col, row: fallback.row },
+      priority: 0,
     };
-  }),
-);
+  });
+});
 const packed = computed(() =>
-  packSections(anchoredFootprints.value, GRID_COLUMNS, rowsPerPage.value),
+  packPositioned(positionedFootprints.value, GRID_COLUMNS, rowsPerPage.value),
 );
 const pageCount = computed(() => packed.value.pages);
 
@@ -173,10 +190,9 @@ const pages = computed<PageEntry[][]>(() => {
 // `row-gap`s make them sum to the page's printable height).
 const pageGridRows = computed(() => `repeat(${rowsPerPage.value}, var(--row-unit))`);
 
-// Drag-and-drop reordering of the section cards. `onReorder` moves the card in
-// the model as the pointer passes each slot, so the grid reflows to preview the
-// drop live; the packed placements recompute reactively from the new order, so
-// the preview respects page breaks and cards never straddle a boundary mid-drag.
+// Drag placement of the section cards. Dragging moves the card's cell live as
+// the pointer moves; the packed placements recompute reactively, so the preview
+// respects page breaks and cards never straddle a boundary mid-drag.
 // Geometry of the first page's grid, anchoring the packer coordinates: its
 // top-left is where content row 0 begins and its width is the content width.
 function dragGeometry() {
@@ -196,67 +212,30 @@ function dragGeometry() {
 }
 
 useCardDrag(sheetRef, {
-  // Reordering a card drops any manual placement it had — it rejoins the flow.
-  onReorder: (from, to) => {
-    const key = orderedSections.value[from]?.key;
-    if (key) clearAnchor(key);
-    moveByIndex(from, to);
-  },
-  // Pin the card to the cell the pointer is over. Any OTHER manually-placed card
-  // the new spot lands on is un-pinned so it flows out of the way — the rest of
-  // the flow then cascades to fill in around the new placement automatically.
-  onPlace: (from, cell) => {
-    const key = orderedSections.value[from]?.key;
-    if (!key) return;
-    const perPage = rowsPerPage.value;
-    const footprint = footprints.value[from];
-    const w = Math.min(Math.max(1, footprint?.cols ?? 1), GRID_COLUMNS);
-    const h = Math.min(Math.max(1, footprint?.rows ?? 1), perPage);
-    const absRow = cell.page * perPage + cell.row;
-    packed.value.placements.forEach((placement, index) => {
-      if (index === from || !placement) return;
-      const otherKey = orderedSections.value[index]?.key;
-      if (!otherKey || !(otherKey in anchors.value)) return; // only bump pinned cards
-      const overlaps =
-        cell.col < placement.col + placement.cols &&
-        cell.col + w > placement.col &&
-        absRow < placement.row + placement.rows &&
-        absRow + h > placement.row;
-      if (overlaps) clearAnchor(otherKey);
-    });
-    placeCard(key, cell);
-  },
-  // A reorder slot: simulate the packer with the dragged card UN-anchored so it
-  // flows, landing wherever it would actually render — including the empty cells
-  // a tall card leaves beside it. The OTHER cards keep their anchors.
-  resolveDrop: (pointer, from) => {
-    const geometry = dragGeometry();
-    if (!geometry) return -1;
-    const footprintsForDrag = anchoredFootprints.value.map((footprint, index) =>
-      index === from ? { cols: footprint.cols, rows: footprint.rows } : footprint,
-    );
-    return packedDropIndex(pointer, footprintsForDrag, geometry, from);
-  },
-  // No reorder slot under the pointer → place the card at the pointed cell. Any
-  // card already there flows out of the way, so a placement is valid anywhere on
-  // the grid; only skip it when the dragged card already sits at this exact cell.
-  resolvePlace: (pointer, from) => {
+  // Move the dragged card's cell to wherever the pointer is. The newest
+  // placement wins a contested cell (highest recency) and the packer flows the
+  // rest around it, so any spot on the grid is a valid drop.
+  onPlace: (key, cell) => placeCard(key as SectionKey, cell),
+  // Resolve the cell under the pointer, clamped so the card stays whole and
+  // within the existing pages (no blank page from dropping past the last sheet).
+  // Returns null when the card already sits there, so we don't churn its recency.
+  resolveCell: (pointer, key) => {
     const geometry = dragGeometry();
     if (!geometry) return null;
+    const index = orderedSections.value.findIndex((section) => section.key === key);
+    const footprint = footprints.value[index];
+    if (!footprint) return null;
     const perPage = rowsPerPage.value;
     const cell = cellAtPoint(pointer, geometry);
-    const footprint = footprints.value[from];
-    if (!footprint) return null;
     const w = Math.min(Math.max(1, footprint.cols), GRID_COLUMNS);
     const h = Math.min(Math.max(1, footprint.rows), perPage);
     const col = Math.min(Math.max(0, cell.col), GRID_COLUMNS - w);
-    // Keep placements within the existing pages (don't spawn a blank page by
-    // dropping into the desk below the last sheet).
     const page = Math.min(Math.floor(cell.row / perPage), Math.max(0, pageCount.value - 1));
     const rowInPage = Math.min(Math.max(0, cell.row % perPage), perPage - h);
-    const row = page * perPage + rowInPage;
-    const current = packed.value.placements[from];
-    if (current && current.col === col && current.row === row) return null;
+    const current = packed.value.placements[index];
+    if (current && current.col === col && current.row === page * perPage + rowInPage) {
+      return null;
+    }
     return { page, col, row: rowInPage };
   },
 });
