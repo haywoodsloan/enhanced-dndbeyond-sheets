@@ -261,13 +261,15 @@ useCardDrag(sheetRef, {
   },
 });
 
-// Glide cards to their new slots when the order changes — a drag-reorder or
-// hiding/showing a section — instead of snapping. A card's own layout toggle is
-// deliberately not animated: the toggled card would resize instantly while its
-// neighbours glided, which looks disjointed, so a layout change reflows all at
-// once. Purely visual: the drag hit-testing measures layout offsets, so the
-// animation's transform never perturbs where cards are computed to be.
-useGridFlip(sheetRef, orderedSections);
+// Glide cards to their new slots when the order OR a manual placement changes —
+// a drag-reorder, hiding/showing a section, or pinning/bumping a card — instead
+// of snapping. Manual placement (`anchors`) only MOVES cards (no resize), so
+// gliding them all is uniform. A card's own layout toggle is deliberately NOT in
+// the trigger: the toggled card would resize instantly while its neighbours
+// glided, which looks disjointed, so a layout change reflows at once. Purely
+// visual: the drag hit-testing measures layout offsets, so the animation's
+// transform never perturbs where cards are computed to be.
+useGridFlip(sheetRef, () => [orderedSections.value, anchors.value]);
 
 /** Open the browser's print dialog; the print stylesheet hides the settings
  * panel and desk so only the sheet prints. */
