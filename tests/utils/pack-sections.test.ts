@@ -209,8 +209,8 @@ describe('packPositioned', () => {
   it('places each card at its home when they do not collide', () => {
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
-        { cols: 1, rows: 1, home: home(2, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(0, 0) },
+        { cols: 1, rows: 1, home: home(2, 0) },
       ],
       3,
       4,
@@ -221,18 +221,18 @@ describe('packPositioned', () => {
 
   it('leaves earlier cells empty when a home skips them', () => {
     const { placements } = packPositioned(
-      [{ cols: 1, rows: 1, home: home(2, 1), priority: 0 }],
+      [{ cols: 1, rows: 1, home: home(2, 1) }],
       3,
       4,
     );
     expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
   });
 
-  it('gives a contested cell to the higher priority; the loser flows forward', () => {
+  it('gives a contested cell to the earlier card; the later one flows forward', () => {
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(1, 1), priority: 5 },
-        { cols: 1, rows: 1, home: home(1, 1), priority: 2 },
+        { cols: 1, rows: 1, home: home(1, 1) },
+        { cols: 1, rows: 1, home: home(1, 1) },
       ],
       3,
       4,
@@ -241,16 +241,18 @@ describe('packPositioned', () => {
     expect(placements[1]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
   });
 
-  it('keeps equal-priority cards in reading order', () => {
+  it('treats every card the same — reading order settles overlaps', () => {
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
-        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(0, 0) },
+        { cols: 1, rows: 1, home: home(0, 0) },
+        { cols: 1, rows: 1, home: home(0, 0) },
       ],
       3,
       4,
     );
     expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
     expect(placements[1]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+    expect(placements[2]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
   });
 });

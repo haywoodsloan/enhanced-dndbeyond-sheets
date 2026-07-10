@@ -31,11 +31,10 @@ export function useSectionLayout(character: Ref<Character | null>) {
   const savedOrder = ref<SectionKey[]>([]);
   const hiddenKeys = ref<SectionKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
-  /** Card placements: section key → its cell (page, col, row-in-page) plus a
-   * recency `seq` (higher = placed more recently, so it wins a contested cell). */
-  const anchors = ref<Record<string, { page: number; col: number; row: number; seq: number }>>({});
-  // Monotonic placement counter; the most-recently-placed card wins conflicts.
-  let nextSeq = 1;
+  /** Card placements: section key → the cell (page, col, row-in-page) the user
+   * moved it to. A card with no entry sits at its default (class-aware) cell;
+   * both kinds are packed identically, in reading order. */
+  const anchors = ref<Record<string, { page: number; col: number; row: number }>>({});
 
   function rebuild() {
     sections.value = character.value
@@ -48,7 +47,6 @@ export function useSectionLayout(character: Ref<Character | null>) {
     hiddenKeys.value = await hiddenSectionsPref.get([]);
     layoutIndices.value = await sectionLayoutPref.get({});
     anchors.value = await sectionAnchorsPref.get({});
-    nextSeq = Object.values(anchors.value).reduce((max, p) => Math.max(max, p.seq ?? 0), 0) + 1;
     rebuild();
   });
   watch(character, rebuild);
@@ -114,7 +112,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
   // Manual placements are set live during a drag (like reorder), so their save
   // is debounced too, to respect the storage.sync write-rate limit.
   let anchorTimer: ReturnType<typeof setTimeout> | undefined;
-  let pendingAnchors: Record<string, { page: number; col: number; row: number; seq: number }> | null = null;
+  let pendingAnchors: Record<string, { page: number; col: number; row: number }> | null = null;
   function flushAnchors() {
     if (anchorTimer !== undefined) {
       clearTimeout(anchorTimer);
@@ -131,15 +129,19 @@ export function useSectionLayout(character: Ref<Character | null>) {
     anchorTimer = setTimeout(flushAnchors, ORDER_PERSIST_DELAY);
   }
 
-  /** Place the visible card at a specific cell (page, col, row-in-page). The
-   * newest placement wins a contested cell (highest `seq`); the caller skips
-   * calling this when the card already sits at that cell. */
+  /** Move the card to a specific cell (page, col, row-in-page). The caller skips
+   * calling this when the card already sits there. */
   function placeCard(key: SectionKey, cell: { page: number; col: number; row: number }) {
-    anchors.value = {
-      ...anchors.value,
-      [key]: { page: cell.page, col: cell.col, row: cell.row, seq: nextSeq },
-    };
-    nextSeq += 1;
+    const current = anchors.value[key];
+    if (
+      current &&
+      current.page === cell.page &&
+      current.col === cell.col &&
+      current.row === cell.row
+    ) {
+      return;
+    }
+    anchors.value = { ...anchors.value, [key]: { page: cell.page, col: cell.col, row: cell.row } };
     persistAnchors();
   }
 

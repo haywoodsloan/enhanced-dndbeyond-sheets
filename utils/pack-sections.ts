@@ -20,16 +20,13 @@ export interface CardFootprint {
   anchor?: { col: number; row: number };
 }
 
-/** A footprint with a target cell + placement priority, for {@link packPositioned}. */
+/** A footprint with a target cell, for {@link packPositioned}. */
 export interface PositionedFootprint {
   cols: number;
   rows: number;
   /** Preferred cell (absolute `row`): placed here if free, else the first free
    * cell forward of it. */
   home: { col: number; row: number };
-  /** Higher priority is placed first, so it wins a contested cell — the loser
-   * flows forward from its own home (and returns to it when unblocked). */
-  priority: number;
 }
 
 /** Where a card sits on the grid. `row` is an absolute content-row index that
@@ -163,14 +160,13 @@ export function packSections(
 }
 
 /**
- * Place every card at its own `home` cell (fully positional — no separate flow):
- * cards are laid down in PRIORITY order (highest first), each at its home if
- * free, else the first free cell forward of it. So the highest-priority card
- * wins a contested cell and lower-priority cards flow forward around it (and
- * snap back to their home once it's free again). Free placement and intentional
- * blanks fall out naturally — a home that skips earlier cells leaves them empty.
- * A card taller than a page is capped; one that would cross a page break starts
- * on the next page.
+ * Place every card at its own `home` cell (fully positional — no separate flow,
+ * and no special/pinned cards): cards are laid down in READING order (input
+ * order), each at its home if free, else the first free cell forward of it. So
+ * when two cards want the same cell the earlier one keeps it and the later flows
+ * forward around it. Free placement and intentional blanks fall out naturally — a
+ * home that skips earlier cells leaves them empty. A card taller than a page is
+ * capped; one that would cross a page break starts on the next page.
  */
 export function packPositioned(
   cards: PositionedFootprint[],
@@ -201,10 +197,10 @@ export function packPositioned(
   };
 
   const placements: CardPlacement[] = new Array(cards.length);
-  // Highest priority first; ties keep the input (reading) order.
-  const order = cards.map((_, index) => index).sort((a, b) => cards[b].priority - cards[a].priority || a - b);
 
-  for (const index of order) {
+  // Cards are seated in reading order: each at its home cell if free, else the
+  // first free cell forward. Earlier cards win a contested cell; later ones flow.
+  for (let index = 0; index < cards.length; index += 1) {
     const card = cards[index];
     const w = Math.min(Math.max(1, Math.floor(card.cols)), cols);
     const h = Math.min(Math.max(1, Math.floor(card.rows)), perPage);
