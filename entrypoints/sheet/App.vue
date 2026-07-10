@@ -130,24 +130,35 @@ const footprints = computed(() =>
     ),
   ),
 );
-// Every card has a cell — no placed-vs-regular distinction. A card the user has
-// moved uses its saved cell as its `home`; a card left alone uses its default
-// (class-aware flow) cell, so untouched cards still auto-arrange. The positional
-// packer seats every card the same way — at its home if free, else just after,
-// in reading order — so free placement and the blanks a moved card leaves behind
-// both fall out naturally, and overlaps shove later cards forward.
+// Every card has a cell AND a recency — no placed-vs-regular distinction. A card
+// the user moved uses its saved cell as its `home`; a card left alone uses its
+// default (class-aware flow) cell, so untouched cards still auto-arrange. The
+// positional packer seats cards most-recently-moved first, each at its home if
+// free else just after — so a freshly-dragged card takes its cell and the others
+// flow aside, while the blank a moved card leaves behind stays empty.
 const defaultPlacements = computed(() =>
   packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value),
 );
 const positionedFootprints = computed<PositionedFootprint[]>(() => {
   const perPage = rowsPerPage.value;
+  const count = orderedSections.value.length;
   return orderedSections.value.map((section, index) => {
     const base = footprints.value[index];
     const moved = anchors.value[section.key];
     const home = moved
       ? { col: moved.col, row: moved.page * perPage + moved.row }
       : defaultPlacements.value.placements[index];
-    return { cols: base.cols, rows: base.rows, home: { col: home.col, row: home.row } };
+    // Every card carries a recency: one the user moved uses its saved `seq` (≥ 1);
+    // one left alone keeps a negative reading-order baseline, so a freshly-dragged
+    // card always outranks the stationary ones — it takes its cell and they flow
+    // aside.
+    const priority = moved ? moved.seq : index - count;
+    return {
+      cols: base.cols,
+      rows: base.rows,
+      home: { col: home.col, row: home.row },
+      priority,
+    };
   });
 });
 const packed = computed(() =>
@@ -201,9 +212,9 @@ function dragGeometry() {
 }
 
 useCardDrag(sheetRef, {
-  // Move the dragged card's cell to wherever the pointer is. The packer seats
-  // every card the same way in reading order, so the others flow around it and
-  // any spot on the grid is a valid drop.
+  // Move the dragged card's cell to wherever the pointer is and stamp it newest,
+  // so the packer seats it first: it takes that cell and any card already there
+  // flows aside. Any spot on the grid is a valid drop.
   onPlace: (key, cell) => placeCard(key as SectionKey, cell),
   // Resolve the cell under the pointer, clamped so the card stays whole and
   // within the existing pages (no blank page from dropping past the last sheet).

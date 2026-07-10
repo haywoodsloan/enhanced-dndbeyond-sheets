@@ -209,8 +209,8 @@ describe('packPositioned', () => {
   it('places each card at its home when they do not collide', () => {
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(0, 0) },
-        { cols: 1, rows: 1, home: home(2, 0) },
+        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(2, 0), priority: 0 },
       ],
       3,
       4,
@@ -221,32 +221,34 @@ describe('packPositioned', () => {
 
   it('leaves earlier cells empty when a home skips them', () => {
     const { placements } = packPositioned(
-      [{ cols: 1, rows: 1, home: home(2, 1) }],
+      [{ cols: 1, rows: 1, home: home(2, 1), priority: 0 }],
       3,
       4,
     );
     expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
   });
 
-  it('gives a contested cell to the earlier card; the later one flows forward', () => {
+  it('gives a contested cell to the most recently moved card; the other flows', () => {
+    // Both want (1,1); card 1 has the higher priority (moved more recently), so it
+    // keeps the cell and card 0 flows forward to the next free cell.
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(1, 1) },
-        { cols: 1, rows: 1, home: home(1, 1) },
+        { cols: 1, rows: 1, home: home(1, 1), priority: 2 },
+        { cols: 1, rows: 1, home: home(1, 1), priority: 5 },
       ],
       3,
       4,
     );
-    expect(placements[0]).toEqual({ col: 1, row: 1, cols: 1, rows: 1 });
-    expect(placements[1]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
+    expect(placements[1]).toEqual({ col: 1, row: 1, cols: 1, rows: 1 });
+    expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
   });
 
-  it('treats every card the same — reading order settles overlaps', () => {
+  it('falls back to reading order for equal-priority cards', () => {
     const { placements } = packPositioned(
       [
-        { cols: 1, rows: 1, home: home(0, 0) },
-        { cols: 1, rows: 1, home: home(0, 0) },
-        { cols: 1, rows: 1, home: home(0, 0) },
+        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
       ],
       3,
       4,
