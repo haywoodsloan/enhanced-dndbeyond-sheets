@@ -84,6 +84,26 @@ describe('useSectionLayout', () => {
     expect(result.anchors.value.skills.seq).toBe(2);
   });
 
+  it('compacts by replacing all anchors with the given gap-free cells', async () => {
+    const character = ref<Character | null>(fighter());
+    const { result } = mountComposable(() => useSectionLayout(character));
+    await flushPromises();
+
+    // A stray manual placement that compacting should sweep away.
+    result.placeCard('notes', { page: 3, col: 0, row: 0 });
+    result.compact({
+      basics: { page: 0, col: 0, row: 0 },
+      attributes: { page: 0, col: 1, row: 0 },
+    });
+
+    // Only the compacted cells remain, each pinned to its new cell.
+    expect(Object.keys(result.anchors.value)).toEqual(['basics', 'attributes']);
+    expect(result.anchors.value.basics).toMatchObject({ page: 0, col: 0, row: 0 });
+    expect(result.anchors.value.attributes).toMatchObject({ page: 0, col: 1, row: 0 });
+    // The compacted cards share one recency stamp.
+    expect(result.anchors.value.basics.seq).toBe(result.anchors.value.attributes.seq);
+  });
+
   it('debounces the placement save and flushes it after the delay', async () => {
     vi.useFakeTimers();
     try {

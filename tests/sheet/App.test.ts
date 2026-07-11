@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
-import { pageFormatPref } from '@/utils/settings/preferences';
+import { pageFormatPref, sectionAnchorsPref } from '@/utils/settings/preferences';
 import { DEFAULT_FORMAT_ID } from '@/utils/layout/page-format';
 import { makeCharacter } from '../fixtures/character';
 
@@ -175,6 +175,29 @@ describe('sheet App', () => {
       expect(style).toMatch(/--page-height:\s*297mm/);
     } finally {
       await pageFormatPref.set(DEFAULT_FORMAT_ID);
+    }
+  });
+
+  it('compacts scattered cards into fewer pages from the Compact button', async () => {
+    // Seed a stray placement far down the sheet so a card sits alone on a late
+    // page with empty space before it.
+    await sectionAnchorsPref.set({ notes: { page: 6, col: 0, row: 0, seq: 1 } });
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    try {
+      await flushPromises();
+      const pageCount = () => wrapper.findAll('.page').length;
+      const before = pageCount();
+      expect(before).toBeGreaterThan(1);
+
+      await wrapper.get('.settings__button--compact').trigger('click');
+      await flushPromises();
+
+      // Cards slid up and left into the gaps, dropping the extra page.
+      expect(pageCount()).toBeLessThan(before);
+    } finally {
+      wrapper.unmount(); // flush the debounced anchor save before resetting
+      await sectionAnchorsPref.set({});
     }
   });
 });

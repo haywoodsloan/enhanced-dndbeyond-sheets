@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cellAtPoint,
+  compactPlacements,
   packPositioned,
   packSections,
   placementPage,
@@ -299,5 +300,59 @@ describe('packPositioned', () => {
     );
     expect(placements[2]).toEqual({ col: 0, row: 2, cols: 1, rows: 1 });
     expect(pages).toBe(2);
+  });
+});
+
+describe('compactPlacements', () => {
+  it('slides scattered cards up and left to close gaps and drop pages', () => {
+    // Three 1x1 cards with gaps between them; the last sits on page 1 (row 5).
+    const compacted = compactPlacements(
+      [
+        { col: 2, row: 0, cols: 1, rows: 1 },
+        { col: 0, row: 2, cols: 1, rows: 1 },
+        { col: 1, row: 5, cols: 1, rows: 1 },
+      ],
+      3,
+      4,
+    );
+    // They collapse onto row 0 of page 0, in reading order — zero gaps, one page.
+    expect(compacted).toEqual([
+      { col: 0, row: 0, cols: 1, rows: 1 },
+      { col: 1, row: 0, cols: 1, rows: 1 },
+      { col: 2, row: 0, cols: 1, rows: 1 },
+    ]);
+  });
+
+  it('keeps the current reading order while compacting', () => {
+    // index 0 currently reads LAST (row 6); index 1 reads FIRST (row 0).
+    const compacted = compactPlacements(
+      [
+        { col: 0, row: 6, cols: 1, rows: 1 },
+        { col: 0, row: 0, cols: 1, rows: 1 },
+      ],
+      3,
+      4,
+    );
+    // The visually-first card takes (0,0); the visually-last takes (1,0).
+    expect(compacted[1]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(compacted[0]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+  });
+
+  it('preserves each card footprint and returns input index order', () => {
+    // A wide 2x1 card that currently trails a 1x1 card.
+    const compacted = compactPlacements(
+      [
+        { col: 1, row: 3, cols: 2, rows: 1 },
+        { col: 0, row: 0, cols: 1, rows: 1 },
+      ],
+      3,
+      4,
+    );
+    // Footprints stay intact; result stays aligned to the input indices.
+    expect(compacted[0]).toMatchObject({ cols: 2, rows: 1 });
+    expect(compacted[1]).toMatchObject({ cols: 1, rows: 1 });
+    // The 1x1 seats first at (0,0); the 2x1 follows in the next free cell.
+    expect(compacted[1]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(compacted[0]).toEqual({ col: 1, row: 0, cols: 2, rows: 1 });
   });
 });

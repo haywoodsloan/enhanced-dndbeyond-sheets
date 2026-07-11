@@ -18,6 +18,7 @@ import {
 } from '@/utils/layout/section-layout';
 import {
   cellAtPoint,
+  compactPlacements,
   packPositioned,
   packSections,
   placementPage,
@@ -57,6 +58,7 @@ const {
   layoutIndices,
   anchors,
   placeCard,
+  compact,
   cycleLayout,
   hide,
   show,
@@ -301,6 +303,22 @@ function printSheet() {
   window.print();
 }
 
+/** Compact the layout: slide every card up and left into the open space so the
+ * sheet uses the fewest pages, keeping each card's current reading order. */
+function compactLayout() {
+  const perPage = rowsPerPage.value;
+  const compacted = compactPlacements(packed.value.placements, GRID_COLUMNS, perPage);
+  const cells: Record<string, { page: number; col: number; row: number }> = {};
+  compacted.forEach((placement, index) => {
+    cells[orderedSections.value[index].key] = {
+      page: Math.floor(placement.row / perPage),
+      col: placement.col,
+      row: placement.row % perPage,
+    };
+  });
+  compact(cells);
+}
+
 // Apply the selected primary theme color across the document. Wrapped
 // defensively because the update needs PrimeVue's theme service to be present.
 watch(
@@ -388,6 +406,20 @@ onUnmounted(() => {
             <rect x="6" y="14" width="12" height="8" />
           </svg>
           <span>Print</span>
+        </button>
+        <button
+          type="button"
+          class="settings__button settings__button--compact"
+          v-tooltip.top="{ value: 'Compact — close gaps into the fewest pages', showDelay: 500 }"
+          aria-label="Compact the layout into the fewest pages"
+          @click="compactLayout"
+        >
+          <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="14" y1="10" x2="21" y2="3" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
         </button>
         <button
           type="button"
@@ -544,7 +576,8 @@ body {
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
-.settings__button--reset {
+.settings__button--reset,
+.settings__button--compact {
   flex: none;
   width: 40px;
   padding: 0;
@@ -552,7 +585,8 @@ body {
   color: var(--p-primary-700, #6b7280);
 }
 
-.settings__button--reset:hover {
+.settings__button--reset:hover,
+.settings__button--compact:hover {
   border-color: var(--p-primary-400, #a1a1aa);
   color: var(--p-primary-color);
 }

@@ -344,6 +344,38 @@ export function packPositioned(
   return { placements, pages };
 }
 
+/**
+ * Re-pack cards densely in their current visual reading order (top-left →
+ * bottom-right), closing every gap so the layout uses the fewest pages — the
+ * "Compact" action. Cards keep their relative order (one the user moved toward
+ * the front stays toward the front); they just slide up and left into the open
+ * space. Returns new placements in the SAME index order as the input.
+ */
+export function compactPlacements(
+  placements: CardPlacement[],
+  columns: number,
+  rowsPerPage: number,
+): CardPlacement[] {
+  // Visit the cards in the order they currently read on the page.
+  const order = placements
+    .map((_, index) => index)
+    .sort(
+      (a, b) => placements[a].row - placements[b].row || placements[a].col - placements[b].col,
+    );
+  // Forward first-fit seats each card in the first free cell, so gaps close and
+  // the page count drops to the minimum this greedy pack can reach.
+  const dense = packSections(
+    order.map((index) => ({ cols: placements[index].cols, rows: placements[index].rows })),
+    columns,
+    rowsPerPage,
+  );
+  const result: CardPlacement[] = new Array(placements.length);
+  order.forEach((sourceIndex, denseIndex) => {
+    result[sourceIndex] = dense.placements[denseIndex];
+  });
+  return result;
+}
+
 /** Which page (0-based) a placement lands on. */
 export function placementPage(placement: CardPlacement, rowsPerPage: number): number {
   const perPage = Math.max(1, Math.floor(rowsPerPage));

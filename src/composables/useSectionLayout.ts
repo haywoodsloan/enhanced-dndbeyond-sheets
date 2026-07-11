@@ -109,6 +109,21 @@ export function useSectionLayout(character: Ref<Character | null>) {
     persistAnchors();
   }
 
+  /** Compact the whole layout: pin every visible card to a new, gap-free cell
+   * (computed by the caller) so the tidied arrangement sticks and persists. They
+   * share one `seq` — the compacted cells don't collide, so recency is moot, and
+   * a later single drag still outranks them. */
+  function compact(cells: Record<string, { page: number; col: number; row: number }>) {
+    const seq = nextSeq;
+    nextSeq += 1;
+    const next: Record<string, { page: number; col: number; row: number; seq: number }> = {};
+    for (const [key, cell] of Object.entries(cells)) {
+      next[key] = { page: cell.page, col: cell.col, row: cell.row, seq };
+    }
+    anchors.value = next;
+    persistAnchors();
+  }
+
   /** Drop a card's manual placement so it rejoins the normal flow. */
   function clearAnchor(key: SectionKey) {
     if (!(key in anchors.value)) return;
@@ -147,6 +162,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     layoutIndices,
     anchors,
     placeCard,
+    compact,
     cycleLayout,
     reset,
     hide: (key: SectionKey) => setHidden(key, true),
