@@ -142,6 +142,28 @@ export function packSections(
 }
 
 /**
+ * Collapse any page left ENTIRELY empty: pages with no card are dropped and every
+ * card after them shifts up a whole page. Each card keeps its row WITHIN its page,
+ * so intentional in-page gaps survive — only a fully blank page disappears. This
+ * is what stops a drag (or a layout change) from ever stranding a blank page
+ * between — or before — the content. Returns the compacted page count.
+ */
+function compactBlankPages(placements: CardPlacement[], perPage: number): number {
+  const usedPages = new Set<number>();
+  for (const placement of placements) usedPages.add(Math.floor(placement.row / perPage));
+
+  const ordered = [...usedPages].sort((a, b) => a - b);
+  const newIndexOfPage = new Map(ordered.map((page, index) => [page, index] as const));
+
+  for (const placement of placements) {
+    const page = Math.floor(placement.row / perPage);
+    placement.row -= (page - newIndexOfPage.get(page)!) * perPage;
+  }
+
+  return Math.max(1, ordered.length);
+}
+
+/**
  * Place every card at its own `home` cell (fully positional — no separate flow,
  * and no pinned/regular split): cards are seated in `priority` order (highest =
  * most recently moved first), each at its home if free, else the first free cell
@@ -149,7 +171,9 @@ export function packSections(
  * it and the others flow forward around it (a displaced card slots into the next
  * free cell). Free placement and intentional blanks fall out naturally — a home
  * that skips earlier cells leaves them empty. A card taller than a page is
- * capped; one that would cross a page break starts on the next page.
+ * capped; one that would cross a page break starts on the next page. Finally,
+ * any fully-empty page is collapsed ({@link compactBlankPages}) so moving a card
+ * or changing a layout can never leave a blank page.
  */
 export function packPositioned(
   cards: PositionedFootprint[],
@@ -179,7 +203,10 @@ export function packPositioned(
     placements[index] = { col, row, cols: w, rows: h };
   }
 
-  return { placements, pages: Math.max(1, Math.ceil(grid.rowCount() / perPage)) };
+  // Pull cards up over any fully-empty page so a move or layout change never
+  // strands a blank page (in-page gaps are kept).
+  const pages = compactBlankPages(placements, perPage);
+  return { placements, pages };
 }
 
 /** Which page (0-based) a placement lands on. */

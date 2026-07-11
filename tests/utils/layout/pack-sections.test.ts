@@ -179,4 +179,47 @@ describe('packPositioned', () => {
     expect(placements[1]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
     expect(placements[2]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
   });
+
+  it('pulls a lone card on a later page back onto the first page', () => {
+    // Home is page 2 (row 8, rowsPerPage 4) with nothing before it → the two
+    // empty pages collapse and the card lands on page 0.
+    const { placements, pages } = packPositioned(
+      [{ cols: 1, rows: 1, home: home(0, 8), priority: 0 }],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(pages).toBe(1);
+  });
+
+  it('collapses a fully-blank page between two occupied pages', () => {
+    // Card 0 fills page 0; card 1 is anchored to page 2 (row 8), so page 1 is
+    // blank → it is removed and card 1 moves up to page 1 (row 4).
+    const { placements, pages } = packPositioned(
+      [
+        { cols: 3, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 3, rows: 1, home: home(0, 8), priority: 0 },
+      ],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 3, rows: 1 });
+    expect(placements[1]).toEqual({ col: 0, row: 4, cols: 3, rows: 1 });
+    expect(pages).toBe(2);
+  });
+
+  it('keeps a card at its row WITHIN the page when collapsing blanks', () => {
+    // Card 1's home is page 2, row-in-page 2 (row 10); after the blank page 1 is
+    // removed it sits on page 1 at the same row-in-page (row 6).
+    const { placements, pages } = packPositioned(
+      [
+        { cols: 3, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 1, home: home(1, 10), priority: 0 },
+      ],
+      3,
+      4,
+    );
+    expect(placements[1]).toEqual({ col: 1, row: 6, cols: 1, rows: 1 });
+    expect(pages).toBe(2);
+  });
 });
