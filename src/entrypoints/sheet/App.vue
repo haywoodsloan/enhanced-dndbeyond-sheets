@@ -10,9 +10,11 @@ import { useStoredRef } from '@/composables/useStoredRef';
 import {
   GRID_COLUMNS,
   GRID_GAP,
+  CONTENT_FIT_SECTIONS,
   canCycleLayout,
   gridRowsPerPage,
   nextViableLayoutIndex,
+  rowsForHeight,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
@@ -128,6 +130,16 @@ const pageStyle = computed(() => ({
 
 const sheetRef = ref<HTMLElement | null>(null);
 
+// A content-fit card (actions/spells/features/notes) measures its real content
+// height and reports it here; `footprints` shrinks that card to fit. Cards that
+// fill their height are ignored, so they keep their curated estimate.
+const measuredHeights = ref<Record<string, number>>({});
+function onMeasure(key: SectionKey, height: number) {
+  if (!CONTENT_FIT_SECTIONS.has(key)) return;
+  if (Math.abs((measuredHeights.value[key] ?? 0) - height) < 1) return;
+  measuredHeights.value = { ...measuredHeights.value, [key]: height };
+}
+
 // Footprint (columns × row-units) of each visible card, packed into the grid.
 // This replaces the margin-push paginator: cards are placed explicitly on real
 // multi-row tracks, so a tall card's shorter neighbours fill the space beside it
@@ -135,14 +147,25 @@ const sheetRef = ref<HTMLElement | null>(null);
 // the next page. Page count, the row template, and each card's grid position all
 // derive from this one pure computation, so a reorder reflows deterministically.
 const footprints = computed(() =>
-  orderedSections.value.map((section) =>
-    sectionSpan(
+  orderedSections.value.map((section) => {
+    const estimate = sectionSpan(
       section.key,
       section.count,
       layoutIndices.value[section.key] ?? 0,
       rowsPerPage.value,
-    ),
-  ),
+    );
+    // A content-fit card reports its real content height; shrink its footprint to
+    // fit so a short list doesn't reserve a tall, half-empty card. Others fill
+    // their height by design and have no measured entry (kept at the estimate);
+    // so does every card before it measures (and in tests without a layout
+    // engine).
+    const measured = measuredHeights.value[section.key];
+    if (measured === undefined) return estimate;
+    return {
+      cols: estimate.cols,
+      rows: rowsForHeight(measured, rowUnit.value, GRID_GAP, estimate.rows),
+    };
+  }),
 );
 // Every card has a cell AND a recency — no placed-vs-regular distinction. A card
 // the user moved uses its saved cell as its `home`; a card left alone uses its
@@ -269,6 +292,14 @@ function onCycleLayout(key: SectionKey) {
   // disabled), so bail.
   const nextIndex = nextViableLayoutIndex(key, current, orderedSections.value[index].count, perPage);
   if (nextIndex === current) return;
+
+  // The new layout renders at a different size — drop the stale measured height
+  // so the footprint uses the fresh estimate until the card re-measures.
+  if (key in measuredHeights.value) {
+    const nextHeights = { ...measuredHeights.value };
+    delete nextHeights[key];
+    measuredHeights.value = nextHeights;
+  }
 
   const placement = packed.value.placements[index];
   if (!placement) {
@@ -478,6 +509,7 @@ onUnmounted(() => {
                 :can-cycle-layout="canCycleLayout(entry.section.key, layoutIndices[entry.section.key] ?? 0, entry.section.count, rowsPerPage)"
                 @hide="hide"
                 @cycle-layout="onCycleLayout"
+                @measure="onMeasure"
               />
             </div>
           </section>

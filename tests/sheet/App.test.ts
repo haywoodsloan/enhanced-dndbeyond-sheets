@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
@@ -184,6 +185,48 @@ describe('sheet App', () => {
       .element as HTMLButtonElement;
     expect(actionsToggle.disabled).toBe(true);
     expect(inventoryToggle.disabled).toBe(false);
+  });
+
+  it('shrinks a content-fit card to its measured content height', async () => {
+    // Feed geometry so every card's end sentinel sits just 40px below its top:
+    // the content-fit cards (actions/spells/features/notes) then report a short
+    // height and shrink to a single row instead of their multi-row estimate.
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const top = this.classList?.contains('card__end') ? 40 : 0;
+        return {
+          top,
+          bottom: top,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await nextTick();
+    await flushPromises();
+
+    // Actions (a content-fit card, estimate 2 rows) shrinks to a single row.
+    const style = wrapper.get('[data-section-key="actions"]').attributes('style') ?? '';
+    expect(style).toMatch(/grid-row:\s*\d+\s*\/\s*span 1/);
+
+    wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it('applies a stored non-default page format to the sheet', async () => {

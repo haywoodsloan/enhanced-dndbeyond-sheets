@@ -16,7 +16,7 @@ import NotesCard from '@/components/cards/NotesCard.vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import { inventoryListColumns, type SectionSpan } from '@/utils/layout/section-layout';
 import { characterSubtitle } from '@/utils/character/character-summary';
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 // `span` controls the card footprint (columns × row-units). A future `expanded`
 // prop will swap between a compact and a detailed body. `hidden` renders the
@@ -46,6 +46,9 @@ const emit = defineEmits<{
   hide: [key: SectionKey];
   show: [key: SectionKey];
   cycleLayout: [key: SectionKey];
+  /** The card's natural content height (px), so the sheet can shrink a
+   * content-fit card's footprint to fit its text. */
+  measure: [key: SectionKey, height: number];
 }>();
 
 const cardStyle = computed(() => {
@@ -71,6 +74,47 @@ const cardSubtitle = computed(() =>
   props.section.key === 'basics' && props.character
     ? characterSubtitle(props.character)
     : '',
+);
+
+// Report the card's natural content height so the sheet can shrink a
+// content-fit card's footprint to its text (the packer otherwise reserves a
+// count-based estimate that can leave a tall, half-empty card). Measured from
+// the card's top to a zero-height sentinel just after the body: a card that
+// FILLS its height keeps the sentinel at the bottom (≈ the allocated height, so
+// nothing shrinks), a shorter list puts it at the content's end. No-ops without
+// a layout engine (happy-dom returns 0), so tests keep the estimate.
+const endRef = ref<HTMLElement | null>(null);
+const CARD_CONTENT_PAD = 12;
+
+function measure() {
+  if (props.hidden) return;
+  const end = endRef.value;
+  const card = end?.closest('.card');
+  if (!end || !card) return;
+  const height = end.getBoundingClientRect().top - card.getBoundingClientRect().top;
+  if (height <= 0) return;
+  emit('measure', props.section.key, height + CARD_CONTENT_PAD);
+}
+
+let resizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  void nextTick(measure);
+  // Re-measure once webfonts settle (they change text heights).
+  if (typeof document !== 'undefined') void document.fonts?.ready?.then(measure);
+  const card = endRef.value?.closest('.card');
+  if (typeof ResizeObserver !== 'undefined' && card) {
+    resizeObserver = new ResizeObserver(() => measure());
+    resizeObserver.observe(card);
+  }
+});
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+// A layout toggle or count change alters the card's width or content, so re-fit.
+watch(
+  () => [props.span.cols, props.span.rows, props.section.count],
+  () => void nextTick(measure),
 );
 </script>
 
@@ -202,6 +246,7 @@ const cardSubtitle = computed(() =>
       />
       <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
       <p v-else class="card__note">Details coming soon.</p>
+      <span v-if="!hidden" ref="endRef" class="card__end" aria-hidden="true"></span>
     </template>
   </Card>
 </template>
@@ -212,6 +257,13 @@ const cardSubtitle = computed(() =>
   overflow: hidden;
   border: 1px solid var(--p-primary-300, #d4d4d8);
   box-shadow: none;
+}
+
+/* Zero-height marker after the card body; its position IS the content's bottom,
+   which the sheet measures to shrink a content-fit card down to its text. */
+.card__end {
+  display: block;
+  height: 0;
 }
 
 /* Drag handle: a grip bar at the top-center that appears on hover; the only

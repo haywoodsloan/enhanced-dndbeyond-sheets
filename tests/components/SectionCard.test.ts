@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import SectionCard from '@/components/SectionCard.vue';
 import { makeCharacter } from '../fixtures/character';
 
@@ -169,5 +170,52 @@ describe('SectionCard', () => {
     });
 
     expect(wrapper.find('.card__layout').exists()).toBe(false);
+  });
+
+  it('measures its content height and emits it for the sheet to shrink to fit', async () => {
+    // happy-dom has no layout, so feed geometry: the end sentinel sits 120px
+    // below the card top (the card top itself reads 0).
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const top = this.classList?.contains('card__end') ? 120 : 0;
+        return {
+          top,
+          bottom: top,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: top,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'actions', title: 'Actions', count: 8, isEmpty: false },
+        span: { cols: 1, rows: 4 },
+      },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const measured = wrapper.emitted('measure');
+    expect(measured).toBeTruthy();
+    // Reports [key, contentHeight]: sentinel top − card top (120) plus the pad.
+    const last = measured![measured!.length - 1];
+    expect(last[0]).toBe('actions');
+    expect(last[1] as number).toBeGreaterThanOrEqual(120);
+
+    wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
   });
 });

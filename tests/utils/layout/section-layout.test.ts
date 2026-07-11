@@ -4,6 +4,7 @@ import {
   gridRowsPerPage,
   inventoryListColumns,
   nextViableLayoutIndex,
+  rowsForHeight,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
@@ -155,6 +156,31 @@ describe('layout viability (skip overflowing layouts)', () => {
     expect(canCycleLayout('actions', 0, 12, 6)).toBe(true);
     // A single-option section can never cycle.
     expect(canCycleLayout('basics', 0, 0, 4)).toBe(false);
+  });
+});
+
+describe('rowsForHeight', () => {
+  it('gives the fewest whole rows that hold a measured height', () => {
+    // pitch = rowUnit + gap = 100; a card R rows tall is R*100 (gap 0 here).
+    expect(rowsForHeight(0, 100, 0, 4)).toBe(1); // never below one row
+    expect(rowsForHeight(100, 100, 0, 4)).toBe(1); // exactly one row-unit
+    expect(rowsForHeight(101, 100, 0, 4)).toBe(2); // just over → two rows
+    expect(rowsForHeight(250, 100, 0, 4)).toBe(3);
+  });
+
+  it('accounts for the inter-row gap', () => {
+    // Two rows with a 6px gap = 2*100 + 6 = 206px.
+    expect(rowsForHeight(206, 100, 6, 4)).toBe(2);
+    expect(rowsForHeight(207, 100, 6, 4)).toBe(3);
+  });
+
+  it('never exceeds the max rows (the estimate is the ceiling)', () => {
+    expect(rowsForHeight(10000, 100, 0, 4)).toBe(4);
+    expect(rowsForHeight(50, 100, 0, 1)).toBe(1);
+  });
+
+  it('falls back to the max when the pitch is degenerate', () => {
+    expect(rowsForHeight(500, 0, 0, 3)).toBe(3);
   });
 });
 

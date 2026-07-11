@@ -189,6 +189,40 @@ export function canCycleLayout(
 }
 
 /**
+ * Sections whose card renders at its NATURAL content height — a list or text
+ * block that doesn't stretch to fill — so its footprint may shrink to the
+ * measured content instead of a count-based estimate (which can leave a tall,
+ * half-empty card). The others (portrait, ability scores, skills, saves,
+ * proficiencies, wealth, inventory) fill their footprint by design and keep
+ * their curated height.
+ */
+export const CONTENT_FIT_SECTIONS: ReadonlySet<SectionKey> = new Set<SectionKey>([
+  'actions',
+  'spells',
+  'features',
+  'notes',
+]);
+
+/**
+ * The fewest whole row-units that hold `height` px on a grid whose row pitch is
+ * `rowUnit + gap` (a card spanning R rows is `R*rowUnit + (R-1)*gap` tall),
+ * clamped to [1, `maxRows`]. Used to shrink a content-fit card's footprint to
+ * its measured height without dropping below one row or above its estimate.
+ */
+export function rowsForHeight(
+  height: number,
+  rowUnit: number,
+  gap: number,
+  maxRows: number,
+): number {
+  const pitch = rowUnit + gap;
+  const cap = Math.max(1, Math.floor(maxRows));
+  if (pitch <= 0) return cap;
+  const rows = Math.ceil((height + gap) / pitch);
+  return Math.min(Math.max(1, rows), cap);
+}
+
+/**
  * How many internal columns the inventory list renders. The wide (3-col) card
  * prefers 2 wider columns for readability, dropping to 3 only when the items
  * wouldn't fit two columns at the card's height; narrower cards keep their own
