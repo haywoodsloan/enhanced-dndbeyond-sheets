@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
+import { computed, nextTick, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
 import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
@@ -250,16 +250,50 @@ const { dragging } = useCardDrag(sheetRef, {
   },
 });
 
+// Changing a card's layout pins it to its CURRENT top-left cell first, so the
+// resized card keeps its spot (growing/shrinking toward the bottom-right) and the
+// neighbours flow to make room, instead of the card jumping to a fresh default
+// position.
+const layoutChanging = ref(false);
+function onCycleLayout(key: SectionKey) {
+  const index = orderedSections.value.findIndex((section) => section.key === key);
+  const placement = index >= 0 ? packed.value.placements[index] : undefined;
+  if (!placement) {
+    cycleLayout(key);
+    return;
+  }
+  // Remember where the card currently sits (its top-left), advance the layout so
+  // its footprint changes, then pin it back at that top-left — clamped to the new
+  // size so a now-wider/taller card still fits its page. `layoutChanging`
+  // suppresses the glide so the pinned resize applies at once.
+  const perPage = rowsPerPage.value;
+  const page = Math.floor(placement.row / perPage);
+  const col = placement.col;
+  const rowInPage = placement.row % perPage;
+
+  layoutChanging.value = true;
+  cycleLayout(key);
+  const span = footprints.value[index];
+  const w = Math.min(Math.max(1, span.cols), GRID_COLUMNS);
+  const h = Math.min(Math.max(1, span.rows), perPage);
+  placeCard(key, {
+    page,
+    col: Math.min(col, GRID_COLUMNS - w),
+    row: Math.min(rowInPage, perPage - h),
+  });
+  void nextTick(() => {
+    layoutChanging.value = false;
+  });
+}
+
 // Glide cards to their new slots when the order OR a manual placement changes —
-// hiding/showing a section or a placement outside a drag — instead of snapping.
-// During an ACTIVE drag the glide is suppressed (`() => dragging.value`) so the
-// live reflow snaps instantly and cards flow out of the way right under the
-// cursor rather than gliding a step behind. A card's own layout toggle is
-// deliberately NOT in the trigger: the toggled card would resize instantly while
-// its neighbours glided, which looks disjointed, so a layout change reflows at
-// once. Purely visual: the drag hit-testing measures layout offsets, so the
-// animation's transform never perturbs where cards are computed to be.
-useGridFlip(sheetRef, () => [orderedSections.value, anchors.value]);
+// a drag-reorder or hiding/showing a section — instead of snapping. A layout
+// toggle is suppressed (`() => layoutChanging.value`, set by `onCycleLayout`): it
+// pins + resizes the card in place, which touches `anchors`, but animating it
+// would snap the toggled card's size while its neighbours glided (disjointed), so
+// it applies at once. Purely visual: the drag hit-testing reads packer geometry,
+// not live rects, so an in-flight glide never skews the drop target.
+useGridFlip(sheetRef, () => [orderedSections.value, anchors.value], () => layoutChanging.value);
 
 /** Open the browser's print dialog; the print stylesheet hides the settings
  * panel and desk so only the sheet prints. */
@@ -400,7 +434,7 @@ onUnmounted(() => {
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
                 @hide="hide"
-                @cycle-layout="cycleLayout"
+                @cycle-layout="onCycleLayout"
               />
             </div>
           </section>

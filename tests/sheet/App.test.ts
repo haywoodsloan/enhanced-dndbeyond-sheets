@@ -135,17 +135,29 @@ describe('sheet App', () => {
     expect(wrapper.find('.hidden-tray').exists()).toBe(false);
   });
 
-  it('cycles a card layout from its layout button', async () => {
+  it('cycles a card layout from its button, keeping its top-left cell', async () => {
     mockedLoad.mockResolvedValue(sampleCharacter);
     const wrapper = mount(App, { props: { characterId: 166869100 } });
     await flushPromises();
 
-    const layout = wrapper.get('[data-section-key="inventory"] .card__layout');
-    const before = layout.attributes('aria-label');
-    await layout.trigger('click');
+    // The card's grid placement is `<colLine> / span <w>` and `<rowLine> / span
+    // <h>`; the two start lines are its top-left cell.
+    const topLeftCell = () => {
+      const style = wrapper.get('[data-section-key="inventory"]').attributes('style') ?? '';
+      const col = /grid-column:\s*(\d+)/.exec(style)?.[1];
+      const row = /grid-row:\s*(\d+)/.exec(style)?.[1];
+      return `${col},${row}`;
+    };
+    const layout = () => wrapper.get('[data-section-key="inventory"] .card__layout');
+
+    const labelBefore = layout().attributes('aria-label');
+    const cellBefore = topLeftCell();
+    await layout().trigger('click');
     await flushPromises();
-    expect(
-      wrapper.get('[data-section-key="inventory"] .card__layout').attributes('aria-label'),
-    ).not.toBe(before);
+
+    // The layout changed...
+    expect(layout().attributes('aria-label')).not.toBe(labelBefore);
+    // ...but the card stayed pinned at its top-left cell rather than reflowing.
+    expect(topLeftCell()).toBe(cellBefore);
   });
 });
