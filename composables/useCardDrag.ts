@@ -1,4 +1,4 @@
-import { onBeforeUnmount, watch, type Ref } from 'vue';
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue';
 
 interface CardDragOptions {
   /** Place the dragged card (by section key) at a specific cell. */
@@ -39,7 +39,10 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
   let startX = 0;
   let startY = 0;
   let armed = false; // pointer is down on a handle but hasn't passed the threshold
-  let dragging = false;
+  // Reactive so the FLIP animation can suppress itself during an active drag: the
+  // live reflow then snaps instantly (cards flow out of the way immediately)
+  // instead of gliding a step behind the cursor; hide/show/reset still glide.
+  const dragging = ref(false);
 
   function reset() {
     document.removeEventListener('pointermove', onPointerMove, true);
@@ -51,16 +54,23 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     source = null;
     draggedKey = null;
     armed = false;
-    dragging = false;
+    dragging.value = false;
   }
 
   function startDrag() {
     if (!source) return;
-    dragging = true;
+    dragging.value = true;
     armed = false;
     const rect = source.getBoundingClientRect();
     clone = source.cloneNode(true) as HTMLElement;
     clone.classList.add('card--drag-clone');
+    // The clone is a visual copy only: strip the section-key identity (so no
+    // `[data-section-key]` lookup ever sees two of the same card) and clear any
+    // FLIP transform copied from the source so it sits exactly under the cursor.
+    clone.removeAttribute('data-section-key');
+    clone
+      .querySelectorAll('[data-section-key]')
+      .forEach((element) => element.removeAttribute('data-section-key'));
     Object.assign(clone.style, {
       position: 'fixed',
       left: `${rect.left}px`,
@@ -68,6 +78,8 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
       width: `${rect.width}px`,
       height: `${rect.height}px`,
       margin: '0',
+      transform: 'none',
+      transition: 'none',
       pointerEvents: 'none',
       zIndex: '1000',
     });
@@ -82,7 +94,7 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
       }
       startDrag();
     }
-    if (!dragging || !clone) return;
+    if (!dragging.value || !clone) return;
 
     clone.style.left = `${event.clientX - grabX}px`;
     clone.style.top = `${event.clientY - grabY}px`;
@@ -97,7 +109,7 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (event.button !== 0 || dragging || armed) return;
+    if (event.button !== 0 || dragging.value || armed) return;
     const element = grid.value;
     if (!element) return;
     const handle = (event.target as HTMLElement).closest?.('.card__drag-handle');
@@ -133,4 +145,7 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
   );
 
   onBeforeUnmount(reset);
+
+  /** `true` while a card is being dragged (for suppressing layout animations). */
+  return { dragging };
 }

@@ -25,9 +25,16 @@ const EPSILON = 0.5;
  * computes drop slots from the packer geometry, not from the cards' live rects,
  * so an in-flight glide never skews the drop target.
  *
- * Honors `prefers-reduced-motion`: when set, cards simply snap (no glide).
+ * Honors `prefers-reduced-motion`: when set, cards simply snap (no glide). The
+ * optional `isSuppressed` predicate turns the glide off on demand — used during
+ * an active drag so the live reflow snaps instantly (cards flow out of the way
+ * immediately) rather than gliding a step behind the cursor.
  */
-export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSource) {
+export function useGridFlip(
+  container: Ref<HTMLElement | null>,
+  order: WatchSource,
+  isSuppressed?: () => boolean,
+) {
   const reduceMotion =
     typeof window !== 'undefined' &&
     !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -51,7 +58,7 @@ export function useGridFlip(container: Ref<HTMLElement | null>, order: WatchSour
   }
 
   function capture() {
-    if (reduceMotion) return;
+    if (reduceMotion || isSuppressed?.()) return;
     const rects = new Map<string, DOMRect>();
     // getBoundingClientRect (visual) so a card interrupted mid-glide starts its
     // next glide from where it currently appears, not where it will rest.

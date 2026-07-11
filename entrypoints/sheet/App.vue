@@ -211,7 +211,7 @@ function dragGeometry() {
   };
 }
 
-useCardDrag(sheetRef, {
+const { dragging } = useCardDrag(sheetRef, {
   // Move the dragged card's cell to wherever the pointer is and stamp it newest,
   // so the packer seats it first: it takes that cell and any card already there
   // flows aside. Any spot on the grid is a valid drop.
@@ -241,13 +241,14 @@ useCardDrag(sheetRef, {
 });
 
 // Glide cards to their new slots when the order OR a manual placement changes —
-// a drag-reorder, hiding/showing a section, or pinning/bumping a card — instead
-// of snapping. Manual placement (`anchors`) only MOVES cards (no resize), so
-// gliding them all is uniform. A card's own layout toggle is deliberately NOT in
-// the trigger: the toggled card would resize instantly while its neighbours
-// glided, which looks disjointed, so a layout change reflows at once. Purely
-// visual: the drag hit-testing measures layout offsets, so the animation's
-// transform never perturbs where cards are computed to be.
+// hiding/showing a section or a placement outside a drag — instead of snapping.
+// During an ACTIVE drag the glide is suppressed (`() => dragging.value`) so the
+// live reflow snaps instantly and cards flow out of the way right under the
+// cursor rather than gliding a step behind. A card's own layout toggle is
+// deliberately NOT in the trigger: the toggled card would resize instantly while
+// its neighbours glided, which looks disjointed, so a layout change reflows at
+// once. Purely visual: the drag hit-testing measures layout offsets, so the
+// animation's transform never perturbs where cards are computed to be.
 useGridFlip(sheetRef, () => [orderedSections.value, anchors.value]);
 
 /** Open the browser's print dialog; the print stylesheet hides the settings

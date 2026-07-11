@@ -81,6 +81,28 @@ test.describe('card drag placement', () => {
     expect(moved(await cardBox(page, 'attributes'), attributesStart)).toBeGreaterThan(8);
   });
 
+  test('flows the other cards out of the way DURING the drag, before release', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+    const attributesStart = await cardBox(page, 'attributes');
+    const handle = await page
+      .locator('[data-section-key="portrait"] .card__drag-handle')
+      .boundingBox();
+    if (!handle) throw new Error('portrait has no drag handle');
+
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    const target = topLeftCell(attributesStart);
+    await page.mouse.move(target.x, target.y, { steps: 40 });
+
+    // Button is still held down: the displaced card has already flowed aside.
+    expect(moved(await cardBox(page, 'attributes'), attributesStart)).toBeGreaterThan(8);
+
+    await page.mouse.up();
+  });
+
   test('a moved card leaves its cell blank without reflowing the others', async ({
     context,
     extensionId,
