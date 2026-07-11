@@ -12,10 +12,23 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text-summary', 'text'],
+      // Terminal summary + full per-file table, a browsable HTML report at
+      // coverage/index.html, and coverage/lcov.info for editors (Coverage
+      // Gutters) and CI services.
+      reporter: ['text-summary', 'text', 'html', 'lcov'],
+      reportsDirectory: './coverage',
       // Measure the app source (under src/); leave out type-only files and HTML shells.
       include: ['src/**'],
       exclude: ['**/*.d.ts', '**/*.html', 'src/services/dndbeyond/api-types.ts'],
+      // Fail the coverage run if it regresses below these floors. Kept a little
+      // under the current numbers so ordinary churn doesn't trip them, but a real
+      // drop does.
+      thresholds: {
+        statements: 94,
+        branches: 87,
+        functions: 94,
+        lines: 94,
+      },
     },
   },
 });

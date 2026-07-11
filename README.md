@@ -100,6 +100,6 @@ Generated and not committed: `.wxt/`, `.output/`, `node_modules/`.
 
 ## Testing
 
-Unit and integration tests use Vitest with WXT's testing plugin and `@vue/test-utils`. They live in `tests/`, mirror the source layout, and are named `*.test.ts`; `npm run test:coverage` reports coverage.
+Unit and integration tests use Vitest with WXT's testing plugin and `@vue/test-utils`. They live in `tests/`, mirror the source layout, and are named `*.test.ts`. Run `npm test` for the suite, or `npm run test:coverage` for a coverage run — it prints a terminal summary and per-file table, writes a browsable report to `coverage/index.html`, and emits `coverage/lcov.info` for editors (e.g. Coverage Gutters) and CI. Coverage is measured against `src/` and gated by minimum thresholds in `vitest.config.ts`, so a regression fails the run.
 
-The pointer-driven card drag needs a real layout engine, so it's covered by Playwright end-to-end tests in `e2e/` (named `*.spec.ts`) that load the built extension and drive the drag in a headless browser. Run them with `npm run test:e2e` (it builds first).
+The pointer-driven card drag needs a real layout engine, so it's covered by Playwright end-to-end tests in `e2e/` (named `*.spec.ts`) that load the built extension and drive the drag in a headless browser. Run them with `npm run test:e2e` (it builds first). These exercise the built bundle in a browser rather than `src/`, so they aren't part of the coverage report.

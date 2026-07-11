@@ -19,6 +19,9 @@ test-results
 playwright-report
 playwright/.cache
 
+# Coverage reports
+coverage
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
