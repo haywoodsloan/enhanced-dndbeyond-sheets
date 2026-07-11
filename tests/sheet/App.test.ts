@@ -221,8 +221,12 @@ describe('sheet App', () => {
     await flushPromises();
 
     // Actions (a content-fit card, estimate 2 rows) shrinks to a single row.
-    const style = wrapper.get('[data-section-key="actions"]').attributes('style') ?? '';
-    expect(style).toMatch(/grid-row:\s*\d+\s*\/\s*span 1/);
+    const actionsStyle = wrapper.get('[data-section-key="actions"]').attributes('style') ?? '';
+    expect(actionsStyle).toMatch(/grid-row:\s*\d+\s*\/\s*span 1/);
+    // Notes is a blank write-in area — NOT content-fit — so it keeps its
+    // multi-row estimate even though its (empty) content measures short.
+    const notesStyle = wrapper.get('[data-section-key="notes"]').attributes('style') ?? '';
+    expect(notesStyle).toMatch(/grid-row:\s*\d+\s*\/\s*span 2/);
 
     wrapper.unmount();
     gbcr.mockRestore();

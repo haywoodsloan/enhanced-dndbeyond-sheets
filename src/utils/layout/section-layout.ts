@@ -189,18 +189,18 @@ export function canCycleLayout(
 }
 
 /**
- * Sections whose card renders at its NATURAL content height — a list or text
- * block that doesn't stretch to fill — so its footprint may shrink to the
- * measured content instead of a count-based estimate (which can leave a tall,
- * half-empty card). The others (portrait, ability scores, skills, saves,
- * proficiencies, wealth, inventory) fill their footprint by design and keep
- * their curated height.
+ * Sections whose card renders at its NATURAL content height — a list that
+ * doesn't stretch to fill — so its footprint may shrink to the measured content
+ * instead of a count-based estimate (which can leave a tall, half-empty card).
+ * Everything else keeps its curated height: the cards that fill by design
+ * (portrait, ability scores, skills, saves, proficiencies, wealth, inventory)
+ * AND `notes`, which is a blank write-in area the user sizes on purpose (it has
+ * no content to shrink to).
  */
 export const CONTENT_FIT_SECTIONS: ReadonlySet<SectionKey> = new Set<SectionKey>([
   'actions',
   'spells',
   'features',
-  'notes',
 ]);
 
 /**

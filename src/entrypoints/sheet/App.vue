@@ -293,6 +293,19 @@ function onCycleLayout(key: SectionKey) {
   const nextIndex = nextViableLayoutIndex(key, current, orderedSections.value[index].count, perPage);
   if (nextIndex === current) return;
 
+  // Capture where the card sits RIGHT NOW (its top-left) — the cell the user
+  // sees, including any shrink-to-fit. Read it BEFORE clearing the measured
+  // height below: clearing re-packs the card at its taller estimate, which can
+  // bump it to a different row/page, and we want to keep the visible spot.
+  const placement = packed.value.placements[index];
+  const topLeft = placement
+    ? {
+        page: Math.floor(placement.row / perPage),
+        col: placement.col,
+        rowInPage: placement.row % perPage,
+      }
+    : null;
+
   // The new layout renders at a different size — drop the stale measured height
   // so the footprint uses the fresh estimate until the card re-measures.
   if (key in measuredHeights.value) {
@@ -301,29 +314,21 @@ function onCycleLayout(key: SectionKey) {
     measuredHeights.value = nextHeights;
   }
 
-  const placement = packed.value.placements[index];
-  if (!placement) {
-    setLayout(key, nextIndex);
-    return;
-  }
-  // Remember where the card currently sits (its top-left), switch to that next
-  // viable layout so its footprint changes, then pin it back at that top-left —
-  // clamped to the new size so a now-wider/taller card still fits its page.
-  // `layoutChanging` suppresses the glide so the pinned resize applies at once.
-  const page = Math.floor(placement.row / perPage);
-  const col = placement.col;
-  const rowInPage = placement.row % perPage;
-
+  // Switch to that next viable layout, then pin the card back at the same
+  // top-left — clamped to the new size so a now-wider/taller card still fits its
+  // page. `layoutChanging` suppresses the glide so the resize applies at once.
   layoutChanging.value = true;
   setLayout(key, nextIndex);
-  const span = footprints.value[index];
-  const w = Math.min(Math.max(1, span.cols), GRID_COLUMNS);
-  const h = Math.min(Math.max(1, span.rows), perPage);
-  placeCard(key, {
-    page,
-    col: Math.min(col, GRID_COLUMNS - w),
-    row: Math.min(rowInPage, perPage - h),
-  });
+  if (topLeft) {
+    const span = footprints.value[index];
+    const w = Math.min(Math.max(1, span.cols), GRID_COLUMNS);
+    const h = Math.min(Math.max(1, span.rows), perPage);
+    placeCard(key, {
+      page: topLeft.page,
+      col: Math.min(topLeft.col, GRID_COLUMNS - w),
+      row: Math.min(topLeft.rowInPage, perPage - h),
+    });
+  }
   void nextTick(() => {
     layoutChanging.value = false;
   });
