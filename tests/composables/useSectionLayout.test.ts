@@ -57,18 +57,18 @@ describe('useSectionLayout', () => {
     expect(await hiddenSectionsPref.get(['notes'])).toEqual([]);
   });
 
-  it('cycles a card layout and persists it, but ignores sections with one option', async () => {
+  it('sets a card layout and persists it, but ignores sections with one option', async () => {
     const character = ref<Character | null>(fighter());
     const { result } = mountComposable(() => useSectionLayout(character));
     await flushPromises();
 
-    result.cycleLayout('inventory'); // inventory has 3 options
+    result.setLayout('inventory', 1); // inventory has 3 options
     await flushPromises();
     expect(result.layoutIndices.value.inventory).toBe(1);
     expect(await sectionLayoutPref.get({})).toEqual({ inventory: 1 });
 
-    // 'basics' has a single fixed footprint — cycling is a no-op.
-    result.cycleLayout('basics');
+    // 'basics' has a single fixed footprint — changing its layout is a no-op.
+    result.setLayout('basics', 1);
     await flushPromises();
     expect(result.layoutIndices.value.basics).toBeUndefined();
   });
@@ -168,7 +168,7 @@ describe('useSectionLayout', () => {
 
     result.placeCard('portrait', { page: 0, col: 2, row: 1 });
     result.hide('notes');
-    result.cycleLayout('inventory');
+    result.setLayout('inventory', 1);
     await flushPromises();
 
     result.reset();

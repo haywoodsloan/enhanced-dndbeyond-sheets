@@ -22,17 +22,25 @@ import { computed } from 'vue';
 // prop will swap between a compact and a detailed body. `hidden` renders the
 // card in the off-page tray: no fixed height, no drag handle, and the toggle
 // restores it to the printable pages instead of removing it. `layoutCount` /
-// `layoutLabel` drive the layout cycle button (shown when a card has >1 option).
-const props = defineProps<{
-  section: CharacterSection;
-  span: SectionSpan;
-  /** Explicit grid placement from the packer (`grid-column` / `grid-row`). */
-  place?: { gridColumn: string; gridRow: string };
-  character?: Character | null;
-  hidden?: boolean;
-  layoutCount?: number;
-  layoutLabel?: string;
-}>();
+// `layoutLabel` drive the layout cycle button (shown when a card has >1 option);
+// `canCycleLayout` (false) disables it when every other layout would overflow a
+// page, so the toggle only offers layouts that still fit.
+const props = withDefaults(
+  defineProps<{
+    section: CharacterSection;
+    span: SectionSpan;
+    /** Explicit grid placement from the packer (`grid-column` / `grid-row`). */
+    place?: { gridColumn: string; gridRow: string };
+    character?: Character | null;
+    hidden?: boolean;
+    layoutCount?: number;
+    layoutLabel?: string;
+    /** False when no layout OTHER than the current one fits a page — the toggle
+     * is then rendered disabled. Defaults to true (enabled). */
+    canCycleLayout?: boolean;
+  }>(),
+  { canCycleLayout: true },
+);
 
 const emit = defineEmits<{
   hide: [key: SectionKey];
@@ -95,8 +103,18 @@ const cardSubtitle = computed(() =>
         v-if="!hidden && (layoutCount ?? 1) > 1"
         type="button"
         class="card__layout"
-        v-tooltip.bottom="{ value: `Layout: ${layoutLabel}`, showDelay: 500 }"
-        :aria-label="`Change layout (currently ${layoutLabel})`"
+        :disabled="!canCycleLayout"
+        v-tooltip.bottom="{
+          value: canCycleLayout
+            ? `Layout: ${layoutLabel}`
+            : `Layout: ${layoutLabel} — no other layout fits the page`,
+          showDelay: 500,
+        }"
+        :aria-label="
+          canCycleLayout
+            ? `Change layout (currently ${layoutLabel})`
+            : `Layout ${layoutLabel}; no other layout fits the page`
+        "
         @click="emit('cycleLayout', section.key)"
       >
         <svg class="card__toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -283,6 +301,20 @@ const cardSubtitle = computed(() =>
 .card:hover .card__layout,
 .card__layout:focus-visible {
   opacity: 1;
+}
+
+/* Disabled: every other layout would overflow a page, so the toggle can't
+   switch. Kept hidden-until-hover like the enabled control, but shown muted and
+   unclickable so it reads as "no other layout fits". */
+.card__layout:disabled {
+  cursor: default;
+  color: var(--p-primary-300, #d4d4d8);
+  border-color: var(--p-primary-200, #e4e4e7);
+}
+
+.card:hover .card__layout:disabled,
+.card__layout:disabled:focus-visible {
+  opacity: 0.5;
 }
 
 .card__toggle-icon {

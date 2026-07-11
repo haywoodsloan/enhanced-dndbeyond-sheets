@@ -163,6 +163,29 @@ describe('sheet App', () => {
     expect(topLeftCell()).toBe(cellBefore);
   });
 
+  it('disables the layout toggle when no other layout fits the page', async () => {
+    // 40 actions at Letter's 4 rows/page: only the Wide layout fits (Medium and
+    // List would overflow), so the actions toggle has nothing viable to switch to
+    // and is disabled. Inventory (24 items) still fits every layout, so its
+    // toggle stays enabled.
+    const heavy = {
+      ...sampleCharacter,
+      sections: sampleCharacter.sections.map((section) =>
+        section.key === 'actions' ? { ...section, count: 40 } : section,
+      ),
+    };
+    mockedLoad.mockResolvedValue(heavy);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+
+    const actionsToggle = wrapper.get('[data-section-key="actions"] .card__layout')
+      .element as HTMLButtonElement;
+    const inventoryToggle = wrapper.get('[data-section-key="inventory"] .card__layout')
+      .element as HTMLButtonElement;
+    expect(actionsToggle.disabled).toBe(true);
+    expect(inventoryToggle.disabled).toBe(false);
+  });
+
   it('applies a stored non-default page format to the sheet', async () => {
     await pageFormatPref.set('a4');
     try {

@@ -18,7 +18,7 @@ const PLACEMENT_PERSIST_DELAY = 500;
 /**
  * Reactive section layout for the sheet. Starts from the class-aware default
  * order and exposes `placeCard` to drag a card to any grid cell, `hide`/`show`
- * to move a section into (or out of) the not-printed tray, and `cycleLayout` to
+ * to move a section into (or out of) the not-printed tray, and `setLayout` to
  * change a card's density — all persisted to `storage.sync`.
  */
 export function useSectionLayout(character: Ref<Character | null>) {
@@ -67,12 +67,15 @@ export function useSectionLayout(character: Ref<Character | null>) {
     if (hidden) clearAnchor(key);
   }
 
-  /** Advance a section to its next curated layout option, then persist it. */
-  function cycleLayout(key: SectionKey) {
+  /** Set a section's layout option directly. The sheet passes the next VIABLE
+   * index (an option that would overflow a page is skipped), so this just stores
+   * and persists the chosen index. */
+  function setLayout(key: SectionKey, index: number) {
     const count = sectionLayoutCount(key);
     if (count <= 1) return;
-    const next = ((layoutIndices.value[key] ?? 0) + 1) % count;
-    layoutIndices.value = { ...layoutIndices.value, [key]: next };
+    const clamped = Math.min(Math.max(0, Math.floor(index)), count - 1);
+    if (clamped === (layoutIndices.value[key] ?? 0)) return;
+    layoutIndices.value = { ...layoutIndices.value, [key]: clamped };
     void sectionLayoutPref.set(layoutIndices.value);
   }
 
@@ -163,7 +166,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     anchors,
     placeCard,
     compact,
-    cycleLayout,
+    setLayout,
     reset,
     hide: (key: SectionKey) => setHidden(key, true),
     show: (key: SectionKey) => setHidden(key, false),

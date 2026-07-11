@@ -154,6 +154,41 @@ export function sectionSpan(
 }
 
 /**
+ * The layout option index the toggle should advance to: the next option after
+ * `current` (wrapping) whose card FITS the page — its height ≤ `rowsPerPage` at
+ * this entry `count` — skipping any option that would overflow (be taller than a
+ * page). Returns `current` when no OTHER option fits, i.e. the toggle should be
+ * disabled.
+ */
+export function nextViableLayoutIndex(
+  key: SectionKey,
+  current: number,
+  count: number,
+  rowsPerPage: number,
+): number {
+  const total = sectionLayoutCount(key);
+  for (let step = 1; step < total; step += 1) {
+    const candidate = (current + step) % total;
+    if (sectionSpan(key, count, candidate, rowsPerPage).rows <= rowsPerPage) return candidate;
+  }
+  return current;
+}
+
+/**
+ * Whether the layout toggle can switch to another option — true only when some
+ * option OTHER than `current` fits the page at this `count`. When false (every
+ * other option would overflow a page), the toggle is disabled.
+ */
+export function canCycleLayout(
+  key: SectionKey,
+  current: number,
+  count: number,
+  rowsPerPage: number,
+): boolean {
+  return nextViableLayoutIndex(key, current, count, rowsPerPage) !== current;
+}
+
+/**
  * How many internal columns the inventory list renders. The wide (3-col) card
  * prefers 2 wider columns for readability, dropping to 3 only when the items
  * wouldn't fit two columns at the card's height; narrower cards keep their own

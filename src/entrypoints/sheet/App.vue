@@ -10,7 +10,9 @@ import { useStoredRef } from '@/composables/useStoredRef';
 import {
   GRID_COLUMNS,
   GRID_GAP,
+  canCycleLayout,
   gridRowsPerPage,
+  nextViableLayoutIndex,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
@@ -59,7 +61,7 @@ const {
   anchors,
   placeCard,
   compact,
-  cycleLayout,
+  setLayout,
   hide,
   show,
   reset: resetLayout,
@@ -259,22 +261,30 @@ const { dragging } = useCardDrag(sheetRef, {
 const layoutChanging = ref(false);
 function onCycleLayout(key: SectionKey) {
   const index = orderedSections.value.findIndex((section) => section.key === key);
-  const placement = index >= 0 ? packed.value.placements[index] : undefined;
+  if (index < 0) return;
+  const perPage = rowsPerPage.value;
+  const current = layoutIndices.value[key] ?? 0;
+  // Skip any layout that would overflow a page — advance to the next option that
+  // still fits. If none does, there's nothing to switch to (the toggle is
+  // disabled), so bail.
+  const nextIndex = nextViableLayoutIndex(key, current, orderedSections.value[index].count, perPage);
+  if (nextIndex === current) return;
+
+  const placement = packed.value.placements[index];
   if (!placement) {
-    cycleLayout(key);
+    setLayout(key, nextIndex);
     return;
   }
-  // Remember where the card currently sits (its top-left), advance the layout so
-  // its footprint changes, then pin it back at that top-left — clamped to the new
-  // size so a now-wider/taller card still fits its page. `layoutChanging`
-  // suppresses the glide so the pinned resize applies at once.
-  const perPage = rowsPerPage.value;
+  // Remember where the card currently sits (its top-left), switch to that next
+  // viable layout so its footprint changes, then pin it back at that top-left —
+  // clamped to the new size so a now-wider/taller card still fits its page.
+  // `layoutChanging` suppresses the glide so the pinned resize applies at once.
   const page = Math.floor(placement.row / perPage);
   const col = placement.col;
   const rowInPage = placement.row % perPage;
 
   layoutChanging.value = true;
-  cycleLayout(key);
+  setLayout(key, nextIndex);
   const span = footprints.value[index];
   const w = Math.min(Math.max(1, span.cols), GRID_COLUMNS);
   const h = Math.min(Math.max(1, span.rows), perPage);
@@ -465,6 +475,7 @@ onUnmounted(() => {
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
+                :can-cycle-layout="canCycleLayout(entry.section.key, layoutIndices[entry.section.key] ?? 0, entry.section.count, rowsPerPage)"
                 @hide="hide"
                 @cycle-layout="onCycleLayout"
               />

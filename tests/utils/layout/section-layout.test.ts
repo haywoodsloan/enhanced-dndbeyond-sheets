@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canCycleLayout,
   gridRowsPerPage,
   inventoryListColumns,
+  nextViableLayoutIndex,
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
@@ -121,6 +123,38 @@ describe('section layout options', () => {
     expect(sectionSpan('notes', 0, 3, 5)).toEqual({ cols: 3, rows: 5 });
     // Falls back to the option's own rows when the page size isn't known.
     expect(sectionSpan('notes', 0, 3)).toEqual({ cols: 3, rows: 4 });
+  });
+});
+
+describe('layout viability (skip overflowing layouts)', () => {
+  it('advances to the next layout that fits the page', () => {
+    // At 6 rows per page every actions layout fits, so it just steps forward…
+    expect(nextViableLayoutIndex('actions', 0, 12, 6)).toBe(1);
+    // …wrapping from the last option back to the first.
+    expect(nextViableLayoutIndex('actions', 2, 12, 6)).toBe(0);
+  });
+
+  it('skips a layout that would overflow the page', () => {
+    // 30 actions at 4 rows/page: Wide (3) and Medium (4) fit, List (6) overflows.
+    expect(sectionSpan('actions', 30, 2, 4).rows).toBeGreaterThan(4); // List overflows
+    // From Medium the toggle skips List and lands on the viable Wide.
+    expect(nextViableLayoutIndex('actions', 1, 30, 4)).toBe(0);
+    // From Wide it still steps to the viable Medium.
+    expect(nextViableLayoutIndex('actions', 0, 30, 4)).toBe(1);
+  });
+
+  it('stays put (disabled) when only the current layout fits', () => {
+    // 40 actions at 4 rows/page: only Wide (4 rows) fits; Medium (5) and List (6)
+    // both overflow, so there is nothing else to switch to.
+    expect(nextViableLayoutIndex('actions', 0, 40, 4)).toBe(0);
+    expect(canCycleLayout('actions', 0, 40, 4)).toBe(false);
+  });
+
+  it('reports whether another viable layout exists', () => {
+    expect(canCycleLayout('actions', 1, 30, 4)).toBe(true);
+    expect(canCycleLayout('actions', 0, 12, 6)).toBe(true);
+    // A single-option section can never cycle.
+    expect(canCycleLayout('basics', 0, 0, 4)).toBe(false);
   });
 });
 
