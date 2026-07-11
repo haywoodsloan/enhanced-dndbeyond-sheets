@@ -98,4 +98,29 @@ describe('useCardDrag', () => {
     document.dispatchEvent(pointer('pointermove', { clientX: 40, clientY: 40 }));
     expect(onPlace).not.toHaveBeenCalled();
   });
+
+  it('strips the section-key identity from the drag clone and its descendants', () => {
+    document.body.innerHTML = `
+      <div id="grid">
+        <div class="card" data-section-key="portrait">
+          <span class="card__drag-handle"></span>
+          <span data-section-key="portrait" class="nested"></span>
+        </div>
+      </div>`;
+    const gridEl = document.getElementById('grid') as HTMLElement;
+    const localRef = ref<HTMLElement | null>(gridEl);
+    mountComposable(() => useCardDrag(localRef, { onPlace, resolveCell }));
+
+    const handleEl = gridEl.querySelector('.card__drag-handle') as HTMLElement;
+    handleEl.dispatchEvent(pointer('pointerdown', { button: 0, clientX: 10, clientY: 10 }));
+    document.dispatchEvent(pointer('pointermove', { clientX: 40, clientY: 40 }));
+
+    const clone = document.querySelector('.card--drag-clone');
+    expect(clone).not.toBeNull();
+    // A visual copy only — no `[data-section-key]` on the clone root OR any child,
+    // so a global lookup never sees two cards with the same key mid-drag.
+    expect(clone!.hasAttribute('data-section-key')).toBe(false);
+    expect(clone!.querySelector('[data-section-key]')).toBeNull();
+    document.dispatchEvent(pointer('pointerup'));
+  });
 });

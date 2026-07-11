@@ -3,6 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
+import { pageFormatPref } from '@/utils/settings/preferences';
+import { DEFAULT_FORMAT_ID } from '@/utils/layout/page-format';
 import { makeCharacter } from '../fixtures/character';
 
 vi.mock('@/services/dndbeyond/load-character', () => ({
@@ -159,5 +161,20 @@ describe('sheet App', () => {
     expect(layout().attributes('aria-label')).not.toBe(labelBefore);
     // ...but the card stayed pinned at its top-left cell rather than reflowing.
     expect(topLeftCell()).toBe(cellBefore);
+  });
+
+  it('applies a stored non-default page format to the sheet', async () => {
+    await pageFormatPref.set('a4');
+    try {
+      mockedLoad.mockResolvedValue(sampleCharacter);
+      const wrapper = mount(App, { props: { characterId: 166869100 } });
+      await flushPromises();
+      // A4 is 210 × 297 mm; the sheet's CSS vars drive both the paper and @page size.
+      const style = wrapper.get('.sheet').attributes('style') ?? '';
+      expect(style).toMatch(/--page-width:\s*210mm/);
+      expect(style).toMatch(/--page-height:\s*297mm/);
+    } finally {
+      await pageFormatPref.set(DEFAULT_FORMAT_ID);
+    }
   });
 });

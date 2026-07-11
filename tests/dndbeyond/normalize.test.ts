@@ -269,4 +269,91 @@ describe('normalizeCharacter', () => {
     } as unknown as RawCharacter);
     expect(character.basics.conditions).toEqual([]);
   });
+
+  it('lists inventory weapons flagged displayAsAttack as actions, before other actions', () => {
+    const raider = {
+      id: 2,
+      name: 'Raider',
+      stats: [
+        { id: 1, name: null, value: 16 },
+        { id: 2, name: null, value: 14 },
+        { id: 3, name: null, value: 14 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 11 },
+        { id: 6, name: null, value: 8 },
+      ],
+      classes: [{ level: 5, definition: { name: 'Barbarian' } }],
+      inventory: [
+        { displayAsAttack: true, definition: { name: 'Greataxe' } },
+        { displayAsAttack: true, definition: {} }, // flagged but unnamed → skipped
+        { displayAsAttack: false, definition: { name: 'Backpack' } }, // not an attack
+      ],
+      actions: { class: [{ name: 'Rage', activation: { activationType: 1 } }] },
+    } as unknown as RawCharacter;
+
+    const { actions } = normalizeCharacter(raider);
+    // The named weapon becomes an action; the unnamed + unflagged items are left
+    // out; weapon attacks are listed before the character's other actions.
+    expect(actions.map((action) => action.name)).toEqual(['Greataxe', 'Rage']);
+    expect(actions.find((action) => action.name === 'Greataxe')?.category).toBe('action');
+  });
+
+  it('merges spells from non-class sources and de-duplicates by name', () => {
+    const mystic = {
+      id: 3,
+      name: 'Mystic',
+      stats: [
+        { id: 1, name: null, value: 8 },
+        { id: 2, name: null, value: 14 },
+        { id: 3, name: null, value: 12 },
+        { id: 4, name: null, value: 13 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 16 },
+      ],
+      classes: [{ level: 3, definition: { name: 'Sorcerer' } }],
+      classSpells: [
+        {
+          spells: [
+            { definition: { name: 'Fire Bolt', level: 0 } },
+            { definition: { name: 'Shield', level: 1 } },
+          ],
+        },
+      ],
+      spells: {
+        race: [{ definition: { name: 'Shield', level: 1 } }], // duplicate of a class spell
+        feat: [{ definition: { name: 'Misty Step', level: 2 } }],
+      },
+    } as unknown as RawCharacter;
+
+    const { spells } = normalizeCharacter(mystic);
+    const names = spells.map((spell) => spell.name);
+    expect(names).toContain('Fire Bolt');
+    expect(names).toContain('Misty Step'); // pulled in from a feat source
+    expect(names.filter((name) => name === 'Shield')).toHaveLength(1); // deduped across sources
+    // Still sorted ascending by level.
+    for (let i = 1; i < spells.length; i += 1) {
+      expect(spells[i].level).toBeGreaterThanOrEqual(spells[i - 1].level);
+    }
+  });
+
+  it('keeps the largest range for a repeated special sense and falls back to the subtype label', () => {
+    const seer = {
+      ...raw,
+      modifiers: {
+        race: [
+          { type: 'set-base', subType: 'darkvision', value: 60, friendlySubtypeName: 'Darkvision' },
+          // Larger range, supplied via `fixedValue` rather than `value`.
+          { type: 'set-base', subType: 'darkvision', fixedValue: 120, friendlySubtypeName: 'Darkvision' },
+          { type: 'set-base', subType: 'blindsight', value: 10 }, // no friendly name
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const { senses } = normalizeCharacter(seer);
+    // The 120 ft. darkvision (from fixedValue) beats the 60 ft. one from the same subtype.
+    expect(senses).toContainEqual({ label: 'Darkvision', value: '120 ft.' });
+    expect(senses.some((sense) => sense.value === '60 ft.')).toBe(false);
+    // A sense with no friendly name is labelled by its raw subtype.
+    expect(senses.some((sense) => sense.label === 'blindsight')).toBe(true);
+  });
 });
