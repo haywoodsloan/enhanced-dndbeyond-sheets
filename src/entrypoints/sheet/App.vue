@@ -410,7 +410,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="settings__button settings__button--compact"
-          v-tooltip.top="{ value: 'Compact — close gaps into the fewest pages', showDelay: 500 }"
+          v-tooltip.top="{ value: 'Compact layout', showDelay: 500 }"
           aria-label="Compact the layout into the fewest pages"
           @click="compactLayout"
         >
@@ -424,7 +424,7 @@ onUnmounted(() => {
         <button
           type="button"
           class="settings__button settings__button--reset"
-          v-tooltip.top="{ value: 'Reset layout to defaults', showDelay: 500 }"
+          v-tooltip.top="{ value: 'Reset layout', showDelay: 500 }"
           aria-label="Reset layout to defaults"
           @click="resetLayout"
         >
