@@ -3,9 +3,11 @@ import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyo
 import { defaultSectionOrder } from '@/utils/layout/section-order';
 import { sectionLayoutCount } from '@/utils/layout/section-layout';
 import {
-  hiddenSectionsPref,
-  sectionAnchorsPref,
-  sectionLayoutPref,
+  DEFAULT_PROFILE_ID,
+  HIDDEN_SECTIONS_KEY,
+  SECTION_ANCHORS_KEY,
+  SECTION_LAYOUT_KEY,
+  scopedPreference,
 } from '@/utils/settings/preferences';
 
 /**
@@ -21,7 +23,10 @@ const PLACEMENT_PERSIST_DELAY = 500;
  * to move a section into (or out of) the not-printed tray, and `setLayout` to
  * change a card's density — all persisted to `storage.sync`.
  */
-export function useSectionLayout(character: Ref<Character | null>) {
+export function useSectionLayout(
+  character: Ref<Character | null>,
+  profileId: Ref<string> = ref(DEFAULT_PROFILE_ID),
+) {
   const sections = ref<CharacterSection[]>([]);
   const hiddenKeys = ref<SectionKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
@@ -33,18 +38,42 @@ export function useSectionLayout(character: Ref<Character | null>) {
   // Monotonic recency counter; the most recently moved card wins a contested cell.
   let nextSeq = 1;
 
+  // The active profile's scoped settings (the default profile uses the original,
+  // unscoped keys). Recomputed per call so a profile switch takes effect.
+  const hiddenPref = () => scopedPreference<SectionKey[]>(HIDDEN_SECTIONS_KEY, profileId.value);
+  const layoutPref = () =>
+    scopedPreference<Record<string, number>>(SECTION_LAYOUT_KEY, profileId.value);
+  const anchorsPref = (id = profileId.value) =>
+    scopedPreference<Record<string, { page: number; col: number; row: number; seq: number }>>(
+      SECTION_ANCHORS_KEY,
+      id,
+    );
+
   function rebuild() {
     sections.value = character.value ? defaultSectionOrder(character.value) : [];
   }
 
-  onMounted(async () => {
-    hiddenKeys.value = await hiddenSectionsPref.get([]);
-    layoutIndices.value = await sectionLayoutPref.get({});
-    anchors.value = await sectionAnchorsPref.get({});
+  async function load() {
+    const [hidden, layout, anchorData] = await Promise.all([
+      hiddenPref().get([]),
+      layoutPref().get({}),
+      anchorsPref().get({}),
+    ]);
+    hiddenKeys.value = hidden;
+    layoutIndices.value = layout;
+    anchors.value = anchorData;
     nextSeq = Object.values(anchors.value).reduce((max, p) => Math.max(max, p.seq ?? 0), 0) + 1;
     rebuild();
-  });
+  }
+
+  onMounted(load);
   watch(character, rebuild);
+  // Switching the active profile swaps in a whole different saved layout. Flush
+  // any pending anchor save (to the profile it belongs to) first, then reload.
+  watch(profileId, () => {
+    flushAnchors();
+    void load();
+  });
 
   const hiddenSet = computed(() => new Set(hiddenKeys.value));
   /** Sections shown on the printable pages (drag order, minus hidden). */
@@ -61,7 +90,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     hiddenKeys.value = hidden
       ? [...hiddenKeys.value, key]
       : hiddenKeys.value.filter((candidate) => candidate !== key);
-    void hiddenSectionsPref.set(hiddenKeys.value);
+    void hiddenPref().set(hiddenKeys.value);
     // A hidden card shouldn't keep a stale placement; it re-joins the flow when
     // shown again.
     if (hidden) clearAnchor(key);
@@ -76,25 +105,29 @@ export function useSectionLayout(character: Ref<Character | null>) {
     const clamped = Math.min(Math.max(0, Math.floor(index)), count - 1);
     if (clamped === (layoutIndices.value[key] ?? 0)) return;
     layoutIndices.value = { ...layoutIndices.value, [key]: clamped };
-    void sectionLayoutPref.set(layoutIndices.value);
+    void layoutPref().set(layoutIndices.value);
   }
 
   // Manual placements are set live during a drag (like reorder), so their save
   // is debounced too, to respect the storage.sync write-rate limit.
   let anchorTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingAnchors: Record<string, { page: number; col: number; row: number; seq: number }> | null = null;
+  // The profile a pending save belongs to — captured at schedule time so a
+  // profile switch mid-debounce still writes to the profile the change was for.
+  let pendingProfileId = profileId.value;
   function flushAnchors() {
     if (anchorTimer !== undefined) {
       clearTimeout(anchorTimer);
       anchorTimer = undefined;
     }
     if (pendingAnchors) {
-      void sectionAnchorsPref.set(pendingAnchors);
+      void anchorsPref(pendingProfileId).set(pendingAnchors);
       pendingAnchors = null;
     }
   }
   function persistAnchors() {
     pendingAnchors = anchors.value;
+    pendingProfileId = profileId.value;
     if (anchorTimer !== undefined) clearTimeout(anchorTimer);
     anchorTimer = setTimeout(flushAnchors, PLACEMENT_PERSIST_DELAY);
   }
@@ -149,9 +182,9 @@ export function useSectionLayout(character: Ref<Character | null>) {
     layoutIndices.value = {};
     anchors.value = {};
     rebuild();
-    void hiddenSectionsPref.set([]);
-    void sectionLayoutPref.set({});
-    void sectionAnchorsPref.set({});
+    void hiddenPref().set([]);
+    void layoutPref().set({});
+    void anchorsPref().set({});
   }
 
   // Persist any pending placement before the composable tears down.

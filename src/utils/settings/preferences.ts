@@ -55,14 +55,48 @@ function definePreference<T>(key: string): Preference<T> {
   };
 }
 
-export const pageFormatPref = definePreference<string>('pref-page-format');
-export const pageMarginPref = definePreference<string>('pref-page-margin');
-export const themeColorPref = definePreference<string>('pref-theme-color');
-export const hiddenSectionsPref = definePreference<SectionKey[]>('pref-hidden-sections');
+/**
+ * The always-present default profile's id. Its settings live at the ORIGINAL,
+ * unscoped keys below, so a layout saved before profiles existed becomes the
+ * Default profile automatically — no migration needed.
+ */
+export const DEFAULT_PROFILE_ID = 'default';
+
+// Base storage keys for the per-profile layout settings.
+export const PAGE_FORMAT_KEY = 'pref-page-format';
+export const PAGE_MARGIN_KEY = 'pref-page-margin';
+export const THEME_COLOR_KEY = 'pref-theme-color';
+export const HIDDEN_SECTIONS_KEY = 'pref-hidden-sections';
+export const SECTION_LAYOUT_KEY = 'pref-section-layout';
+export const SECTION_ANCHORS_KEY = 'pref-section-anchors';
+
+/** The storage key for a base preference under a given profile. The default
+ * profile keeps the bare key (so pre-profiles saves map to it); other profiles
+ * suffix the key with their id. */
+export function scopedKey(base: string, profileId: string): string {
+  return profileId === DEFAULT_PROFILE_ID ? base : `${base}::${profileId}`;
+}
+
+/** A {@link Preference} for a base key scoped to a profile. */
+export function scopedPreference<T>(base: string, profileId: string): Preference<T> {
+  return definePreference<T>(scopedKey(base, profileId));
+}
+
+export const pageFormatPref = definePreference<string>(PAGE_FORMAT_KEY);
+export const pageMarginPref = definePreference<string>(PAGE_MARGIN_KEY);
+export const themeColorPref = definePreference<string>(THEME_COLOR_KEY);
+export const hiddenSectionsPref = definePreference<SectionKey[]>(HIDDEN_SECTIONS_KEY);
 /** Per-section chosen layout-option index (section key → index). */
-export const sectionLayoutPref = definePreference<Record<string, number>>('pref-section-layout');
+export const sectionLayoutPref = definePreference<Record<string, number>>(SECTION_LAYOUT_KEY);
 /** Per-section placement: section key → the cell it was moved to + a recency
  * `seq` (higher = moved more recently, so it wins a contested cell). */
 export const sectionAnchorsPref = definePreference<
   Record<string, { page: number; col: number; row: number; seq: number }>
->('pref-section-anchors');
+>(SECTION_ANCHORS_KEY);
+
+/** The list of saved profiles + which one is active (a single, global key, NOT
+ * per-profile). Its `ProfilesState` type lives in `./profiles`. */
+export const profilesPref = definePreference<{
+  activeId: string;
+  profiles: { id: string; name: string }[];
+}>('pref-profiles');

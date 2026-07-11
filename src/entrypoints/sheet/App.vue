@@ -7,6 +7,7 @@ import { useSectionLayout } from '@/composables/useSectionLayout';
 import { useCardDrag } from '@/composables/useCardDrag';
 import { useGridFlip } from '@/composables/useGridFlip';
 import { useStoredRef } from '@/composables/useStoredRef';
+import { useProfiles } from '@/composables/useProfiles';
 import {
   GRID_COLUMNS,
   GRID_GAP,
@@ -38,7 +39,11 @@ import {
   mmToPx,
 } from '@/utils/layout/page-format';
 import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/settings/theme-color';
-import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/settings/preferences';
+import {
+  PAGE_FORMAT_KEY,
+  PAGE_MARGIN_KEY,
+  THEME_COLOR_KEY,
+} from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */
@@ -56,6 +61,17 @@ const props = defineProps<{ characterId: number | null }>();
 
 const { character, status, error } = useCharacter(toRef(props, 'characterId'));
 
+// Layout profiles: named snapshots of all the layout settings. The active id is
+// threaded into every settings source below so switching profiles swaps in a
+// whole different saved layout (and autosaves each profile as it's edited).
+const {
+  profiles,
+  activeId: activeProfileId,
+  create: createProfile,
+  switchTo: switchProfile,
+  remove: removeProfile,
+} = useProfiles();
+
 const {
   sections: orderedSections,
   hiddenSections,
@@ -67,12 +83,13 @@ const {
   hide,
   show,
   reset: resetLayout,
-} = useSectionLayout(character);
+} = useSectionLayout(character, activeProfileId);
 
-// Page layout settings (page type, margins, theme color), persisted locally.
-const formatId = useStoredRef(pageFormatPref, DEFAULT_FORMAT_ID);
-const marginId = useStoredRef(pageMarginPref, DEFAULT_MARGIN_ID);
-const colorId = useStoredRef(themeColorPref, DEFAULT_COLOR_ID);
+// Page layout settings (page type, margins, theme color), scoped to the active
+// profile so each profile keeps its own paper + accent.
+const formatId = useStoredRef(PAGE_FORMAT_KEY, DEFAULT_FORMAT_ID, activeProfileId);
+const marginId = useStoredRef(PAGE_MARGIN_KEY, DEFAULT_MARGIN_ID, activeProfileId);
+const colorId = useStoredRef(THEME_COLOR_KEY, DEFAULT_COLOR_ID, activeProfileId);
 
 // PrimeVue Select needs mutable arrays; the source lists stay readonly.
 const formatOptions = [...PAGE_FORMATS];
@@ -402,6 +419,50 @@ onUnmounted(() => {
 
 <template>
   <div class="workspace">
+    <aside class="profiles">
+      <h2 class="settings__title">Profiles</h2>
+      <ul class="profiles__list">
+        <li
+          v-for="profile in profiles"
+          :key="profile.id"
+          class="profiles__item"
+          :class="{ 'profiles__item--active': profile.id === activeProfileId }"
+        >
+          <button
+            type="button"
+            class="profiles__switch"
+            :aria-current="profile.id === activeProfileId ? 'true' : undefined"
+            @click="switchProfile(profile.id)"
+          >
+            {{ profile.name }}
+          </button>
+          <button
+            v-if="profiles.length > 1"
+            type="button"
+            class="profiles__delete"
+            v-tooltip.top="{ value: 'Delete profile', showDelay: 500 }"
+            :aria-label="`Delete profile ${profile.name}`"
+            @click="removeProfile(profile.id)"
+          >
+            <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+          </button>
+        </li>
+      </ul>
+      <button type="button" class="settings__button profiles__new" @click="createProfile()">
+        <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>New profile</span>
+      </button>
+    </aside>
+
     <aside class="settings">
       <h2 class="settings__title">Page layout</h2>
 
@@ -562,7 +623,8 @@ body {
   min-height: 100vh;
 }
 
-.settings {
+.settings,
+.profiles {
   position: sticky;
   top: 24px;
   flex: none;
@@ -635,6 +697,85 @@ body {
 
 .settings__button--reset:hover,
 .settings__button--compact:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+  color: var(--p-primary-color);
+}
+
+/* Profiles panel: the list of saved layout profiles, a switch button per row
+   (the active one filled), a delete button, and a New profile button. */
+.profiles {
+  margin-right: 0;
+}
+
+.profiles__list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profiles__item {
+  display: flex;
+  gap: 6px;
+}
+
+.profiles__switch {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 8px;
+  background: var(--paper);
+  color: #1c1c1e;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.profiles__switch:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+}
+
+.profiles__item--active .profiles__switch {
+  background: var(--p-primary-color);
+  border-color: var(--p-primary-color);
+  color: #fff;
+  font-weight: 600;
+}
+
+.profiles__delete {
+  flex: none;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--p-primary-700, #6b7280);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.profiles__delete:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.profiles__new {
+  width: 100%;
+  flex: none;
+  background: var(--paper);
+  color: var(--p-primary-700, #6b7280);
+}
+
+.profiles__new:hover {
   border-color: var(--p-primary-400, #a1a1aa);
   color: var(--p-primary-color);
 }
@@ -761,7 +902,8 @@ body {
     display: block;
   }
 
-  .settings {
+  .settings,
+  .profiles {
     display: none;
   }
 
