@@ -2,6 +2,9 @@ import { defineConfig } from 'wxt';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
+  // Keep all source under src/ (separate from the root config files). WXT points
+  // its `@`/`~` aliases at srcDir, so `@/...` imports resolve into src/.
+  srcDir: 'src',
   modules: ['@wxt-dev/module-vue'],
   // Build Manifest V3 for all browsers (including Firefox).
   manifestVersion: 3,

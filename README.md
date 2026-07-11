@@ -73,24 +73,25 @@ Recent Chrome no longer loads unpacked extensions from the command line, so load
 ## Project structure
 
 ```
-entrypoints/       Extension entrypoints (background, popup, sheet page)
-components/        Vue components
-  SectionCard.vue    The card shell (drag handle, layout + visibility toggles)
-  cards/             Per-section content cards (abilities, skills, spells, …)
-composables/       Vue composables (character load, layout, drag, FLIP)
-services/
-  dndbeyond/         The D&D Beyond data layer (fetch, auth, normalize, model)
-utils/
-  layout/            Grid packing, pagination, section order/spans
-  character/         D&D 5e formatting and character summaries
-  url/               Character- and sheet-URL parsing
-  settings/          Persisted preferences and theme colors
-  debug.ts           Redacting logger
+src/               Application source (WXT srcDir; the @ alias points here)
+  entrypoints/       Extension entrypoints (background, popup, sheet page)
+  components/        Vue components
+    SectionCard.vue    The card shell (drag handle, layout + visibility toggles)
+    cards/             Per-section content cards (abilities, skills, spells, …)
+  composables/       Vue composables (character load, layout, drag, FLIP)
+  services/
+    dndbeyond/         The D&D Beyond data layer (fetch, auth, normalize, model)
+  utils/
+    layout/            Grid packing, pagination, section order/spans
+    character/         D&D 5e formatting and character summaries
+    url/               Character- and sheet-URL parsing
+    settings/          Persisted preferences and theme colors
+    debug.ts           Redacting logger
 modules/           Local WXT modules
 public/            Static files copied as-is (icons)
-tests/             Unit and integration tests (mirrors source layout)
+tests/             Unit and integration tests (mirrors src/ layout)
 e2e/               Playwright end-to-end tests
-wxt.config.ts      WXT configuration
+wxt.config.ts      WXT configuration (srcDir: 'src')
 vitest.config.ts   Vitest configuration
 playwright.config.ts  Playwright configuration
 ```
