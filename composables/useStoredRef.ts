@@ -15,9 +15,16 @@ export function useStoredRef<T>(preference: Preference<T>, fallback: T): Ref<T> 
     loaded = true;
   });
 
-  watch(state, (value) => {
-    if (loaded) void preference.set(value);
-  });
+  // A SYNC watcher fires during the assignment above — while `loaded` is still
+  // false — so the initial load doesn't write the value straight back. Later
+  // (user) changes run with `loaded` true and persist.
+  watch(
+    state,
+    (value) => {
+      if (loaded) void preference.set(value);
+    },
+    { flush: 'sync' },
+  );
 
   return state;
 }

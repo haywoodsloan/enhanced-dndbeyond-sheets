@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applySavedOrder,
-  defaultSectionOrder,
-  moveSectionByIndex,
-  moveVisibleByIndex,
-} from '@/utils/section-order';
+import { defaultSectionOrder } from '@/utils/section-order';
 import {
   SECTION_KEYS,
   type Character,
@@ -132,93 +127,28 @@ describe('defaultSectionOrder', () => {
       'notes',
     ]);
   });
-});
 
-const asSections = (keys: SectionKey[]): CharacterSection[] =>
-  keys.map((key) => ({ key, title: key, count: 1, isEmpty: false }));
-
-describe('applySavedOrder', () => {
-  const base = asSections(['basics', 'skills', 'spells']);
-
-  it('returns the base order when nothing is saved', () => {
-    expect(applySavedOrder(base, []).map((s) => s.key)).toEqual([
-      'basics',
-      'skills',
-      'spells',
-    ]);
+  it('falls back to the martial layout when the character has no classes', () => {
+    const character = buildCharacter({
+      classes: [],
+      level: 0,
+      sections: SECTION_KEYS.map((key) => ({ key, title: key, count: 1, isEmpty: false })),
+    });
+    const order = orderedKeys(character);
+    // Martial style keeps actions ahead of spells.
+    expect(order.indexOf('actions')).toBeLessThan(order.indexOf('spells'));
   });
 
-  it('reorders to match a full saved order', () => {
-    expect(
-      applySavedOrder(base, ['spells', 'basics', 'skills']).map((s) => s.key),
-    ).toEqual(['spells', 'basics', 'skills']);
-  });
-
-  it('appends unsaved keys after the saved ones in base order', () => {
-    expect(applySavedOrder(base, ['spells']).map((s) => s.key)).toEqual([
-      'spells',
-      'basics',
-      'skills',
-    ]);
-  });
-});
-
-describe('moveSectionByIndex', () => {
-  const base = asSections(['basics', 'skills', 'spells', 'notes']);
-
-  it('moves an item to a later index', () => {
-    expect(moveSectionByIndex(base, 0, 2).map((s) => s.key)).toEqual([
-      'skills',
-      'spells',
-      'basics',
-      'notes',
-    ]);
-  });
-
-  it('moves an item to an earlier index', () => {
-    expect(moveSectionByIndex(base, 3, 1).map((s) => s.key)).toEqual([
-      'basics',
-      'notes',
-      'skills',
-      'spells',
-    ]);
-  });
-
-  it('returns the same array for a no-op or out-of-range index', () => {
-    expect(moveSectionByIndex(base, 1, 1)).toBe(base);
-    expect(moveSectionByIndex(base, -1, 2)).toBe(base);
-    expect(moveSectionByIndex(base, 0, 9)).toBe(base);
-  });
-});
-
-describe('moveVisibleByIndex', () => {
-  // Full order with 'skills' hidden — visible list is [basics, spells, notes].
-  const base = asSections(['basics', 'skills', 'spells', 'notes']);
-  const hidden: SectionKey[] = ['skills'];
-
-  it('moves a visible card past the hidden section using visible indices', () => {
-    // Drag visible[0] (basics) to visible[1] (spells): basics lands in spells'
-    // full slot, jumping over the hidden 'skills'.
-    expect(moveVisibleByIndex(base, hidden, 0, 1).map((s) => s.key)).toEqual([
-      'skills',
-      'spells',
-      'basics',
-      'notes',
-    ]);
-  });
-
-  it('moves a visible card to the front', () => {
-    // Drag visible[2] (notes) to visible[0] (basics).
-    expect(moveVisibleByIndex(base, hidden, 2, 0).map((s) => s.key)).toEqual([
-      'notes',
-      'basics',
-      'skills',
-      'spells',
-    ]);
-  });
-
-  it('returns the same array for a no-op or out-of-range visible index', () => {
-    expect(moveVisibleByIndex(base, hidden, 1, 1)).toBe(base);
-    expect(moveVisibleByIndex(base, hidden, 0, 5)).toBe(base);
+  it('sorts sections with an unknown key to the end, keeping their order', () => {
+    const character = buildCharacter({
+      classes: [{ name: 'Fighter', level: 1 }],
+      level: 1,
+      sections: [
+        { key: 'mystery-a' as SectionKey, title: 'A', count: 1, isEmpty: false },
+        { key: 'basics', title: 'Basics', count: 1, isEmpty: false },
+        { key: 'mystery-b' as SectionKey, title: 'B', count: 1, isEmpty: false },
+      ],
+    });
+    expect(orderedKeys(character)).toEqual(['basics', 'mystery-a', 'mystery-b']);
   });
 });

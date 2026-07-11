@@ -14,6 +14,7 @@
     "compile": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "wxt build && playwright test",
     "test:e2e:headed": "wxt build && playwright test --headed",
     "postinstall": "wxt prepare"
@@ -21,13 +22,12 @@
   "dependencies": {
     "@primevue/themes": "^4.5.4",
     "primevue": "^4.5.5",
-    "sortablejs": "^1.15.7",
     "vue": "^3.5.29"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "@types/sortablejs": "^1.15.9",
     "@vitejs/plugin-vue": "^6.0.7",
+    "@vitest/coverage-v8": "^4.1.10",
     "@vue/test-utils": "^2.4.11",
     "@wxt-dev/module-vue": "^1.0.3",
     "happy-dom": "^20.10.6",

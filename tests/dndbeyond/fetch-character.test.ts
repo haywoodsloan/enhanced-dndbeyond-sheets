@@ -90,4 +90,17 @@ describe('fetchCharacter', () => {
 
     await expect(fetchCharacter(1)).rejects.toBeInstanceOf(CharacterFetchError);
   });
+
+  it('reports "unknown error" when the failure envelope omits a message', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ id: 1, success: false, message: null, data: null }),
+        ),
+    );
+
+    await expect(fetchCharacter(1)).rejects.toThrow(/unknown error/);
+  });
 });

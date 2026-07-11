@@ -8,31 +8,22 @@ Built with WXT and Vue 3.
 
 ## Status
 
-Early development. Working now:
+Functional. Implemented:
 
-- Project scaffold (WXT + Vue 3 + TypeScript).
-- Unit and integration test harness (Vitest).
 - Character data layer: fetch a character by id (public, or private via the signed-in user's session) and normalize it into an internal model with per-section metadata.
 - Activation: a toolbar icon and a right-click menu on a D&D Beyond character page open the enhanced sheet in a new tab, carrying the character id.
-- Enhanced-sheet tab: loads the character and renders the list of sheet sections with entry counts (loading and error states handled).
+- Enhanced sheet: renders every section (attributes, skills, saves, senses, proficiencies, actions, spells, inventory, wealth, features, notes, portrait) with a class-aware default layout and auto-hidden empty sections.
+- Customization: drag any card to any grid cell (free positional placement), hide/show sections, and cycle a card's density — all persisted via `storage.sync`.
+- Print: a page-accurate, paginated layout with selectable page size, margins, and theme color.
+- Tests: unit/integration tests (Vitest) plus end-to-end drag tests (Playwright).
 
-Not yet implemented, in planned order:
-
-1. Class-aware default ordering and auto-hide of empty sections.
-2. Drag-and-drop customization with saved layouts.
-3. Section content (attributes, inventory, spells, attacks, features).
-4. Print layout.
-5. Polish and customization.
-
-End-to-end and visual tests are planned for a later phase.
-
-## How it works (planned)
+## How it works
 
 1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
 2. Activate the extension from the toolbar icon or the page context menu.
 3. While you use D&D Beyond, the extension captures the `Authorization` header from the site's own character-service requests and holds it in memory (`storage.session`, cleared when the browser closes, never written to disk). On activation it opens a new tab with the enhanced sheet, which fetches your character using that captured header — so **private characters load** and the sheet always reflects the character's latest state. Without a captured header only public characters load.
-4. Sheet sections are shown in a drag-and-drop layout. Default order depends on the character's class, empty sections are hidden, and hidden sections are placed at the end.
-5. Adjust the layout and print.
+4. Sheet sections render in a class-aware default layout, with empty sections auto-hidden. Drag any card to any grid cell to place it freely; hide or show sections and cycle a card's density.
+5. Adjust the page size, margins, and theme color, then print.
 
 ## Requirements
 
@@ -54,8 +45,10 @@ npm install
 | `npm run build` | Production build (Chrome) to `.output/`. |
 | `npm run build:firefox` | Production build (Firefox). |
 | `npm run zip` | Package the build as a zip for store submission. |
-| `npm test` | Run the test suite once. |
+| `npm test` | Run the unit/integration suite once. |
 | `npm run test:watch` | Run tests in watch mode. |
+| `npm run test:coverage` | Run the suite with a coverage report. |
+| `npm run test:e2e` | Build, then run the Playwright end-to-end tests. |
 | `npm run compile` | Type-check with `vue-tsc`. |
 
 ## Debugging
@@ -80,19 +73,24 @@ Recent Chrome no longer loads unpacked extensions from the command line, so load
 ## Project structure
 
 ```
-entrypoints/      Extension entrypoints (background, sheet page)
-services/         Interacting with APIs and external services (the D&D Beyond data layer)
-utils/            Generic code utilities — URL parsing, logging (auto-imported)
-composables/      Vue composables (auto-imported)
-modules/          Local WXT modules
-public/           Static files copied as-is (icons)
-tests/            Unit and integration tests (mirrors source layout)
-wxt.config.ts     WXT configuration
-vitest.config.ts  Test configuration
+entrypoints/       Extension entrypoints (background, popup, sheet page)
+components/        Vue section-card components
+composables/       Vue composables (character load, layout, drag, FLIP)
+services/          External-service integration (the D&D Beyond data layer)
+utils/             Generic utilities — packing, URL parsing, preferences, logging
+modules/           Local WXT modules
+public/            Static files copied as-is (icons)
+tests/             Unit and integration tests (mirrors source layout)
+e2e/               Playwright end-to-end tests
+wxt.config.ts      WXT configuration
+vitest.config.ts   Vitest configuration
+playwright.config.ts  Playwright configuration
 ```
 
 Generated and not committed: `.wxt/`, `.output/`, `node_modules/`.
 
 ## Testing
 
-Tests use Vitest with WXT's testing plugin and `@vue/test-utils`. Test files live in `tests/`, mirroring the source layout, and are named `*.test.ts`.
+Unit and integration tests use Vitest with WXT's testing plugin and `@vue/test-utils`. They live in `tests/`, mirror the source layout, and are named `*.test.ts`; `npm run test:coverage` reports coverage.
+
+The pointer-driven card drag needs a real layout engine, so it's covered by Playwright end-to-end tests in `e2e/` (named `*.spec.ts`) that load the built extension and drive the drag in a headless browser. Run them with `npm run test:e2e` (it builds first).

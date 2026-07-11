@@ -111,4 +111,41 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Could not load character');
     expect(wrapper.text()).toContain('boom');
   });
+
+  it('prints the sheet from the Print button', () => {
+    const printMock = vi.fn();
+    vi.stubGlobal('print', printMock); // happy-dom has no window.print
+    const wrapper = mount(App, { props: { characterId: null } });
+    wrapper.get('.settings__button--print').trigger('click');
+    expect(printMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it('hides a section into the tray, then Reset restores it', async () => {
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+
+    await wrapper.get('[data-section-key="notes"] .card__toggle').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.hidden-tray [data-section-key="notes"]').exists()).toBe(true);
+
+    await wrapper.get('.settings__button--reset').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.hidden-tray').exists()).toBe(false);
+  });
+
+  it('cycles a card layout from its layout button', async () => {
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+
+    const layout = wrapper.get('[data-section-key="inventory"] .card__layout');
+    const before = layout.attributes('aria-label');
+    await layout.trigger('click');
+    await flushPromises();
+    expect(
+      wrapper.get('[data-section-key="inventory"] .card__layout').attributes('aria-label'),
+    ).not.toBe(before);
+  });
 });

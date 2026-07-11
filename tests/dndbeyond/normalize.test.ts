@@ -253,4 +253,20 @@ describe('normalizeCharacter', () => {
     expect(spells?.count).toBe(0);
     expect(spells?.isEmpty).toBe(true);
   });
+
+  it('leaves a non-parseable avatar url unchanged', () => {
+    const character = normalizeCharacter({
+      ...raw,
+      decorations: { ...raw.decorations, avatarUrl: 'http://[bad' },
+    } as RawCharacter);
+    expect(character.avatarUrl).toBe('http://[bad');
+  });
+
+  it('drops conditions with an unknown id', () => {
+    const character = normalizeCharacter({
+      ...raw,
+      conditions: [{ id: 999999 }],
+    } as unknown as RawCharacter);
+    expect(character.basics.conditions).toEqual([]);
+  });
 });

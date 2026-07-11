@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   cellAtPoint,
-  packedDropIndex,
   packPositioned,
   packSections,
   placementPage,
@@ -97,83 +96,6 @@ describe('placementStyle', () => {
       gridColumn: '3 / span 1',
       gridRow: '2 / span 2',
     });
-  });
-});
-
-describe('packedDropIndex', () => {
-  // Three 100px columns (no gaps) on a tall single page, so each row is 100px.
-  const geometry = {
-    left: 0,
-    top: 0,
-    width: 300,
-    columns: 3,
-    rowsPerPage: 6,
-    rowUnit: 100,
-    gap: 0,
-    interGap: 0,
-  };
-  // basics(3x1), attributes(1x2), portrait(1x1), skills(1x3), saves(2x1), senses(1x1).
-  // Skills is the tall column-2 card; the cell under the portrait (col 1, row 2)
-  // stays empty because Saves is 2-wide and wraps past it.
-  const footprints = [fp(3, 1), fp(1, 2), fp(1, 1), fp(1, 3), fp(2, 1), fp(1, 1)];
-
-  it('drops a card into the empty cell beside a tall neighbour', () => {
-    // The gap under the portrait is (col 1, row 2) → x∈[100,200], y∈[200,300].
-    // Dragging Senses (index 5) there inserts it right after Skills (index 4).
-    expect(packedDropIndex({ x: 150, y: 250 }, footprints, geometry, 5)).toBe(4);
-  });
-
-  it('is a no-op when the pointer maps back to the card’s own slot', () => {
-    // Senses currently packs to (col 0, row 4) → x∈[0,100], y∈[400,500].
-    expect(packedDropIndex({ x: 50, y: 450 }, footprints, geometry, 5)).toBe(-1);
-  });
-
-  it('is a no-op for an out-of-range source index', () => {
-    expect(packedDropIndex({ x: 150, y: 250 }, footprints, geometry, 9)).toBe(-1);
-  });
-});
-
-describe('packSections anchors', () => {
-  it('pins an anchored card at its cell and flows the rest around it', () => {
-    const { placements } = packSections(
-      [fp(1, 1), { cols: 1, rows: 1, anchor: { col: 2, row: 0 } }, fp(1, 1)],
-      3,
-      4,
-    );
-    expect(placements[1]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
-    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
-    expect(placements[2]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
-  });
-
-  it('leaves earlier cells empty when a card is pinned to a later cell', () => {
-    const { placements } = packSections(
-      [{ cols: 1, rows: 1, anchor: { col: 2, row: 1 } }],
-      3,
-      4,
-    );
-    expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
-  });
-
-  it('falls back to flow when the anchor overlaps an already-placed card', () => {
-    const { placements } = packSections(
-      [
-        { cols: 1, rows: 1, anchor: { col: 0, row: 0 } },
-        { cols: 1, rows: 1, anchor: { col: 0, row: 0 } },
-      ],
-      3,
-      4,
-    );
-    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
-    expect(placements[1]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
-  });
-
-  it('falls back to flow when the anchor is off the grid', () => {
-    const { placements } = packSections(
-      [{ cols: 1, rows: 1, anchor: { col: 3, row: 0 } }],
-      3,
-      4,
-    );
-    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
   });
 });
 

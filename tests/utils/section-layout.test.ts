@@ -44,6 +44,22 @@ describe('sectionSpan dynamic height', () => {
     expect(sectionSpan('skills', 999)).toEqual({ cols: 3, rows: 1 });
     expect(sectionSpan('basics', 999)).toEqual({ cols: 3, rows: 1 });
   });
+
+  it('grows a non-default curated option by its own dynamic config', () => {
+    // spells Medium (index 1): dynamic { perRow: 9, maxRows: 6 }.
+    expect(sectionSpan('spells', 45, 1)).toEqual({ cols: 2, rows: 5 }); // ceil(45/9)=5
+  });
+
+  it('clamps an out-of-range layout index to the first/last option', () => {
+    expect(sectionSpan('attributes', 0, -5)).toEqual(sectionSpan('attributes', 0, 0));
+    expect(sectionSpan('attributes', 0, 99)).toEqual(sectionSpan('attributes', 0, 1));
+  });
+
+  it('spans a full-page option to the page height, falling back to its rows', () => {
+    // notes' 4th option (index 3) is fullPage.
+    expect(sectionSpan('notes', 0, 3, 8)).toEqual({ cols: 3, rows: 8 });
+    expect(sectionSpan('notes', 0, 3)).toEqual({ cols: 3, rows: 4 });
+  });
 });
 
 describe('section layout options', () => {

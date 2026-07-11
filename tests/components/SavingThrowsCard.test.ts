@@ -28,4 +28,18 @@ describe('SavingThrowsCard', () => {
     expect(str.text()).toContain('+2');
     expect(str.find('.save__prof--on').exists()).toBe(false);
   });
+
+  it('renders the defences list when provided', () => {
+    const wrapper = mount(SavingThrowsCard, {
+      props: { saves, defences: ['Advantage on saves vs. charm', 'Magic sleep immunity'] },
+    });
+    const block = wrapper.get('[data-defences]');
+    expect(block.text()).toContain('Advantage on saves vs. charm');
+    expect(wrapper.findAll('.defences__item')).toHaveLength(2);
+  });
+
+  it('omits the defences block when there are none', () => {
+    const wrapper = mount(SavingThrowsCard, { props: { saves } });
+    expect(wrapper.find('[data-defences]').exists()).toBe(false);
+  });
 });

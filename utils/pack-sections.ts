@@ -10,14 +10,10 @@
  * the drag hit-testing that reads the rendered rects — the drop targeting.
  */
 
-/** A card's grid footprint: how many columns and row-units it spans, plus an
- * optional manual `anchor` cell it is pinned to. */
+/** A card's grid footprint: how many columns and row-units it spans. */
 export interface CardFootprint {
   cols: number;
   rows: number;
-  /** Manual placement: pin the card at this cell (absolute `row`, `col`) instead
-   * of letting it flow. Ignored (the card flows) when it no longer fits there. */
-  anchor?: { col: number; row: number };
 }
 
 /** A footprint with a target cell + placement recency, for {@link packPositioned}. */
@@ -48,120 +44,101 @@ export interface PackedLayout {
   pages: number;
 }
 
+/** A mutable column-occupancy grid shared by the packers. Rows grow on demand. */
+function createOccupancy(columns: number) {
+  const cols = Math.max(1, Math.floor(columns));
+  const occupied: boolean[][] = [];
+  const ensureRow = (row: number) => {
+    while (occupied.length <= row) occupied.push(new Array<boolean>(cols).fill(false));
+  };
+  return {
+    cols,
+    rowCount: () => occupied.length,
+    isFree(row: number, col: number, w: number, h: number): boolean {
+      for (let r = row; r < row + h; r += 1) {
+        ensureRow(r);
+        for (let c = col; c < col + w; c += 1) if (occupied[r][c]) return false;
+      }
+      return true;
+    },
+    occupy(row: number, col: number, w: number, h: number) {
+      for (let r = row; r < row + h; r += 1) {
+        ensureRow(r);
+        for (let c = col; c < col + w; c += 1) occupied[r][c] = true;
+      }
+    },
+  };
+}
+
+/**
+ * Scan forward from (`startCol`, `startRow`) — across the row, wrapping to the
+ * next row, and jumping to the top of the next page when a card would straddle a
+ * page break — for the first free cell that fits a `w`×`h` card.
+ */
+function firstFreeCell(
+  grid: ReturnType<typeof createOccupancy>,
+  startCol: number,
+  startRow: number,
+  w: number,
+  h: number,
+  perPage: number,
+): { col: number; row: number } {
+  let col = startCol;
+  let row = startRow;
+  for (;;) {
+    if (col + w > grid.cols) {
+      row += 1;
+      col = 0;
+      continue;
+    }
+    const pageStart = Math.floor(row / perPage) * perPage;
+    if (row + h > pageStart + perPage) {
+      row = pageStart + perPage;
+      col = 0;
+      continue;
+    }
+    if (grid.isFree(row, col, w, h)) return { col, row };
+    col += 1;
+  }
+}
+
 /**
  * Place `footprints` (in order) on a `columns`-wide grid whose pages are
- * `rowsPerPage` row-units tall. Cards carrying an `anchor` are pinned to that
- * cell first (pass 1); the rest then flow in order with a sparse first-fit
- * forward-only cursor (matching CSS `grid-auto-flow: row`) around the pinned
- * cards (pass 2), so the flowing cards' visual order still tracks the list order
- * for hit-testing while the pinned cards sit exactly where the user dropped them
- * (earlier cells left empty). An anchor that no longer fits (off-grid, straddles
- * a page, or overlaps) is dropped and that card simply flows. A card taller than
+ * `rowsPerPage` row-units tall, using a forward-only first-fit cursor (matching
+ * CSS `grid-auto-flow: row`): each card takes the next free cell after the
+ * previous one, so their visual order tracks the list order. A card taller than
  * a page is capped; one that would cross a page break starts on the next page.
+ * This is the class-aware DEFAULT layout — the home cells `packPositioned` seeds
+ * from.
  */
 export function packSections(
   footprints: CardFootprint[],
   columns: number,
   rowsPerPage: number,
 ): PackedLayout {
-  const cols = Math.max(1, Math.floor(columns));
   const perPage = Math.max(1, Math.floor(rowsPerPage));
-  const occupied: boolean[][] = [];
-
-  const ensureRow = (row: number) => {
-    while (occupied.length <= row) occupied.push(new Array<boolean>(cols).fill(false));
-  };
-  const isFree = (row: number, col: number, w: number, h: number): boolean => {
-    for (let r = row; r < row + h; r += 1) {
-      ensureRow(r);
-      for (let c = col; c < col + w; c += 1) {
-        if (occupied[r][c]) return false;
-      }
-    }
-    return true;
-  };
-  const occupy = (row: number, col: number, w: number, h: number) => {
-    for (let r = row; r < row + h; r += 1) {
-      ensureRow(r);
-      for (let c = col; c < col + w; c += 1) occupied[r][c] = true;
-    }
-  };
-
+  const grid = createOccupancy(columns);
   const placements: CardPlacement[] = new Array(footprints.length);
-  const clampW = (footprint: CardFootprint) => Math.min(Math.max(1, Math.floor(footprint.cols)), cols);
-  const clampH = (footprint: CardFootprint) => Math.min(Math.max(1, Math.floor(footprint.rows)), perPage);
 
-  // Pass 1: pin each anchored card at its cell. An anchor that no longer fits
-  // (off-grid, straddles a page, or overlaps an already-placed card) is deferred
-  // to the flow, so a manual placement degrades gracefully to normal flow.
-  const flow: number[] = [];
-  footprints.forEach((footprint, index) => {
-    const anchor = footprint.anchor;
-    if (!anchor) {
-      flow.push(index);
-      return;
-    }
-    const w = clampW(footprint);
-    const h = clampH(footprint);
-    const col = Math.floor(anchor.col);
-    const row = Math.floor(anchor.row);
-    const pageStart = Math.floor(row / perPage) * perPage;
-    const fits =
-      col >= 0 &&
-      col + w <= cols &&
-      row >= 0 &&
-      row + h <= pageStart + perPage &&
-      isFree(row, col, w, h);
-    if (fits) {
-      occupy(row, col, w, h);
-      placements[index] = { col, row, cols: w, rows: h };
-    } else {
-      flow.push(index);
-    }
-  });
-
-  // Pass 2: flow the remaining cards with a forward-only first-fit cursor,
-  // skipping the cells the anchored cards took.
-  let cursorRow = 0;
   let cursorCol = 0;
-  for (const index of flow) {
-    const footprint = footprints[index];
-    const w = clampW(footprint);
-    const h = clampH(footprint);
-
-    let row = cursorRow;
-    let col = cursorCol;
-    for (;;) {
-      if (col + w > cols) {
-        row += 1;
-        col = 0;
-        continue;
-      }
-      // Keep the card on a single page; jump past a boundary it would cross.
-      const pageStart = Math.floor(row / perPage) * perPage;
-      if (row + h > pageStart + perPage) {
-        row = pageStart + perPage;
-        col = 0;
-        continue;
-      }
-      if (isFree(row, col, w, h)) break;
-      col += 1;
-    }
-
-    occupy(row, col, w, h);
+  let cursorRow = 0;
+  footprints.forEach((footprint, index) => {
+    const w = Math.min(Math.max(1, Math.floor(footprint.cols)), grid.cols);
+    const h = Math.min(Math.max(1, Math.floor(footprint.rows)), perPage);
+    const { col, row } = firstFreeCell(grid, cursorCol, cursorRow, w, h, perPage);
+    grid.occupy(row, col, w, h);
     placements[index] = { col, row, cols: w, rows: h };
 
     // Advance the cursor just past this card (forward-only — no back-filling).
     cursorRow = row;
     cursorCol = col + w;
-    if (cursorCol >= cols) {
+    if (cursorCol >= grid.cols) {
       cursorRow = row + 1;
       cursorCol = 0;
     }
-  }
+  });
 
-  const pages = Math.max(1, Math.ceil(occupied.length / perPage));
-  return { placements, pages };
+  return { placements, pages: Math.max(1, Math.ceil(grid.rowCount() / perPage)) };
 }
 
 /**
@@ -179,30 +156,10 @@ export function packPositioned(
   columns: number,
   rowsPerPage: number,
 ): PackedLayout {
-  const cols = Math.max(1, Math.floor(columns));
   const perPage = Math.max(1, Math.floor(rowsPerPage));
-  const occupied: boolean[][] = [];
-
-  const ensureRow = (row: number) => {
-    while (occupied.length <= row) occupied.push(new Array<boolean>(cols).fill(false));
-  };
-  const isFree = (row: number, col: number, w: number, h: number): boolean => {
-    for (let r = row; r < row + h; r += 1) {
-      ensureRow(r);
-      for (let c = col; c < col + w; c += 1) {
-        if (occupied[r][c]) return false;
-      }
-    }
-    return true;
-  };
-  const occupy = (row: number, col: number, w: number, h: number) => {
-    for (let r = row; r < row + h; r += 1) {
-      ensureRow(r);
-      for (let c = col; c < col + w; c += 1) occupied[r][c] = true;
-    }
-  };
-
+  const grid = createOccupancy(columns);
   const placements: CardPlacement[] = new Array(cards.length);
+
   // Most recent (highest priority) first so a freshly-moved card wins its cell;
   // ties fall back to reading order. Every card carries a priority, so there is
   // no separate handling for "placed" vs "regular" cards.
@@ -212,34 +169,17 @@ export function packPositioned(
 
   for (const index of order) {
     const card = cards[index];
-    const w = Math.min(Math.max(1, Math.floor(card.cols)), cols);
+    const w = Math.min(Math.max(1, Math.floor(card.cols)), grid.cols);
     const h = Math.min(Math.max(1, Math.floor(card.rows)), perPage);
-
     // Start at the home cell (clamped so the card fits), then scan forward.
-    let col = Math.min(Math.max(0, Math.floor(card.home.col)), cols - w);
-    let row = Math.max(0, Math.floor(card.home.row));
-    for (;;) {
-      if (col + w > cols) {
-        row += 1;
-        col = 0;
-        continue;
-      }
-      const pageStart = Math.floor(row / perPage) * perPage;
-      if (row + h > pageStart + perPage) {
-        row = pageStart + perPage;
-        col = 0;
-        continue;
-      }
-      if (isFree(row, col, w, h)) break;
-      col += 1;
-    }
-
-    occupy(row, col, w, h);
+    const startCol = Math.min(Math.max(0, Math.floor(card.home.col)), grid.cols - w);
+    const startRow = Math.max(0, Math.floor(card.home.row));
+    const { col, row } = firstFreeCell(grid, startCol, startRow, w, h, perPage);
+    grid.occupy(row, col, w, h);
     placements[index] = { col, row, cols: w, rows: h };
   }
 
-  const pages = Math.max(1, Math.ceil(occupied.length / perPage));
-  return { placements, pages };
+  return { placements, pages: Math.max(1, Math.ceil(grid.rowCount() / perPage)) };
 }
 
 /** Which page (0-based) a placement lands on. */
@@ -293,71 +233,11 @@ export interface GridGeometry {
   interGap: number;
 }
 
-/** Array move: remove the item at `from` and re-insert it at `to`. */
-function moveItem<T>(items: T[], from: number, to: number): T[] {
-  const next = items.slice();
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
-
-/** Top offset (px) of content-row `row`, including the taller inter-page gap. */
-function rowTop(row: number, g: GridGeometry): number {
-  const page = Math.floor(row / g.rowsPerPage);
-  const rowInPage = row % g.rowsPerPage;
-  return row * g.rowUnit + (page * (g.rowsPerPage - 1) + rowInPage) * g.gap + page * g.interGap;
-}
-
-/**
- * The insertion index that would drop the card at `fromIndex` under `pointer`.
- * For each candidate slot it re-packs the footprints with the card moved there,
- * turns that card's resulting placement into a viewport rect, and keeps the slot
- * whose rect holds the pointer (nearest centre breaks ties). Because it drives
- * the REAL packer it lands the card in the empty cells beside a tall card that a
- * plain reading-order scan of the rendered rects can't resolve. Returns -1 when
- * the pointer maps back to the card's own slot, or to no landing slot at all.
- */
-export function packedDropIndex(
-  pointer: Point,
-  footprints: CardFootprint[],
-  geometry: GridGeometry,
-  fromIndex: number,
-): number {
-  const count = footprints.length;
-  if (fromIndex < 0 || fromIndex >= count) return -1;
-  const colGap = geometry.gap;
-  const colWidth = (geometry.width - (geometry.columns - 1) * colGap) / geometry.columns;
-
-  let best = -1;
-  let bestDistance = Infinity;
-  for (let to = 0; to < count; to += 1) {
-    const { placements } = packSections(
-      moveItem(footprints, fromIndex, to),
-      geometry.columns,
-      geometry.rowsPerPage,
-    );
-    const placement = placements[to];
-    const left = geometry.left + placement.col * (colWidth + colGap);
-    const right = left + placement.cols * colWidth + (placement.cols - 1) * colGap;
-    const top = geometry.top + rowTop(placement.row, geometry);
-    const bottom = top + placement.rows * geometry.rowUnit + (placement.rows - 1) * geometry.gap;
-    if (pointer.x < left || pointer.x > right || pointer.y < top || pointer.y > bottom) continue;
-    const dx = pointer.x - (left + right) / 2;
-    const dy = pointer.y - (top + bottom) / 2;
-    const distance = dx * dx + dy * dy;
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = to;
-    }
-  }
-  return best === fromIndex ? -1 : best;
-}
-
 /**
  * The grid cell (absolute `row` + `col`) a pointer is over — the inverse of the
- * geometry `rowTop` uses. Drives manual placement: dropping a card on an empty
- * cell pins it there. Row/col are clamped into the grid; the caller decides
- * whether the cell is free and whether the card fits.
+ * geometry the renderer lays cards out with. Drives manual placement: dropping a
+ * card on a cell moves it there. Row/col are clamped into the grid; the caller
+ * decides whether the card fits.
  */
 export function cellAtPoint(pointer: Point, geometry: GridGeometry): { col: number; row: number } {
   const { left, top, width, columns, rowsPerPage, rowUnit, gap, interGap } = geometry;

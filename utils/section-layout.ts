@@ -30,19 +30,6 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   notes: { cols: 3, rows: 2 },
 };
 
-/** The default footprint for a section. */
-/**
- * Content-heavy sections grow taller with the number of entries they hold. Each
- * config says roughly how many entries fill one row-unit of height (`perRow`)
- * and caps the growth (`maxRows`); the floor is the section's base rows above.
- */
-const DYNAMIC_ROWS: Partial<Record<SectionKey, { perRow: number; maxRows: number }>> = {
-  actions: { perRow: 12, maxRows: 5 },
-  spells: { perRow: 12, maxRows: 6 },
-  inventory: { perRow: 20, maxRows: 6 },
-  features: { perRow: 13, maxRows: 6 },
-};
-
 /** One hand-designed footprint a card can be toggled to. */
 export interface LayoutOption {
   /** Short name shown in the card's layout toggle. */
@@ -64,9 +51,8 @@ export interface LayoutOption {
 /**
  * Curated layout options per section: a small, ordered set the user can toggle
  * between, each tuned to how that card presents its content. The FIRST option is
- * the default and matches SECTION_SPAN / DYNAMIC_ROWS so nothing changes until
- * the user picks another. Sections without an entry keep a single fixed footprint
- * (no toggle). All these cards reflow to the card width on their own (auto-fill
+ * the default and matches SECTION_SPAN so nothing changes until the user picks
+ * another. Sections without an entry keep a single fixed footprint (no toggle). All these cards reflow to the card width on their own (auto-fill
  * grids, wrapping text, or a scaling image), so only the footprint is curated
  * here — the narrower options carry more rows for the taller reflowed content.
  */
@@ -137,10 +123,10 @@ function clampIndex(index: number, length: number): number {
 
 /**
  * The card footprint for a section. When the section has curated `SECTION_LAYOUTS`
- * the chosen `layoutIndex` picks the option (its `cols` plus a floor/grown
- * `rows`); a `fullPage` option instead spans `rowsPerPage` rows (one page tall).
- * Otherwise `rows` grows with `count` for content-heavy sections and all others
- * keep their fixed footprint.
+ * the chosen `layoutIndex` picks the option: its `cols` plus `rows`, where a
+ * content-heavy option grows `rows` with `count` (floored at the option's `rows`,
+ * capped at its `dynamic.maxRows`) and a `fullPage` option spans `rowsPerPage`
+ * rows (one page tall). Sections without curated layouts keep a fixed footprint.
  */
 export function sectionSpan(
   key: SectionKey,
@@ -163,14 +149,8 @@ export function sectionSpan(
     return { cols: option.cols, rows };
   }
 
-  const base = SECTION_SPAN[key];
-  const dynamic = DYNAMIC_ROWS[key];
-  if (!dynamic) return base;
-  const rows = Math.min(
-    dynamic.maxRows,
-    Math.max(base.rows, Math.ceil(count / dynamic.perRow)),
-  );
-  return { cols: base.cols, rows };
+  // Sections without curated layouts keep a fixed footprint.
+  return SECTION_SPAN[key];
 }
 
 /**

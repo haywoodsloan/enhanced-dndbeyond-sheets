@@ -1,34 +1,28 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
-import {
-  applySavedOrder,
-  defaultSectionOrder,
-  moveVisibleByIndex,
-} from '@/utils/section-order';
+import { defaultSectionOrder } from '@/utils/section-order';
 import { sectionLayoutCount } from '@/utils/section-layout';
 import {
   hiddenSectionsPref,
   sectionAnchorsPref,
   sectionLayoutPref,
-  sectionOrderPref,
 } from '@/utils/preferences';
 
 /**
- * Debounce (ms) before a reorder is saved. A live drag calls `moveByIndex` many
+ * Debounce (ms) before a placement is saved. A live drag calls `placeCard` many
  * times a second; `storage.sync` rate-limits writes, so we coalesce the save to
- * fire once the reorder settles.
+ * fire once the drag settles.
  */
-const ORDER_PERSIST_DELAY = 500;
+const PLACEMENT_PERSIST_DELAY = 500;
 
 /**
  * Reactive section layout for the sheet. Starts from the class-aware default
- * order, applies the user's saved order (loaded from local storage), and
- * exposes `moveByIndex` to drag-reorder the visible cards plus `hide`/`show`
- * to move a section into (or out of) the not-printed tray — both persisted.
+ * order and exposes `placeCard` to drag a card to any grid cell, `hide`/`show`
+ * to move a section into (or out of) the not-printed tray, and `cycleLayout` to
+ * change a card's density — all persisted to `storage.sync`.
  */
 export function useSectionLayout(character: Ref<Character | null>) {
   const sections = ref<CharacterSection[]>([]);
-  const savedOrder = ref<SectionKey[]>([]);
   const hiddenKeys = ref<SectionKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
   /** Card placements: section key → the cell (page, col, row-in-page) the user
@@ -40,13 +34,10 @@ export function useSectionLayout(character: Ref<Character | null>) {
   let nextSeq = 1;
 
   function rebuild() {
-    sections.value = character.value
-      ? applySavedOrder(defaultSectionOrder(character.value), savedOrder.value)
-      : [];
+    sections.value = character.value ? defaultSectionOrder(character.value) : [];
   }
 
   onMounted(async () => {
-    savedOrder.value = await sectionOrderPref.get([]);
     hiddenKeys.value = await hiddenSectionsPref.get([]);
     layoutIndices.value = await sectionLayoutPref.get({});
     anchors.value = await sectionAnchorsPref.get({});
@@ -64,34 +55,6 @@ export function useSectionLayout(character: Ref<Character | null>) {
   const hiddenSections = computed(() =>
     sections.value.filter((section) => hiddenSet.value.has(section.key)),
   );
-
-  // A live drag calls `moveByIndex` many times a second; persisting on each one
-  // would blow `storage.sync`'s write-rate limit, so the save is debounced to
-  // fire once the reorder settles (and flushed on unmount).
-  let orderTimer: ReturnType<typeof setTimeout> | undefined;
-  let pendingOrder: SectionKey[] | null = null;
-  function flushOrder() {
-    if (orderTimer !== undefined) {
-      clearTimeout(orderTimer);
-      orderTimer = undefined;
-    }
-    if (pendingOrder) {
-      void sectionOrderPref.set(pendingOrder);
-      pendingOrder = null;
-    }
-  }
-
-  /** Move the visible card at `from` to `to`, then persist the new order. */
-  function moveByIndex(from: number, to: number) {
-    const next = moveVisibleByIndex(sections.value, hiddenKeys.value, from, to);
-    if (next === sections.value) return;
-    sections.value = next;
-    const keys = next.map((section) => section.key);
-    savedOrder.value = keys;
-    pendingOrder = keys;
-    if (orderTimer !== undefined) clearTimeout(orderTimer);
-    orderTimer = setTimeout(flushOrder, ORDER_PERSIST_DELAY);
-  }
 
   function setHidden(key: SectionKey, hidden: boolean) {
     if (hiddenKeys.value.includes(key) === hidden) return;
@@ -130,7 +93,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
   function persistAnchors() {
     pendingAnchors = anchors.value;
     if (anchorTimer !== undefined) clearTimeout(anchorTimer);
-    anchorTimer = setTimeout(flushAnchors, ORDER_PERSIST_DELAY);
+    anchorTimer = setTimeout(flushAnchors, PLACEMENT_PERSIST_DELAY);
   }
 
   /** Move the card to a specific cell (page, col, row-in-page), stamping it as the
@@ -158,31 +121,23 @@ export function useSectionLayout(character: Ref<Character | null>) {
   /** Restore the default layout — default order, nothing hidden, default card
    * layouts — and clear the saved preferences. */
   function reset() {
-    // Drop any pending debounced saves so they can't overwrite the reset.
-    if (orderTimer !== undefined) {
-      clearTimeout(orderTimer);
-      orderTimer = undefined;
-    }
-    pendingOrder = null;
+    // Drop any pending debounced save so it can't overwrite the reset.
     if (anchorTimer !== undefined) {
       clearTimeout(anchorTimer);
       anchorTimer = undefined;
     }
     pendingAnchors = null;
-    savedOrder.value = [];
     hiddenKeys.value = [];
     layoutIndices.value = {};
     anchors.value = {};
     rebuild();
-    void sectionOrderPref.set([]);
     void hiddenSectionsPref.set([]);
     void sectionLayoutPref.set({});
     void sectionAnchorsPref.set({});
   }
 
-  // Persist any pending reorder / placement before the composable tears down.
+  // Persist any pending placement before the composable tears down.
   onBeforeUnmount(() => {
-    flushOrder();
     flushAnchors();
   });
 
@@ -191,9 +146,7 @@ export function useSectionLayout(character: Ref<Character | null>) {
     hiddenSections,
     layoutIndices,
     anchors,
-    moveByIndex,
     placeCard,
-    clearAnchor,
     cycleLayout,
     reset,
     hide: (key: SectionKey) => setHidden(key, true),

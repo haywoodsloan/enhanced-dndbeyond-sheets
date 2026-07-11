@@ -50,6 +50,15 @@ describe('useCharacter', () => {
     expect(error.value).toBe('boom');
   });
 
+  it('uses a generic message when the failure is not an Error', async () => {
+    mockedLoad.mockRejectedValue('kaboom');
+    const { status, error } = useCharacter(ref(9));
+    await flushPromises();
+
+    expect(status.value).toBe('error');
+    expect(error.value).toBe('Failed to load character.');
+  });
+
   it('reloads when the id changes', async () => {
     mockedLoad.mockResolvedValue(sample);
     const id = ref<number | null>(1);

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import InventoryCard from '@/components/InventoryCard.vue';
 
 describe('InventoryCard', () => {
@@ -72,5 +73,48 @@ describe('InventoryCard', () => {
 
     const threeCol = mount(InventoryCard, { props: { inventory, columns: 3 } });
     expect(threeCol.findAll('[data-item-blank]')).toHaveLength(3);
+  });
+
+  it('fills each column with extra write-in rows measured from the laid-out card', async () => {
+    const inventory = Array.from({ length: 6 }, (_, index) => ({
+      name: `Item ${index}`,
+      quantity: 1,
+      equipped: false,
+      attuned: false,
+    }));
+
+    // happy-dom has no layout, so feed measure() geometry: a tall column with a
+    // sentinel partway down leaves spare height for many write-in rows.
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const bottom = this.classList?.contains('column')
+          ? 400
+          : this.classList?.contains('column__sentinel')
+            ? 100
+            : this.classList?.contains('item__name--blank')
+              ? 150
+              : 0;
+        return { bottom, top: 0, left: 0, right: 0, width: 0, height: bottom, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts = { ready: Promise.resolve() };
+
+    const wrapper = mount(InventoryCard, { props: { inventory, columns: 2 } });
+    await flushPromises();
+    await nextTick();
+
+    // measure() computed extra rows from the spare height (well past the base 2/col).
+    expect(wrapper.findAll('[data-item-blank]').length).toBeGreaterThan(8);
+
+    wrapper.unmount(); // disconnects the ResizeObserver
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
+    delete (document as unknown as { fonts?: unknown }).fonts;
   });
 });
