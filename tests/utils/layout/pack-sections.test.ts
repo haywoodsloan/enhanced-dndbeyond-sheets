@@ -222,4 +222,82 @@ describe('packPositioned', () => {
     expect(placements[1]).toEqual({ col: 1, row: 6, cols: 1, rows: 1 });
     expect(pages).toBe(2);
   });
+
+  it('flows a bumped card backward into a near gap instead of wrapping forward', () => {
+    // W1/W2 hold the ends of row 0, leaving (1,0) free; X wants (2,0) but W2 has
+    // it. The gap at (1,0) is one column back; the next forward slot is (0,1), a
+    // whole row down — so X flows BACKWARD to the nearer gap.
+    const { placements } = packPositioned(
+      [
+        { cols: 1, rows: 1, home: home(0, 0), priority: 20 },
+        { cols: 1, rows: 1, home: home(2, 0), priority: 10 },
+        { cols: 1, rows: 1, home: home(2, 0), priority: 0 },
+      ],
+      3,
+      4,
+      { width: 100, height: 100 },
+    );
+    expect(placements[2]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+  });
+
+  it('uses the real cell size to pick the shorter move — short rows flow up', () => {
+    // X is bumped from (1,1); its options are (2,1) one column right and (1,0)
+    // one row up. With rows shorter than columns, the upward move is shorter.
+    const cards = [
+      { cols: 1, rows: 1, home: home(1, 1), priority: 30 },
+      { cols: 1, rows: 1, home: home(0, 1), priority: 20 },
+      { cols: 1, rows: 1, home: home(2, 0), priority: 10 },
+      { cols: 1, rows: 1, home: home(1, 1), priority: 0 },
+    ];
+    const { placements } = packPositioned(cards, 3, 4, { width: 100, height: 50 });
+    expect(placements[3]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+  });
+
+  it('uses the real cell size to pick the shorter move — narrow columns flow right', () => {
+    // Same setup; now columns are narrower than rows are tall, so the sideways
+    // move to (2,1) is the shorter one.
+    const cards = [
+      { cols: 1, rows: 1, home: home(1, 1), priority: 30 },
+      { cols: 1, rows: 1, home: home(0, 1), priority: 20 },
+      { cols: 1, rows: 1, home: home(2, 0), priority: 10 },
+      { cols: 1, rows: 1, home: home(1, 1), priority: 0 },
+    ];
+    const { placements } = packPositioned(cards, 3, 4, { width: 50, height: 100 });
+    expect(placements[3]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
+  });
+
+  it('flows to a same-page slot rather than jumping to the next page', () => {
+    // Row 0 is full and (2,1) is taken; X wants (2,1). There is no room ahead on
+    // page 0 (next free cell would be page 1), but (1,1) is free behind it — so X
+    // stays on page 0 instead of overflowing.
+    const { placements, pages } = packPositioned(
+      [
+        { cols: 3, rows: 1, home: home(0, 0), priority: 30 },
+        { cols: 1, rows: 1, home: home(2, 1), priority: 20 },
+        { cols: 1, rows: 1, home: home(2, 1), priority: 0 },
+      ],
+      3,
+      2,
+      { width: 100, height: 100 },
+    );
+    expect(placements[2]).toEqual({ col: 1, row: 1, cols: 1, rows: 1 });
+    expect(pages).toBe(1);
+  });
+
+  it('overflows to the next page only when the home page is full', () => {
+    // Both rows of page 0 are full; X wants (0,0) but it is taken and there is no
+    // free slot anywhere on the page, so it overflows to page 1.
+    const { placements, pages } = packPositioned(
+      [
+        { cols: 3, rows: 1, home: home(0, 0), priority: 30 },
+        { cols: 3, rows: 1, home: home(0, 1), priority: 20 },
+        { cols: 1, rows: 1, home: home(0, 0), priority: 0 },
+      ],
+      3,
+      2,
+      { width: 100, height: 100 },
+    );
+    expect(placements[2]).toEqual({ col: 0, row: 2, cols: 1, rows: 1 });
+    expect(pages).toBe(2);
+  });
 });

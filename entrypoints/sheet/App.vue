@@ -97,6 +97,16 @@ const rowUnit = computed(() => {
   return (printHeight - (rows - 1) * GRID_GAP) / rows;
 });
 
+// On-screen size of one grid cell (its column and row pitch, gap included) so
+// the packer can flow a bumped card the physically shorter way (forward vs
+// backward) rather than always forward.
+const cellSize = computed(() => {
+  const marginPx = mmToPx(margin.value.mm);
+  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  const colWidth = (printWidth - (GRID_COLUMNS - 1) * GRID_GAP) / GRID_COLUMNS;
+  return { width: colWidth + GRID_GAP, height: rowUnit.value + GRID_GAP };
+});
+
 // Drive the paper geometry (and thus its aspect ratio) from the chosen format.
 const pageStyle = computed(() => ({
   '--page-width': `${format.value.width}mm`,
@@ -162,7 +172,7 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
   });
 });
 const packed = computed(() =>
-  packPositioned(positionedFootprints.value, GRID_COLUMNS, rowsPerPage.value),
+  packPositioned(positionedFootprints.value, GRID_COLUMNS, rowsPerPage.value, cellSize.value),
 );
 const pageCount = computed(() => packed.value.pages);
 

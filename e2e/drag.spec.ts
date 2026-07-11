@@ -103,7 +103,7 @@ test.describe('card drag placement', () => {
     await page.mouse.up();
   });
 
-  test('a moved card leaves its cell blank without reflowing the others', async ({
+  test('a displaced card takes the short way into the vacated cell, not a global reflow', async ({
     context,
     extensionId,
   }) => {
@@ -117,18 +117,22 @@ test.describe('card drag placement', () => {
       x: portraitStart.x + portraitStart.width / 2,
       y: portraitStart.y + portraitStart.height / 2,
     };
+    const sensesCell = {
+      x: sensesStart.x + sensesStart.width / 2,
+      y: sensesStart.y + sensesStart.height / 2,
+    };
     expect(await keyAt(page, origin.x, origin.y)).toBe('portrait');
 
     // Drop the portrait onto the senses card, further down the SAME column.
-    await dragCardTo(page, 'portrait', {
-      x: sensesStart.x + sensesStart.width / 2,
-      y: sensesStart.y + sensesStart.height / 2,
-    });
+    await dragCardTo(page, 'portrait', sensesCell);
 
-    // The portrait's old cell is now an intentional blank — nothing flowed up to
-    // fill it...
-    await expect.poll(() => keyAt(page, origin.x, origin.y)).toBeNull();
-    // ...and an unrelated card stayed exactly where it was (no global reflow).
+    // Senses flowed the SHORT way out of the way — up into the cell the portrait
+    // just vacated (a nearby backward move), so its old cell now holds senses
+    // rather than wrapping far forward or leaving a blank.
+    await expect.poll(() => keyAt(page, origin.x, origin.y)).toBe('senses');
+    // The portrait really did move down onto the senses area (the drop landed).
+    expect(moved(await cardBox(page, 'portrait'), portraitStart)).toBeGreaterThan(8);
+    // The drop stays local: an unrelated card did not move (no cascade).
     expect(moved(await cardBox(page, 'attributes'), attributesStart)).toBeLessThan(2);
   });
 

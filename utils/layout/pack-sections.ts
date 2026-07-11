@@ -164,21 +164,140 @@ function compactBlankPages(placements: CardPlacement[], perPage: number): number
 }
 
 /**
+ * On-screen size of one grid cell (its column and row pitch, gap included). It
+ * lets the packer weigh how FAR a bumped card would travel each way, so it can
+ * flow the shorter direction instead of always forward. Defaults to unit squares
+ * (used by tests), which reduces the choice to plain grid distance.
+ */
+export interface CellSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The nearest free `w`×`h` cell FORWARD of (`homeCol`,`homeRow`) in reading order
+ * WITHOUT leaving the home page — or `null` when the page has no room ahead (the
+ * caller then decides whether to overflow to the next page).
+ */
+function freeCellForwardOnPage(
+  grid: ReturnType<typeof createOccupancy>,
+  homeCol: number,
+  homeRow: number,
+  w: number,
+  h: number,
+  perPage: number,
+): { col: number; row: number } | null {
+  const pageEnd = Math.floor(homeRow / perPage) * perPage + perPage;
+  let col = homeCol;
+  let row = homeRow;
+  for (;;) {
+    if (col + w > grid.cols) {
+      row += 1;
+      col = 0;
+      continue;
+    }
+    if (row + h > pageEnd) return null;
+    if (grid.isFree(row, col, w, h)) return { col, row };
+    col += 1;
+  }
+}
+
+/**
+ * The nearest free `w`×`h` cell BACKWARD of (`homeCol`,`homeRow`) in reading
+ * order on the same page — or `null` when there is none.
+ */
+function freeCellBackwardOnPage(
+  grid: ReturnType<typeof createOccupancy>,
+  homeCol: number,
+  homeRow: number,
+  w: number,
+  h: number,
+  perPage: number,
+): { col: number; row: number } | null {
+  const pageStart = Math.floor(homeRow / perPage) * perPage;
+  const pageEnd = pageStart + perPage;
+  const maxCol = grid.cols - w;
+  let row = homeRow;
+  let col = Math.min(homeCol, maxCol) - 1;
+  for (;;) {
+    if (col < 0) {
+      row -= 1;
+      col = maxCol;
+      if (row < pageStart) return null;
+      continue;
+    }
+    if (row + h <= pageEnd && grid.isFree(row, col, w, h)) return { col, row };
+    col -= 1;
+  }
+}
+
+/** Squared on-screen distance from a home cell to a candidate, scaled by the
+ * real cell size so a column move and a row move compare fairly. */
+function cellDistanceSq(
+  homeCol: number,
+  homeRow: number,
+  target: { col: number; row: number },
+  cell: CellSize,
+): number {
+  const dx = (target.col - homeCol) * cell.width;
+  const dy = (target.row - homeRow) * cell.height;
+  return dx * dx + dy * dy;
+}
+
+/**
+ * Seat one card: at its `home` if free, otherwise flowed OUT OF THE WAY to the
+ * nearest free slot — forward or backward in reading order on the same page,
+ * whichever is the shorter on-screen move (an exact tie keeps the forward slot).
+ * Only when the whole page is full does it overflow forward to the next page.
+ */
+function flowToNearestCell(
+  grid: ReturnType<typeof createOccupancy>,
+  homeCol: number,
+  homeRow: number,
+  w: number,
+  h: number,
+  perPage: number,
+  cell: CellSize,
+): { col: number; row: number } {
+  if (grid.isFree(homeRow, homeCol, w, h)) return { col: homeCol, row: homeRow };
+
+  const forward = freeCellForwardOnPage(grid, homeCol, homeRow, w, h, perPage);
+  const backward = freeCellBackwardOnPage(grid, homeCol, homeRow, w, h, perPage);
+  if (forward && backward) {
+    const forwardDist = cellDistanceSq(homeCol, homeRow, forward, cell);
+    const backwardDist = cellDistanceSq(homeCol, homeRow, backward, cell);
+    return backwardDist < forwardDist ? backward : forward;
+  }
+  if (forward) return forward;
+  if (backward) return backward;
+
+  // The home page is full — a plain forward scan bumps the card onto the next
+  // page (normal overflow, not a "get out of the way" move).
+  return firstFreeCell(grid, homeCol, homeRow, w, h, perPage);
+}
+
+/**
  * Place every card at its own `home` cell (fully positional — no separate flow,
  * and no pinned/regular split): cards are seated in `priority` order (highest =
- * most recently moved first), each at its home if free, else the first free cell
- * forward of it. So the card most recently dropped onto a contested cell keeps
- * it and the others flow forward around it (a displaced card slots into the next
- * free cell). Free placement and intentional blanks fall out naturally — a home
- * that skips earlier cells leaves them empty. A card taller than a page is
- * capped; one that would cross a page break starts on the next page. Finally,
- * any fully-empty page is collapsed ({@link compactBlankPages}) so moving a card
- * or changing a layout can never leave a blank page.
+ * most recently moved first). Placement is TWO-PHASE: first every card claims
+ * its home cell if free (a contested home goes to the higher-priority card),
+ * then each displaced card flows out of the way to the nearest free slot —
+ * forward OR backward in reading order on the same page — whichever is the
+ * shorter on-screen move (so a card bumped next to a gap slides into it rather
+ * than always wrapping forward). `cell` supplies the real cell size for that
+ * distance; it defaults to unit squares. Settling homes before any card flows
+ * keeps a drop LOCAL: a displaced card only ever lands in a genuine gap, never
+ * on another card's home, so unrelated cards don't cascade. Free placement and intentional blanks fall out
+ * naturally — a home that skips earlier cells leaves them empty. A card taller
+ * than a page is capped; one that would cross a page break starts on the next
+ * page. Finally, any fully-empty page is collapsed ({@link compactBlankPages})
+ * so moving a card or changing a layout can never leave a blank page.
  */
 export function packPositioned(
   cards: PositionedFootprint[],
   columns: number,
   rowsPerPage: number,
+  cell: CellSize = { width: 1, height: 1 },
 ): PackedLayout {
   const perPage = Math.max(1, Math.floor(rowsPerPage));
   const grid = createOccupancy(columns);
@@ -191,14 +310,30 @@ export function packPositioned(
     .map((_, index) => index)
     .sort((a, b) => cards[b].priority - cards[a].priority || a - b);
 
+  // Phase 1 — every card claims its home cell if it is free. Priority order means
+  // a contested home goes to the higher-priority (more recently moved) card; the
+  // loser is deferred. Settling all uncontested homes FIRST is what keeps a drop
+  // local — a displaced card can then only land in a genuine gap, never on top of
+  // another card's home (which would cascade a reflow across the page).
+  const deferred: { index: number; col: number; row: number; w: number; h: number }[] = [];
   for (const index of order) {
     const card = cards[index];
     const w = Math.min(Math.max(1, Math.floor(card.cols)), grid.cols);
     const h = Math.min(Math.max(1, Math.floor(card.rows)), perPage);
-    // Start at the home cell (clamped so the card fits), then scan forward.
-    const startCol = Math.min(Math.max(0, Math.floor(card.home.col)), grid.cols - w);
-    const startRow = Math.max(0, Math.floor(card.home.row));
-    const { col, row } = firstFreeCell(grid, startCol, startRow, w, h, perPage);
+    const col = Math.min(Math.max(0, Math.floor(card.home.col)), grid.cols - w);
+    const row = Math.max(0, Math.floor(card.home.row));
+    if (grid.isFree(row, col, w, h)) {
+      grid.occupy(row, col, w, h);
+      placements[index] = { col, row, cols: w, rows: h };
+    } else {
+      deferred.push({ index, col, row, w, h });
+    }
+  }
+
+  // Phase 2 — each displaced card flows out of the way to the nearest free slot,
+  // forward or backward, whichever is the shorter on-screen move.
+  for (const { index, col: homeCol, row: homeRow, w, h } of deferred) {
+    const { col, row } = flowToNearestCell(grid, homeCol, homeRow, w, h, perPage, cell);
     grid.occupy(row, col, w, h);
     placements[index] = { col, row, cols: w, rows: h };
   }
