@@ -1,6 +1,6 @@
 import { extractAuthorization, setAuthToken } from '@/services/dndbeyond/auth-token';
-import { parseCharacterId } from '@/utils/character-url';
-import { enhancedSheetUrl } from '@/utils/sheet-url';
+import { parseCharacterId } from '@/utils/url/character-url';
+import { enhancedSheetUrl } from '@/utils/url/sheet-url';
 import { debugLog } from '@/utils/debug';
 
 const CONTEXT_MENU_ID = 'open-enhanced-sheet';

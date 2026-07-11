@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import SpellsCard from '@/components/SpellsCard.vue';
+import SpellsCard from '@/components/cards/SpellsCard.vue';
 
 describe('SpellsCard', () => {
   it('groups spells by level', () => {

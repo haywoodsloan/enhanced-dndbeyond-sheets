@@ -74,10 +74,18 @@ Recent Chrome no longer loads unpacked extensions from the command line, so load
 
 ```
 entrypoints/       Extension entrypoints (background, popup, sheet page)
-components/        Vue section-card components
+components/        Vue components
+  SectionCard.vue    The card shell (drag handle, layout + visibility toggles)
+  cards/             Per-section content cards (abilities, skills, spells, …)
 composables/       Vue composables (character load, layout, drag, FLIP)
-services/          External-service integration (the D&D Beyond data layer)
-utils/             Generic utilities — packing, URL parsing, preferences, logging
+services/
+  dndbeyond/         The D&D Beyond data layer (fetch, auth, normalize, model)
+utils/
+  layout/            Grid packing, pagination, section order/spans
+  character/         D&D 5e formatting and character summaries
+  url/               Character- and sheet-URL parsing
+  settings/          Persisted preferences and theme colors
+  debug.ts           Redacting logger
 modules/           Local WXT modules
 public/            Static files copied as-is (icons)
 tests/             Unit and integration tests (mirrors source layout)

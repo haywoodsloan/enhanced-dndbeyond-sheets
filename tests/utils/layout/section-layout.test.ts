@@ -5,7 +5,7 @@ import {
   sectionLayoutCount,
   sectionLayoutLabel,
   sectionSpan,
-} from '@/utils/section-layout';
+} from '@/utils/layout/section-layout';
 
 describe('sectionSpan', () => {
   it('gives content-heavy sections a larger footprint', () => {

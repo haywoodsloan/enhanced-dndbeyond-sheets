@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { CharacterBasics } from '@/services/dndbeyond/model';
-import { CONDITION_NAMES, formatModifier } from '@/utils/dnd5e';
+import { CONDITION_NAMES, formatModifier } from '@/utils/character/dnd5e';
 
 const props = defineProps<{ basics: CharacterBasics }>();
 

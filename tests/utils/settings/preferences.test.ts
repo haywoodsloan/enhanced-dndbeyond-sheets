@@ -5,7 +5,7 @@ import {
   pageFormatPref,
   sectionLayoutPref,
   themeColorPref,
-} from '@/utils/preferences';
+} from '@/utils/settings/preferences';
 
 describe('preferences', () => {
   beforeEach(() => {

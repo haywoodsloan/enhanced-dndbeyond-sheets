@@ -10,7 +10,7 @@ import {
   type AbilityKey,
   type ArmorCategory,
   type ProficiencyLevel,
-} from '@/utils/dnd5e';
+} from '@/utils/character/dnd5e';
 import type {
   RawAction,
   RawCharacter,

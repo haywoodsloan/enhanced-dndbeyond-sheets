@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import WealthCard from '@/components/WealthCard.vue';
+import WealthCard from '@/components/cards/WealthCard.vue';
 
 describe('WealthCard', () => {
   it('renders each coin denomination', () => {

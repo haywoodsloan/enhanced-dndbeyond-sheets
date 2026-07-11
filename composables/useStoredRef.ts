@@ -1,5 +1,5 @@
 import { onMounted, ref, watch, type Ref } from 'vue';
-import type { Preference } from '@/utils/preferences';
+import type { Preference } from '@/utils/settings/preferences';
 
 /**
  * A `ref` synced to a persisted {@link Preference}: it loads the stored value

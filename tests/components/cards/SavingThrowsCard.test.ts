@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import SavingThrowsCard from '@/components/SavingThrowsCard.vue';
+import SavingThrowsCard from '@/components/cards/SavingThrowsCard.vue';
 import type { SavingThrow } from '@/services/dndbeyond/model';
 
 const saves: SavingThrow[] = [

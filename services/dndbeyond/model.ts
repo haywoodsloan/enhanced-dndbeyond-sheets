@@ -3,7 +3,7 @@
  * decoupled from D&D Beyond's raw API shape (see `api-types.ts`) so the rest of
  * the app depends on a stable structure.
  */
-import type { AbilityKey, ProficiencyLevel } from '@/utils/dnd5e';
+import type { AbilityKey, ProficiencyLevel } from '@/utils/character/dnd5e';
 /** The character-sheet sections this extension knows how to lay out. */
 export const SECTION_KEYS = [
   'portrait',

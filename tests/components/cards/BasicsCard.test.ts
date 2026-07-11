@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import BasicsCard from '@/components/BasicsCard.vue';
+import BasicsCard from '@/components/cards/BasicsCard.vue';
 import type { CharacterBasics } from '@/services/dndbeyond/model';
 
 const basics: CharacterBasics = {

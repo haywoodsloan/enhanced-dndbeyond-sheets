@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSectionOrder } from '@/utils/section-order';
+import { defaultSectionOrder } from '@/utils/layout/section-order';
 import {
   SECTION_KEYS,
   type Character,
   type CharacterSection,
   type SectionKey,
 } from '@/services/dndbeyond/model';
-import { makeCharacter as buildCharacter } from '../fixtures/character';
+import { makeCharacter as buildCharacter } from '../../fixtures/character';
 
 function makeCharacter(
   classes: { name: string; level: number }[],

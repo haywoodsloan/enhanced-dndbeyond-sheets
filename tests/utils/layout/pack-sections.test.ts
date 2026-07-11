@@ -6,7 +6,7 @@ import {
   placementPage,
   placementStyle,
   type CardFootprint,
-} from '@/utils/pack-sections';
+} from '@/utils/layout/pack-sections';
 
 const fp = (cols: number, rows: number): CardFootprint => ({ cols, rows });
 

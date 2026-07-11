@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
-import InventoryCard from '@/components/InventoryCard.vue';
+import InventoryCard from '@/components/cards/InventoryCard.vue';
 
 describe('InventoryCard', () => {
   it('lists items with quantity and labeled equipped/attuned circles', () => {

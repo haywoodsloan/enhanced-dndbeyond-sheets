@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import SensesCard from '@/components/SensesCard.vue';
+import SensesCard from '@/components/cards/SensesCard.vue';
 
 describe('SensesCard', () => {
   it('renders each sense with its label and value', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { characterSubtitle } from '@/utils/character-summary';
-import { makeCharacter } from '../fixtures/character';
+import { characterSubtitle } from '@/utils/character/character-summary';
+import { makeCharacter } from '../../fixtures/character';
 
 describe('characterSubtitle', () => {
   it('joins race and class with a middot', () => {

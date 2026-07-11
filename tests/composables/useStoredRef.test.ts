@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { useStoredRef } from '@/composables/useStoredRef';
-import type { Preference } from '@/utils/preferences';
+import type { Preference } from '@/utils/settings/preferences';
 import { mountComposable } from '../fixtures/mount-composable';
 
 /** An in-memory {@link Preference} that records every `set` call. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import SkillsCard from '@/components/SkillsCard.vue';
+import SkillsCard from '@/components/cards/SkillsCard.vue';
 import type { Skill } from '@/services/dndbeyond/model';
 
 const skills: Skill[] = [

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import ActionsCard from '@/components/ActionsCard.vue';
+import ActionsCard from '@/components/cards/ActionsCard.vue';
 
 describe('ActionsCard', () => {
   it('lists action names', () => {

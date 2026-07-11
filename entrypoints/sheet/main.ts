@@ -3,7 +3,7 @@ import PrimeVue from 'primevue/config';
 import Aura from '@primevue/themes/aura';
 import Tooltip from 'primevue/tooltip';
 import App from './App.vue';
-import { parseSheetCharacterId } from '@/utils/sheet-url';
+import { parseSheetCharacterId } from '@/utils/url/sheet-url';
 import { debugLog } from '@/utils/debug';
 
 // The character id is passed as a query parameter when the sheet tab is opened.

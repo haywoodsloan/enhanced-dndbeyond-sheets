@@ -8,7 +8,7 @@ import {
   formatModifier,
   maxHitPoints,
   proficiencyBonus,
-} from '@/utils/dnd5e';
+} from '@/utils/character/dnd5e';
 
 describe('abilityModifier', () => {
   it('applies floor((score - 10) / 2)', () => {

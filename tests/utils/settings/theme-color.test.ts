@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
+import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/settings/theme-color';
 
 describe('theme colors', () => {
   it('offers named colors with hex bases', () => {

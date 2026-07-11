@@ -1,21 +1,21 @@
 <script lang="ts" setup>
 import Card from 'primevue/card';
-import AbilityScores from '@/components/AbilityScores.vue';
-import BasicsCard from '@/components/BasicsCard.vue';
-import PortraitCard from '@/components/PortraitCard.vue';
-import SavingThrowsCard from '@/components/SavingThrowsCard.vue';
-import SensesCard from '@/components/SensesCard.vue';
-import SkillsCard from '@/components/SkillsCard.vue';
-import ProficienciesCard from '@/components/ProficienciesCard.vue';
-import ActionsCard from '@/components/ActionsCard.vue';
-import SpellsCard from '@/components/SpellsCard.vue';
-import InventoryCard from '@/components/InventoryCard.vue';
-import WealthCard from '@/components/WealthCard.vue';
-import FeaturesCard from '@/components/FeaturesCard.vue';
-import NotesCard from '@/components/NotesCard.vue';
+import AbilityScores from '@/components/cards/AbilityScores.vue';
+import BasicsCard from '@/components/cards/BasicsCard.vue';
+import PortraitCard from '@/components/cards/PortraitCard.vue';
+import SavingThrowsCard from '@/components/cards/SavingThrowsCard.vue';
+import SensesCard from '@/components/cards/SensesCard.vue';
+import SkillsCard from '@/components/cards/SkillsCard.vue';
+import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
+import ActionsCard from '@/components/cards/ActionsCard.vue';
+import SpellsCard from '@/components/cards/SpellsCard.vue';
+import InventoryCard from '@/components/cards/InventoryCard.vue';
+import WealthCard from '@/components/cards/WealthCard.vue';
+import FeaturesCard from '@/components/cards/FeaturesCard.vue';
+import NotesCard from '@/components/cards/NotesCard.vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
-import { inventoryListColumns, type SectionSpan } from '@/utils/section-layout';
-import { characterSubtitle } from '@/utils/character-summary';
+import { inventoryListColumns, type SectionSpan } from '@/utils/layout/section-layout';
+import { characterSubtitle } from '@/utils/character/character-summary';
 import { computed } from 'vue';
 
 // `span` controls the card footprint (columns × row-units). A future `expanded`

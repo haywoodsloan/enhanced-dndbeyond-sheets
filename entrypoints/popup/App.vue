@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue';
-import { parseCharacterId } from '@/utils/character-url';
-import { enhancedSheetUrl } from '@/utils/sheet-url';
+import { parseCharacterId } from '@/utils/url/character-url';
+import { enhancedSheetUrl } from '@/utils/url/sheet-url';
 import { debugLog } from '@/utils/debug';
 
 // Hidden until we know the active tab isn't a character page, so a character

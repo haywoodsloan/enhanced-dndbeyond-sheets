@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import FeaturesCard from '@/components/FeaturesCard.vue';
+import FeaturesCard from '@/components/cards/FeaturesCard.vue';
 
 describe('FeaturesCard', () => {
   it('renders grouped feature names', () => {

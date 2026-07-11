@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import ProficienciesCard from '@/components/ProficienciesCard.vue';
+import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
 import type { CharacterProficiencies } from '@/services/dndbeyond/model';
 
 const proficiencies: CharacterProficiencies = {

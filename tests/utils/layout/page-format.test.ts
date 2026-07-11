@@ -5,7 +5,7 @@ import {
   MARGIN_PRESETS,
   PAGE_FORMATS,
   mmToPx,
-} from '@/utils/page-format';
+} from '@/utils/layout/page-format';
 
 describe('page formats', () => {
   it('includes common worldwide sizes, all portrait', () => {

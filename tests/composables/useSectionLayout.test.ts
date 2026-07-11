@@ -7,7 +7,7 @@ import {
   hiddenSectionsPref,
   sectionAnchorsPref,
   sectionLayoutPref,
-} from '@/utils/preferences';
+} from '@/utils/settings/preferences';
 import { SECTION_KEYS, type Character } from '@/services/dndbeyond/model';
 import { makeCharacter } from '../fixtures/character';
 import { mountComposable } from '../fixtures/mount-composable';

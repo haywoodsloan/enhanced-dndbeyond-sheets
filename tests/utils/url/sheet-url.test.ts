@@ -4,7 +4,7 @@ import {
   SHEET_PAGE,
   enhancedSheetUrl,
   parseSheetCharacterId,
-} from '@/utils/sheet-url';
+} from '@/utils/url/sheet-url';
 
 describe('enhancedSheetUrl', () => {
   it('builds a sheet url carrying the character id', () => {

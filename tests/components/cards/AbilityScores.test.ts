@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import AbilityScores from '@/components/AbilityScores.vue';
+import AbilityScores from '@/components/cards/AbilityScores.vue';
 import type { AbilityScore } from '@/services/dndbeyond/model';
 
 const abilities: AbilityScore[] = [

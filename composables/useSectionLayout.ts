@@ -1,12 +1,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
-import { defaultSectionOrder } from '@/utils/section-order';
-import { sectionLayoutCount } from '@/utils/section-layout';
+import { defaultSectionOrder } from '@/utils/layout/section-order';
+import { sectionLayoutCount } from '@/utils/layout/section-layout';
 import {
   hiddenSectionsPref,
   sectionAnchorsPref,
   sectionLayoutPref,
-} from '@/utils/preferences';
+} from '@/utils/settings/preferences';
 
 /**
  * Debounce (ms) before a placement is saved. A live drag calls `placeCard` many

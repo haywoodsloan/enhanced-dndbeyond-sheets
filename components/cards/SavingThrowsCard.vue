@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import type { SavingThrow } from '@/services/dndbeyond/model';
-import { formatModifier } from '@/utils/dnd5e';
+import { formatModifier } from '@/utils/character/dnd5e';
 
 withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
   defences: () => [],

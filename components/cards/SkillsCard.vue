@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { Skill } from '@/services/dndbeyond/model';
-import { formatModifier } from '@/utils/dnd5e';
+import { formatModifier } from '@/utils/character/dnd5e';
 
 const props = defineProps<{ skills: Skill[]; columns?: number }>();
 

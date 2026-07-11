@@ -15,7 +15,7 @@ import {
   sectionLayoutLabel,
   sectionSpan,
   type SectionSpan,
-} from '@/utils/section-layout';
+} from '@/utils/layout/section-layout';
 import {
   cellAtPoint,
   packPositioned,
@@ -23,7 +23,7 @@ import {
   placementPage,
   placementStyle,
   type PositionedFootprint,
-} from '@/utils/pack-sections';
+} from '@/utils/layout/pack-sections';
 import type { CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
@@ -31,9 +31,9 @@ import {
   MARGIN_PRESETS,
   PAGE_FORMATS,
   mmToPx,
-} from '@/utils/page-format';
-import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/theme-color';
-import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/preferences';
+} from '@/utils/layout/page-format';
+import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/settings/theme-color';
+import { pageFormatPref, pageMarginPref, themeColorPref } from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */

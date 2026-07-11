@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import NotesCard from '@/components/NotesCard.vue';
+import NotesCard from '@/components/cards/NotesCard.vue';
 
 describe('NotesCard', () => {
   it('renders note entries by label', () => {

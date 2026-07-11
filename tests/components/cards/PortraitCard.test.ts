@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import PortraitCard from '@/components/PortraitCard.vue';
+import PortraitCard from '@/components/cards/PortraitCard.vue';
 
 describe('PortraitCard', () => {
   it('renders the avatar image', () => {
