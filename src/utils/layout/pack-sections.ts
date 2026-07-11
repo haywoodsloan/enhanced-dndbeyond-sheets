@@ -345,34 +345,38 @@ export function packPositioned(
 }
 
 /**
- * Re-pack cards densely in their current visual reading order (top-left →
- * bottom-right), closing every gap so the layout uses the fewest pages — the
- * "Compact" action. Cards keep their relative order (one the user moved toward
- * the front stays toward the front); they just slide up and left into the open
- * space. Returns new placements in the SAME index order as the input.
+ * Re-pack cards densely to use the fewest pages — the "Compact" action. Cards
+ * are visited in their current visual reading order (top-left → bottom-right)
+ * and each is seated in the TOPMOST-leftmost free cell that fits — a BACK-FILLING
+ * first-fit that rescans from (0,0) every time, NOT a forward-only cursor. So a
+ * card floats UP past earlier ones into a gap a taller neighbour left whenever
+ * that yields a denser layout, closing gaps a plain forward flow can't reach.
+ * Returns new placements in the SAME index order as the input.
  */
 export function compactPlacements(
   placements: CardPlacement[],
   columns: number,
   rowsPerPage: number,
 ): CardPlacement[] {
-  // Visit the cards in the order they currently read on the page.
+  const perPage = Math.max(1, Math.floor(rowsPerPage));
+  const grid = createOccupancy(columns);
+  // Visit the cards in the order they currently read on the page…
   const order = placements
     .map((_, index) => index)
     .sort(
       (a, b) => placements[a].row - placements[b].row || placements[a].col - placements[b].col,
     );
-  // Forward first-fit seats each card in the first free cell, so gaps close and
-  // the page count drops to the minimum this greedy pack can reach.
-  const dense = packSections(
-    order.map((index) => ({ cols: placements[index].cols, rows: placements[index].rows })),
-    columns,
-    rowsPerPage,
-  );
+  // …then seat each in the topmost free cell it fits. Rescanning from (0,0) every
+  // time lets a later card back-fill a gap ABOVE an already-placed one — that is
+  // what pulls cards up past others into the densest greedy pack.
   const result: CardPlacement[] = new Array(placements.length);
-  order.forEach((sourceIndex, denseIndex) => {
-    result[sourceIndex] = dense.placements[denseIndex];
-  });
+  for (const index of order) {
+    const w = Math.min(Math.max(1, Math.floor(placements[index].cols)), grid.cols);
+    const h = Math.min(Math.max(1, Math.floor(placements[index].rows)), perPage);
+    const { col, row } = firstFreeCell(grid, 0, 0, w, h, perPage);
+    grid.occupy(row, col, w, h);
+    result[index] = { col, row, cols: w, rows: h };
+  }
   return result;
 }
 

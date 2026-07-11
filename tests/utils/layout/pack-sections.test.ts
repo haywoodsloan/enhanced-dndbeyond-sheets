@@ -355,4 +355,26 @@ describe('compactPlacements', () => {
     expect(compacted[1]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
     expect(compacted[0]).toEqual({ col: 1, row: 0, cols: 2, rows: 1 });
   });
+
+  it('floats later cards up past others to save a page (back-fill)', () => {
+    // A 2-row-per-page grid: a 1x1 top card, then a full-width card on row 1,
+    // then two 1x1 cards stranded on page 1.
+    const compacted = compactPlacements(
+      [
+        { col: 0, row: 0, cols: 1, rows: 1 }, // A — stays top-left
+        { col: 0, row: 1, cols: 3, rows: 1 }, // B — full width, row 1
+        { col: 0, row: 2, cols: 1, rows: 1 }, // C — on page 1
+        { col: 0, row: 3, cols: 1, rows: 1 }, // D — on page 1
+      ],
+      3,
+      2,
+    );
+    // A forward-only flow would leave the row-0 cells beside A empty and keep
+    // C and D on page 1. Back-fill floats C and D UP into that gap, so all four
+    // cards fit on ONE page (rows 0-1) instead of two.
+    expect(compacted[0]).toEqual({ col: 0, row: 0, cols: 1, rows: 1 });
+    expect(compacted[1]).toEqual({ col: 0, row: 1, cols: 3, rows: 1 });
+    expect(compacted[2]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
+    expect(compacted[3]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
+  });
 });
