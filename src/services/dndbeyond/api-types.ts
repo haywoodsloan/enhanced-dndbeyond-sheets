@@ -23,6 +23,8 @@ export interface RawStat {
 export interface RawClassDefinition {
   name?: string;
   canCastSpells?: boolean;
+  /** Ability id used for this class's spellcasting (see ABILITIES). */
+  spellCastingAbilityId?: number | null;
   classFeatures?: RawClassFeature[];
 }
 
@@ -155,6 +157,8 @@ export interface RawAction {
   limitedUse?: RawLimitedUse | null;
   /** Damage dice, when the action deals damage. */
   dice?: RawDice | null;
+  /** Ability id whose modifier is added to the action's damage/effect. */
+  abilityModifierStatId?: number | null;
   /** Flat damage value when there are no dice (e.g. a fixed rider). */
   value?: number | null;
   /** Damage type id (see DAMAGE_TYPES). */

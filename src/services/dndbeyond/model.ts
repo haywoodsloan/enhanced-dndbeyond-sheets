@@ -104,6 +104,14 @@ export interface CharacterAction {
   name: string;
   /** Activation category used to group and order actions. */
   category: ActionCategory;
+  /** Limited-use pool rendered as empty checkboxes, when the action is rationed. */
+  resource?: ResourcePool;
+  /** Damage dice, when the action deals damage. */
+  damage?: DamageInfo;
+  /** Save prompt, e.g. "DC 14 CON", when the action forces a save. */
+  save?: string;
+  /** Range / reach shorthand, e.g. "30 ft.". */
+  range?: string;
 }
 
 /** Damage dice (and computed flat bonus) for an attack, action, or spell. */

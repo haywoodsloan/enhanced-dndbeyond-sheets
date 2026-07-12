@@ -263,6 +263,17 @@ describe('normalizeCharacter', () => {
     expect(names).not.toContain('Pull of Death');
   });
 
+  it('enriches actions with resources, damage, saves, and range', () => {
+    const byName = new Map(normalizeCharacter(raw).actions.map((a) => [a.name, a]));
+    // Channel Divinity is usable twice per long rest.
+    expect(byName.get('Channel Divinity')?.resource).toEqual({ max: 2, recharge: 'LR' });
+    // Divine Spark rolls 1d8 + Wisdom (+4), forces a DC 14 Con save, range 30 ft.
+    const spark = byName.get('Channel Divinity: Divine Spark');
+    expect(spark?.damage).toMatchObject({ dice: '1d8', bonus: 4 });
+    expect(spark?.save).toBe('DC 14 CON');
+    expect(spark?.range).toBe('30 ft.');
+  });
+
   it('never flags an empty section that still has entries', () => {
     const character = normalizeCharacter(raw);
     for (const section of character.sections) {

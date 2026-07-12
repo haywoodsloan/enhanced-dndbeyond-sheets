@@ -1,9 +1,11 @@
 import {
   ABILITIES,
   SKILLS,
+  abilityKeyById,
   abilityModifier,
   armorClass,
   conditionName,
+  damageTypeName,
   maxHitPoints,
   proficiencyBonus,
   proficiencyContribution,
@@ -32,6 +34,7 @@ import type {
   CharacterProficiencies,
   CharacterSection,
   Coins,
+  DamageInfo,
   FeatureGroup,
   FeatureItem,
   InventoryEntry,
@@ -436,13 +439,54 @@ function resolveAttacks(
   return attacks;
 }
 
+/** The character's primary spellcasting ability id, if any class casts. */
+function spellcastingAbilityId(raw: RawCharacter): number | undefined {
+  for (const cls of asArray(raw.classes)) {
+    const id = cls.definition?.spellCastingAbilityId;
+    if (id != null) return id;
+  }
+  return undefined;
+}
+
+/** Spell save DC: 8 + proficiency bonus + spellcasting ability modifier. */
+function spellSaveDc(raw: RawCharacter, abilities: AbilityScore[], level: number): number {
+  const key = abilityKeyById(spellcastingAbilityId(raw));
+  const mod = abilities.find((ability) => ability.key === key)?.modifier ?? 0;
+  return 8 + proficiencyBonus(level) + mod;
+}
+
+/** Damage line for an action from its dice, ability modifier, and type. */
+function actionDamage(
+  action: RawAction,
+  modByStatId: (id: number | null | undefined) => number,
+): DamageInfo | undefined {
+  const dice = action.dice?.diceString;
+  if (!dice) return undefined;
+  const bonus = modByStatId(action.abilityModifierStatId);
+  const type = damageTypeName(action.damageTypeId);
+  const damage: DamageInfo = { dice };
+  if (bonus) damage.bonus = bonus;
+  if (type) damage.type = type;
+  return damage;
+}
+
 /**
  * Real action-economy options (Action / Bonus Action / Reaction) from every
- * source, deduped. Weapon attacks now live in the Attacks card, and passive /
- * special / no-action riders — which D&D Beyond doesn't list as actions — are
- * dropped so the card mirrors the site instead of every internal entry.
+ * source, deduped, each enriched with its limited-use checkboxes, damage, save,
+ * and range. Weapon attacks now live in the Attacks card, and passive / special
+ * / no-action riders — which D&D Beyond doesn't list as actions — are dropped so
+ * the card mirrors the site instead of every internal entry.
  */
-function resolveActions(raw: RawCharacter): CharacterAction[] {
+function resolveActions(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): CharacterAction[] {
+  const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
+  const modByStatId = (id: number | null | undefined) =>
+    modByKey.get(abilityKeyById(id) ?? ('' as AbilityKey)) ?? 0;
+  const saveDc = spellSaveDc(raw, abilities, level);
+
   const actions: CharacterAction[] = [];
   const seen = new Set<string>();
   if (raw.actions) {
@@ -451,7 +495,19 @@ function resolveActions(raw: RawCharacter): CharacterAction[] {
         const category = actionCategory(action.activation?.activationType);
         if (!action.name || category === 'other' || seen.has(action.name)) continue;
         seen.add(action.name);
-        actions.push({ name: action.name, category });
+
+        const entry: CharacterAction = { name: action.name, category };
+        const resource = limitedUseToPool(action.limitedUse, level);
+        if (resource) entry.resource = resource;
+        const damage = actionDamage(action, modByStatId);
+        if (damage) entry.damage = damage;
+        const saveKey = abilityKeyById(action.saveStatId);
+        if (saveKey) {
+          entry.save = `DC ${action.fixedSaveDc ?? saveDc} ${saveKey.toUpperCase()}`;
+        }
+        const range = action.range?.range;
+        if (range) entry.range = `${range} ft.`;
+        actions.push(entry);
       }
     }
   }
@@ -726,7 +782,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
-  const actions = resolveActions(raw);
+  const actions = resolveActions(raw, abilities, level);
   const resources = resolveResourceMap(raw, level);
   const features = resolveFeatures(raw, resources);
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);

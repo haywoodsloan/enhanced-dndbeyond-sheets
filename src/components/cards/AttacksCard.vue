@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import type { Attack } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
+import { formatDamage } from '@/utils/character/format';
 
 const props = defineProps<{ attacks: Attack[] }>();
 
@@ -14,21 +15,11 @@ interface AttackRow {
   notes: string;
 }
 
-/** "1d8+2 Piercing", "3 Bludgeoning", or "" when the attack deals no damage. */
-function damageLabel(attack: Attack): string {
-  const dmg = attack.damage;
-  if (!dmg) return '';
-  const base = dmg.dice
-    ? `${dmg.dice}${dmg.bonus ? formatModifier(dmg.bonus) : ''}`
-    : String(dmg.bonus ?? 0);
-  return dmg.type ? `${base} ${dmg.type}` : base;
-}
-
 const rows = computed<AttackRow[]>(() =>
   props.attacks.map((attack) => ({
     name: attack.name,
     hit: attack.toHit != null ? formatModifier(attack.toHit) : (attack.save ?? ''),
-    damage: damageLabel(attack),
+    damage: formatDamage(attack.damage),
     range: attack.range ?? '',
     notes: attack.notes?.join(', ') ?? '',
   })),

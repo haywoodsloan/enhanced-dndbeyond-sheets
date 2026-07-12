@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model';
+import { formatDamage } from '@/utils/character/format';
+import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 
 const props = defineProps<{ actions: CharacterAction[] }>();
 
@@ -15,11 +17,16 @@ const groups = computed(() =>
   CATEGORY_ORDER.map(({ category, label }) => ({
     category,
     label,
-    names: props.actions
-      .filter((action) => action.category === category)
-      .map((action) => action.name),
-  })).filter((group) => group.names.length > 0),
+    actions: props.actions.filter((action) => action.category === category),
+  })).filter((group) => group.actions.length > 0),
 );
+
+/** Compact meta line for an action: "1d8+4 · DC 14 CON · 30 ft.". */
+function metaOf(action: CharacterAction): string {
+  return [formatDamage(action.damage), action.save, action.range]
+    .filter(Boolean)
+    .join(' · ');
+}
 </script>
 
 <template>
@@ -33,12 +40,14 @@ const groups = computed(() =>
       <span class="actions__label">{{ group.label }}</span>
       <ul class="actions__list">
         <li
-          v-for="(name, index) in group.names"
+          v-for="(action, index) in group.actions"
           :key="index"
           class="actions__item"
           data-action
         >
-          {{ name }}
+          <span class="actions__name">{{ action.name }}</span>
+          <ResourceBoxes v-if="action.resource" :resource="action.resource" />
+          <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
         </li>
       </ul>
     </div>
@@ -73,6 +82,14 @@ const groups = computed(() =>
   position: relative;
   padding-left: 14px;
   font-size: 14px;
+}
+
+/* The damage/save/range meta trails the name in a lighter, smaller style. */
+.actions__meta {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+  white-space: nowrap;
 }
 
 /* A disc marker to match the bulleted lists on the other cards (the grid layout
