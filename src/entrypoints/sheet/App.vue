@@ -123,7 +123,10 @@ async function onNewProfile() {
   if (profile) await startRename(id, profile.name);
 }
 
-// Drag-to-reorder the profile list via each row's grip handle.
+// Drag-to-reorder the profile list via each row's grip handle. The order updates
+// LIVE as the dragged row hovers another: native `dragover` fires ~once per row
+// crossing (the same-row no-op guard skips the rest), so it previews the new
+// order under the cursor without spamming storage writes.
 const draggingProfileId = ref<string | null>(null);
 
 function onProfileDragStart(id: string, event: DragEvent) {
@@ -135,16 +138,12 @@ function onProfileDragStart(id: string, event: DragEvent) {
   if (row) event.dataTransfer.setDragImage(row, 10, 10);
 }
 
-function onProfileDragOver(event: DragEvent) {
+function onProfileDragOver(overId: string, event: DragEvent) {
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-}
-
-function onProfileDrop(targetId: string) {
   const draggedId = draggingProfileId.value;
-  draggingProfileId.value = null;
-  if (!draggedId || draggedId === targetId) return;
-  const targetIndex = profiles.value.findIndex((entry) => entry.id === targetId);
-  if (targetIndex >= 0) moveToProfile(draggedId, targetIndex);
+  if (!draggedId || draggedId === overId) return;
+  const overIndex = profiles.value.findIndex((entry) => entry.id === overId);
+  if (overIndex >= 0) moveToProfile(draggedId, overIndex);
 }
 
 function onProfileDragEnd() {
@@ -590,8 +589,8 @@ onUnmounted(() => {
             'profiles__item--active': profile.id === activeProfileId,
             'profiles__item--dragging': draggingProfileId === profile.id,
           }"
-          @dragover.prevent="onProfileDragOver"
-          @drop.prevent="onProfileDrop(profile.id)"
+          @dragover.prevent="onProfileDragOver(profile.id, $event)"
+          @drop.prevent
         >
           <input
             v-if="editingProfileId === profile.id"
