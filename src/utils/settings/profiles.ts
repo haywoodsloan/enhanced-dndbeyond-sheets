@@ -50,6 +50,22 @@ export function generateProfileId(): string {
 }
 
 /**
+ * A unique "{base} copy" name for a duplicated profile. Strips an existing
+ * " copy"/" copy N" suffix so duplicating a copy re-bases (avoids "copy copy"),
+ * then returns the first free " copy" / " copy 2" / " copy 3" … not already taken.
+ */
+export function uniqueProfileCopyName(
+  sourceName: string,
+  existingNames: readonly string[],
+): string {
+  const root = sourceName.replace(/ copy(?: \d+)?$/, '').trim() || sourceName.trim();
+  const taken = new Set(existingNames);
+  let candidate = `${root} copy`;
+  for (let n = 2; taken.has(candidate); n += 1) candidate = `${root} copy ${n}`;
+  return candidate;
+}
+
+/**
  * Remove a deleted profile's stored settings (best-effort). The default
  * profile's keys are the shared, unscoped ones, so they are never removed.
  */

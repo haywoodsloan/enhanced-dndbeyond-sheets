@@ -122,6 +122,58 @@ describe('useProfiles', () => {
     expect(saved.profiles.find((profile) => profile.id === id)?.name).toBe('Tablet');
   });
 
+  it('gives each duplicate a unique, incrementing copy name', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+
+    await result.duplicate('default');
+    await flushPromises();
+    await result.duplicate('default');
+    await flushPromises();
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual([
+      'Default',
+      'Default copy',
+      'Default copy 2',
+    ]);
+
+    // Duplicating a copy re-bases the name (no "copy copy").
+    const copyId = result.profiles.value[1].id;
+    await result.duplicate(copyId);
+    await flushPromises();
+    expect(result.profiles.value.at(-1)?.name).toBe('Default copy 3');
+  });
+
+  it('create returns the new profile id', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+    const id = result.create('Screen');
+    expect(typeof id).toBe('string');
+    expect(result.profiles.value.find((profile) => profile.id === id)?.name).toBe('Screen');
+    expect(result.activeId.value).toBe(id);
+  });
+
+  it('moves a profile up and down, clamping at the ends', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+    result.create('B');
+    await flushPromises();
+    result.create('C');
+    await flushPromises();
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'B', 'C']);
+
+    const cId = result.profiles.value[2].id;
+    result.move(cId, -1);
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'C', 'B']);
+    result.move(cId, -1);
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
+    result.move(cId, -1); // already first → clamp
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
+
+    const lastId = result.profiles.value[2].id;
+    result.move(lastId, 1); // already last → clamp
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
+  });
+
   it('loads a persisted profile list and active id', async () => {
     await profilesPref.set({
       activeId: 'p2',

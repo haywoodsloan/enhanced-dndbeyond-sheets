@@ -13,8 +13,9 @@ test.describe('layout profiles', () => {
     await settle(page);
     await expect(page.locator('.hidden-tray [data-section-key="senses"]')).toBeVisible();
 
-    // Create a new profile — it starts fresh, so nothing is hidden.
+    // Create a new profile — it opens in rename mode; keep the default name.
     await page.locator('.profiles__new').click();
+    await page.locator('.profiles__rename-input').press('Escape');
     expect(await page.locator('.profiles__switch').count()).toBe(2);
     await expect(page.locator('.hidden-tray')).toHaveCount(0);
     await expect(page.locator('.page [data-section-key="senses"]')).toHaveCount(1);
@@ -24,16 +25,34 @@ test.describe('layout profiles', () => {
     await expect(page.locator('.hidden-tray [data-section-key="senses"]')).toBeVisible();
   });
 
-  test('deleting a profile removes it and reactivates another', async ({ context, extensionId }) => {
+  test('deleting a profile (after confirm) removes it and reactivates another', async ({
+    context,
+    extensionId,
+  }) => {
     const page = await openSheet(context, extensionId);
 
     await page.locator('.profiles__new').click();
+    await page.locator('.profiles__rename-input').press('Escape');
     expect(await page.locator('.profiles__switch').count()).toBe(2);
 
-    // Delete the active (new) profile via its trash button.
+    // Delete the active (new) profile and confirm the inline prompt.
     await page.locator('.profiles__item--active .profiles__delete').click();
+    await page.locator('.profiles__confirm-yes').click();
     await expect(page.locator('.profiles__switch')).toHaveCount(1);
     await expect(page.locator('.profiles__switch', { hasText: 'Default' })).toBeVisible();
+  });
+
+  test('canceling the delete confirmation keeps the profile', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+
+    await page.locator('.profiles__new').click();
+    await page.locator('.profiles__rename-input').press('Escape');
+
+    await page.locator('.profiles__item--active .profiles__delete').click();
+    await expect(page.locator('.profiles__confirm')).toBeVisible();
+    await page.locator('.profiles__confirm-no').click();
+    await expect(page.locator('.profiles__confirm')).toHaveCount(0);
+    expect(await page.locator('.profiles__switch').count()).toBe(2);
   });
 
   test('the delete button shows for the only profile but is disabled', async ({
@@ -48,6 +67,7 @@ test.describe('layout profiles', () => {
 
     // Adding a second profile enables deletion.
     await page.locator('.profiles__new').click();
+    await page.locator('.profiles__rename-input').press('Escape');
     await expect(page.locator('.profiles__delete')).toHaveCount(2);
     await expect(page.locator('.profiles__delete').first()).toBeEnabled();
   });
@@ -94,10 +114,45 @@ test.describe('layout profiles', () => {
     await expect(page.locator('.profiles__switch', { hasText: 'Battle Map' })).toBeVisible();
   });
 
+  test('names a new profile inline on creation', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+
+    // The New button opens an inline name field focused on the new profile.
+    await page.locator('.profiles__new').click();
+    const input = page.locator('.profiles__rename-input');
+    await expect(input).toBeFocused();
+    await input.fill('Screen Layout');
+    await input.press('Enter');
+
+    await expect(page.locator('.profiles__switch', { hasText: 'Screen Layout' })).toBeVisible();
+  });
+
+  test('reorders profiles with the up control', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+
+    // Add a "Second" profile → order is [Default, Second].
+    await page.locator('.profiles__new').click();
+    const input = page.locator('.profiles__rename-input');
+    await input.fill('Second');
+    await input.press('Enter');
+    expect((await page.locator('.profiles__switch').allInnerTexts()).map((t) => t.trim())).toEqual([
+      'Default',
+      'Second',
+    ]);
+
+    // Move "Second" up → order becomes [Second, Default].
+    await page.getByRole('button', { name: 'Move profile Second up' }).click();
+    expect((await page.locator('.profiles__switch').allInnerTexts()).map((t) => t.trim())).toEqual([
+      'Second',
+      'Default',
+    ]);
+  });
+
   test('profiles persist across a reload', async ({ context, extensionId }) => {
     const page = await openSheet(context, extensionId);
 
     await page.locator('.profiles__new').click();
+    await page.locator('.profiles__rename-input').press('Escape');
     expect(await page.locator('.profiles__switch').count()).toBe(2);
 
     // The profile list is saved immediately; give the async write a beat.

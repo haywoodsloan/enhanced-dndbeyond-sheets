@@ -70,6 +70,7 @@ const {
   create: createProfile,
   duplicate: duplicateProfile,
   rename: renameProfile,
+  move: moveProfile,
   switchTo: switchProfile,
   remove: removeProfile,
 } = useProfiles();
@@ -78,8 +79,12 @@ const {
 // Enter or blur; cancel (discard) on Escape.
 const editingProfileId = ref<string | null>(null);
 const editingName = ref('');
+// Inline delete confirmation: clicking a row's trash arms a confirm bar; the
+// profile is removed only on the explicit confirm.
+const confirmingDeleteId = ref<string | null>(null);
 
 async function startRename(id: string, name: string) {
+  confirmingDeleteId.value = null;
   editingProfileId.value = id;
   editingName.value = name;
   await nextTick();
@@ -95,6 +100,27 @@ function commitRename() {
 
 function cancelRename() {
   editingProfileId.value = null;
+}
+
+function askDelete(id: string) {
+  editingProfileId.value = null;
+  confirmingDeleteId.value = id;
+}
+
+function confirmDelete() {
+  if (confirmingDeleteId.value) removeProfile(confirmingDeleteId.value);
+  confirmingDeleteId.value = null;
+}
+
+function cancelDelete() {
+  confirmingDeleteId.value = null;
+}
+
+// Create a profile, then focus its name field so the user can name it right away.
+async function onNewProfile() {
+  const id = createProfile();
+  const profile = profiles.value.find((entry) => entry.id === id);
+  if (profile) await startRename(id, profile.name);
 }
 
 const {
@@ -529,7 +555,7 @@ onUnmounted(() => {
       <h2 class="settings__title">Profiles</h2>
       <ul class="profiles__list">
         <li
-          v-for="profile in profiles"
+          v-for="(profile, index) in profiles"
           :key="profile.id"
           class="profiles__item"
           :class="{ 'profiles__item--active': profile.id === activeProfileId }"
@@ -544,7 +570,57 @@ onUnmounted(() => {
             @keyup.esc="cancelRename"
             @blur="commitRename"
           />
+          <div v-else-if="confirmingDeleteId === profile.id" class="profiles__confirm">
+            <span class="profiles__confirm-text">Delete “{{ profile.name }}”?</span>
+            <button
+              type="button"
+              class="profiles__confirm-yes"
+              :aria-label="`Confirm deleting profile ${profile.name}`"
+              @click="confirmDelete"
+            >
+              <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="profiles__confirm-no"
+              :aria-label="`Cancel deleting profile ${profile.name}`"
+              @click="cancelDelete"
+            >
+              <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
           <template v-else>
+            <div class="profiles__reorder">
+              <button
+                type="button"
+                class="profiles__move"
+                :disabled="index === 0"
+                v-tooltip.top="{ value: 'Move up', showDelay: 500 }"
+                :aria-label="`Move profile ${profile.name} up`"
+                @click="moveProfile(profile.id, -1)"
+              >
+                <svg class="profiles__move-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="6 15 12 9 18 15" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="profiles__move"
+                :disabled="index === profiles.length - 1"
+                v-tooltip.bottom="{ value: 'Move down', showDelay: 500 }"
+                :aria-label="`Move profile ${profile.name} down`"
+                @click="moveProfile(profile.id, 1)"
+              >
+                <svg class="profiles__move-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
             <button
               type="button"
               class="profiles__switch"
@@ -582,7 +658,7 @@ onUnmounted(() => {
               :disabled="profiles.length <= 1"
               v-tooltip.top="{ value: 'Delete profile', showDelay: 500 }"
               :aria-label="`Delete profile ${profile.name}`"
-              @click="removeProfile(profile.id)"
+              @click="askDelete(profile.id)"
             >
               <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <polyline points="3 6 5 6 21 6" />
@@ -595,7 +671,7 @@ onUnmounted(() => {
           </template>
         </li>
       </ul>
-      <button type="button" class="settings__button profiles__new" @click="createProfile()">
+      <button type="button" class="settings__button profiles__new" @click="onNewProfile">
         <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
@@ -816,7 +892,9 @@ body {
 
 .profiles__rename,
 .profiles__dupe,
-.profiles__delete {
+.profiles__delete,
+.profiles__confirm-yes,
+.profiles__confirm-no {
   flex: none;
   width: 30px;
   display: flex;
@@ -844,6 +922,83 @@ body {
 .profiles__delete:disabled {
   cursor: default;
   opacity: 0.4;
+}
+
+/* Up/down reorder controls stacked at the left of each row. */
+.profiles__reorder {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.profiles__move {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--p-primary-300, #d4d4d8);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--p-primary-700, #6b7280);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.profiles__move:enabled:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+  color: var(--p-primary-color);
+}
+
+.profiles__move:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.profiles__move-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Inline delete confirmation bar (replaces the row while confirming). */
+.profiles__confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.profiles__confirm-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #1c1c1e;
+}
+
+.profiles__confirm-yes {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.profiles__confirm-yes:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+.profiles__confirm-no:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+  color: var(--p-primary-color);
 }
 
 .profiles__rename-input {

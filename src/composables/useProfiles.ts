@@ -5,6 +5,7 @@ import {
   copyProfileData,
   deleteProfileData,
   generateProfileId,
+  uniqueProfileCopyName,
   type ProfileMeta,
 } from '@/utils/settings/profiles';
 
@@ -44,13 +45,14 @@ export function useProfiles() {
     () => profiles.value.find((profile) => profile.id === activeId.value) ?? profiles.value[0],
   );
 
-  /** Create a new (empty) profile and switch to it. */
-  function create(name?: string) {
+  /** Create a new (empty) profile, switch to it, and return its id. */
+  function create(name?: string): string {
     const id = generateProfileId();
     const label = name?.trim() || `Profile ${profiles.value.length + 1}`;
     profiles.value = [...profiles.value, { id, name: label }];
     activeId.value = id;
     persist();
+    return id;
   }
 
   /** Duplicate a profile: copy its settings into a new profile, then switch to
@@ -60,7 +62,11 @@ export function useProfiles() {
     if (!source) return;
     const newId = generateProfileId();
     await copyProfileData(id, newId);
-    profiles.value = [...profiles.value, { id: newId, name: `${source.name} copy` }];
+    const name = uniqueProfileCopyName(
+      source.name,
+      profiles.value.map((profile) => profile.name),
+    );
+    profiles.value = [...profiles.value, { id: newId, name }];
     activeId.value = newId;
     persist();
   }
@@ -74,6 +80,18 @@ export function useProfiles() {
     profiles.value = profiles.value.map((profile) =>
       profile.id === id ? { ...profile, name: label } : profile,
     );
+    persist();
+  }
+
+  /** Move a profile up (delta -1) or down (delta +1) in the list. */
+  function move(id: string, delta: number) {
+    const index = profiles.value.findIndex((profile) => profile.id === id);
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= profiles.value.length) return;
+    const next = [...profiles.value];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    profiles.value = next;
     persist();
   }
 
@@ -94,5 +112,15 @@ export function useProfiles() {
     void deleteProfileData(id);
   }
 
-  return { profiles, activeId, activeProfile, create, duplicate, rename, switchTo, remove };
+  return {
+    profiles,
+    activeId,
+    activeProfile,
+    create,
+    duplicate,
+    rename,
+    move,
+    switchTo,
+    remove,
+  };
 }
