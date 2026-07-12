@@ -29,6 +29,30 @@ export const PAGE_FORMATS: readonly PageFormat[] = [
 
 export const DEFAULT_FORMAT_ID = 'letter';
 
+/** Page orientation options. Landscape swaps a format's width and height. */
+export interface PageOrientation {
+  id: string;
+  name: string;
+}
+
+export const PAGE_ORIENTATIONS: readonly PageOrientation[] = [
+  { id: 'portrait', name: 'Portrait' },
+  { id: 'landscape', name: 'Landscape' },
+];
+
+export const DEFAULT_ORIENTATION_ID = 'portrait';
+
+/** A format's width/height in mm for the chosen orientation (landscape swaps the
+ * portrait dimensions). */
+export function orientedSize(
+  format: PageFormat,
+  orientationId: string,
+): { width: number; height: number } {
+  return orientationId === 'landscape'
+    ? { width: format.height, height: format.width }
+    : { width: format.width, height: format.height };
+}
+
 export interface MarginPreset {
   id: string;
   name: string;

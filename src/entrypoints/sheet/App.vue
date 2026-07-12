@@ -34,14 +34,18 @@ import type { CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
+  DEFAULT_ORIENTATION_ID,
   MARGIN_PRESETS,
   PAGE_FORMATS,
+  PAGE_ORIENTATIONS,
   mmToPx,
+  orientedSize,
 } from '@/utils/layout/page-format';
 import { DEFAULT_COLOR_ID, THEME_COLORS } from '@/utils/settings/theme-color';
 import {
   PAGE_FORMAT_KEY,
   PAGE_MARGIN_KEY,
+  PAGE_ORIENTATION_KEY,
   THEME_COLOR_KEY,
 } from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
@@ -183,11 +187,13 @@ const {
 // profile so each profile keeps its own paper + accent.
 const formatId = useStoredRef(PAGE_FORMAT_KEY, DEFAULT_FORMAT_ID, activeProfileId);
 const marginId = useStoredRef(PAGE_MARGIN_KEY, DEFAULT_MARGIN_ID, activeProfileId);
+const orientationId = useStoredRef(PAGE_ORIENTATION_KEY, DEFAULT_ORIENTATION_ID, activeProfileId);
 const colorId = useStoredRef(THEME_COLOR_KEY, DEFAULT_COLOR_ID, activeProfileId);
 
 // PrimeVue Select needs mutable arrays; the source lists stay readonly.
 const formatOptions = [...PAGE_FORMATS];
 const marginOptions = [...MARGIN_PRESETS];
+const orientationOptions = [...PAGE_ORIENTATIONS];
 const colorOptions = [...THEME_COLORS];
 
 const format = computed(
@@ -196,12 +202,14 @@ const format = computed(
 const margin = computed(
   () => MARGIN_PRESETS.find((entry) => entry.id === marginId.value) ?? MARGIN_PRESETS[0],
 );
+// The paper's width/height in mm, swapped when landscape is selected.
+const pageSize = computed(() => orientedSize(format.value, orientationId.value));
 
 // How many grid row-units fit on one printed page (varies with format/margin).
 const rowsPerPage = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
-  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
-  const printHeight = mmToPx(format.value.height) - 2 * marginPx;
+  const printWidth = mmToPx(pageSize.value.width) - 2 * marginPx;
+  const printHeight = mmToPx(pageSize.value.height) - 2 * marginPx;
   return gridRowsPerPage(printWidth, printHeight);
 });
 
@@ -209,7 +217,7 @@ const rowsPerPage = computed(() => {
 // height:width (margins removed) — i.e. roughly square cells.
 const rowUnit = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
-  const printHeight = mmToPx(format.value.height) - 2 * marginPx;
+  const printHeight = mmToPx(pageSize.value.height) - 2 * marginPx;
   const rows = rowsPerPage.value;
   return (printHeight - (rows - 1) * GRID_GAP) / rows;
 });
@@ -219,15 +227,15 @@ const rowUnit = computed(() => {
 // backward) rather than always forward.
 const cellSize = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
-  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  const printWidth = mmToPx(pageSize.value.width) - 2 * marginPx;
   const colWidth = (printWidth - (GRID_COLUMNS - 1) * GRID_GAP) / GRID_COLUMNS;
   return { width: colWidth + GRID_GAP, height: rowUnit.value + GRID_GAP };
 });
 
 // Drive the paper geometry (and thus its aspect ratio) from the chosen format.
 const pageStyle = computed(() => ({
-  '--page-width': `${format.value.width}mm`,
-  '--page-height': `${format.value.height}mm`,
+  '--page-width': `${pageSize.value.width}mm`,
+  '--page-height': `${pageSize.value.height}mm`,
   '--page-margin': `${margin.value.mm}mm`,
   '--row-unit': `${rowUnit.value}px`,
   '--grid-gap': `${GRID_GAP}px`,
@@ -510,7 +518,7 @@ watchEffect(() => {
     pageRule = document.createElement('style');
     document.head.appendChild(pageRule);
   }
-  pageRule.textContent = `@page { size: ${format.value.width}mm ${format.value.height}mm; margin: 0; }`;
+  pageRule.textContent = `@page { size: ${pageSize.value.width}mm ${pageSize.value.height}mm; margin: 0; }`;
 });
 onUnmounted(() => {
   pageRule?.remove();
@@ -529,6 +537,17 @@ onUnmounted(() => {
         <Select
           v-model="formatId"
           :options="formatOptions"
+          option-label="name"
+          option-value="id"
+          class="settings__control"
+        />
+      </label>
+
+      <label class="settings__field">
+        <span class="settings__label">Orientation</span>
+        <Select
+          v-model="orientationId"
+          :options="orientationOptions"
           option-label="name"
           option-value="id"
           class="settings__control"

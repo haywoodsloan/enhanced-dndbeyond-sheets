@@ -88,6 +88,35 @@ test.describe('sheet layout controls', () => {
     expect(await pageWidth()).toBe('210mm');
   });
 
+  test('switching to landscape swaps the sheet dimensions', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+    const dims = () =>
+      page
+        .locator('.sheet')
+        .first()
+        .evaluate((el) => {
+          const style = getComputedStyle(el);
+          return {
+            w: style.getPropertyValue('--page-width').trim(),
+            h: style.getPropertyValue('--page-height').trim(),
+          };
+        });
+
+    // Letter portrait by default.
+    expect(await dims()).toEqual({ w: '215.9mm', h: '279.4mm' });
+
+    // Pick Landscape from the Orientation dropdown.
+    await page
+      .locator('.settings__field', { hasText: 'Orientation' })
+      .locator('.settings__control')
+      .click();
+    await page.getByRole('option', { name: 'Landscape' }).click();
+    await settle(page);
+
+    // Width and height are swapped.
+    expect(await dims()).toEqual({ w: '279.4mm', h: '215.9mm' });
+  });
+
   test('a hidden section stays hidden across a reload', async ({ context, extensionId }) => {
     const page = await openSheet(context, extensionId);
     const key = 'wealth';

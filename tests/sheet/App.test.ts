@@ -4,8 +4,8 @@ import { nextTick } from 'vue';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
-import { pageFormatPref, sectionAnchorsPref } from '@/utils/settings/preferences';
-import { DEFAULT_FORMAT_ID } from '@/utils/layout/page-format';
+import { pageFormatPref, pageOrientationPref, sectionAnchorsPref } from '@/utils/settings/preferences';
+import { DEFAULT_FORMAT_ID, DEFAULT_ORIENTATION_ID } from '@/utils/layout/page-format';
 import { makeCharacter } from '../fixtures/character';
 
 vi.mock('@/services/dndbeyond/load-character', () => ({
@@ -245,6 +245,21 @@ describe('sheet App', () => {
       expect(style).toMatch(/--page-height:\s*297mm/);
     } finally {
       await pageFormatPref.set(DEFAULT_FORMAT_ID);
+    }
+  });
+
+  it('swaps the sheet dimensions when landscape orientation is chosen', async () => {
+    await pageOrientationPref.set('landscape');
+    try {
+      mockedLoad.mockResolvedValue(sampleCharacter);
+      const wrapper = mount(App, { props: { characterId: 166869100 } });
+      await flushPromises();
+      // Default Letter is 215.9 × 279.4 mm portrait; landscape swaps them.
+      const style = wrapper.get('.sheet').attributes('style') ?? '';
+      expect(style).toMatch(/--page-width:\s*279\.4mm/);
+      expect(style).toMatch(/--page-height:\s*215\.9mm/);
+    } finally {
+      await pageOrientationPref.set(DEFAULT_ORIENTATION_ID);
     }
   });
 

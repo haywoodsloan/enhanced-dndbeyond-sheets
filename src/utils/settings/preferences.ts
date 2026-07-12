@@ -65,6 +65,7 @@ export const DEFAULT_PROFILE_ID = 'default';
 // Base storage keys for the per-profile layout settings.
 export const PAGE_FORMAT_KEY = 'pref-page-format';
 export const PAGE_MARGIN_KEY = 'pref-page-margin';
+export const PAGE_ORIENTATION_KEY = 'pref-page-orientation';
 export const THEME_COLOR_KEY = 'pref-theme-color';
 export const HIDDEN_SECTIONS_KEY = 'pref-hidden-sections';
 export const SECTION_LAYOUT_KEY = 'pref-section-layout';
@@ -84,6 +85,7 @@ export function scopedPreference<T>(base: string, profileId: string): Preference
 
 export const pageFormatPref = definePreference<string>(PAGE_FORMAT_KEY);
 export const pageMarginPref = definePreference<string>(PAGE_MARGIN_KEY);
+export const pageOrientationPref = definePreference<string>(PAGE_ORIENTATION_KEY);
 export const themeColorPref = definePreference<string>(THEME_COLOR_KEY);
 export const hiddenSectionsPref = definePreference<SectionKey[]>(HIDDEN_SECTIONS_KEY);
 /** Per-section chosen layout-option index (section key → index). */
