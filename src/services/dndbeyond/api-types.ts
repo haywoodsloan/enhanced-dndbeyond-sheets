@@ -74,7 +74,58 @@ export interface RawInventoryItem {
     filterType?: string;
     armorClass?: number | null;
     armorTypeId?: number | null;
+    magic?: boolean;
+    /** Weapon damage dice (`1d8`, etc.); absent on non-weapons. */
+    damage?: RawDice | null;
+    /** Weapon damage type name, e.g. "Piercing". */
+    damageType?: string | null;
+    /** Weapon properties (Finesse, Light, Thrown, …). */
+    properties?: RawWeaponProperty[] | null;
+    /** 1 = melee, 2 = ranged. */
+    attackType?: number | null;
+    /** Weapon category: 1 = simple, 2 = martial. */
+    categoryId?: number | null;
+    /** Normal range / reach in feet. */
+    range?: number | null;
+    /** Long range in feet (thrown/ranged weapons). */
+    longRange?: number | null;
+    /** Flat to-hit / damage bonuses granted by a magic weapon. */
+    grantedModifiers?: RawModifier[] | null;
   };
+}
+
+/** A dice expression from the raw payload (weapon/action/spell damage). */
+export interface RawDice {
+  diceCount?: number | null;
+  diceValue?: number | null;
+  diceMultiplier?: number | null;
+  fixedValue?: number | null;
+  diceString?: string | null;
+}
+
+/** A named weapon property (Finesse, Light, Thrown, Versatile, …). */
+export interface RawWeaponProperty {
+  id?: number;
+  name?: string;
+}
+
+/** Limited-use resource metadata attached to an action or feature. */
+export interface RawLimitedUse {
+  name?: string | null;
+  maxUses?: number | null;
+  numberUsed?: number | null;
+  /** Rest that restores uses: 1 = short rest, 2 = long rest. */
+  resetType?: number | null;
+  /** When true the pool size scales with the proficiency bonus. */
+  useProficiencyBonus?: boolean | null;
+}
+
+/** Range / area block on an action. */
+export interface RawActionRange {
+  range?: number | null;
+  longRange?: number | null;
+  aoeType?: number | null;
+  aoeSize?: number | null;
 }
 
 export interface RawSpell {
@@ -97,6 +148,20 @@ export interface RawAction {
   name?: string;
   displayAsAttack?: boolean | null;
   activation?: { activationType?: number | null } | null;
+  /** Limited-use pool (checkbox resource) when the action is rationed. */
+  limitedUse?: RawLimitedUse | null;
+  /** Damage dice, when the action deals damage. */
+  dice?: RawDice | null;
+  /** Flat damage value when there are no dice (e.g. a fixed rider). */
+  value?: number | null;
+  /** Damage type id (see DAMAGE_TYPES). */
+  damageTypeId?: number | null;
+  /** Ability id the action forces a save against, when save-based. */
+  saveStatId?: number | null;
+  /** Explicit save DC, overriding the computed spell save DC. */
+  fixedSaveDc?: number | null;
+  /** Range / area of the action. */
+  range?: RawActionRange | null;
 }
 
 /**

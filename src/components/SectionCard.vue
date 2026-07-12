@@ -7,6 +7,7 @@ import SavingThrowsCard from '@/components/cards/SavingThrowsCard.vue';
 import SensesCard from '@/components/cards/SensesCard.vue';
 import SkillsCard from '@/components/cards/SkillsCard.vue';
 import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
+import AttacksCard from '@/components/cards/AttacksCard.vue';
 import ActionsCard from '@/components/cards/ActionsCard.vue';
 import SpellsCard from '@/components/cards/SpellsCard.vue';
 import InventoryCard from '@/components/cards/InventoryCard.vue';
@@ -218,6 +219,10 @@ watch(
         v-else-if="section.key === 'proficiencies' && character"
         :proficiencies="character.proficiencies"
         :columns="span.cols"
+      />
+      <AttacksCard
+        v-else-if="section.key === 'attacks' && character"
+        :attacks="character.attacks"
       />
       <ActionsCard
         v-else-if="section.key === 'actions' && character"

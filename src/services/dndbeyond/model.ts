@@ -13,6 +13,7 @@ export const SECTION_KEYS = [
   'savingThrows',
   'senses',
   'proficiencies',
+  'attacks',
   'actions',
   'spells',
   'inventory',
@@ -105,6 +106,33 @@ export interface CharacterAction {
   category: ActionCategory;
 }
 
+/** Damage dice (and computed flat bonus) for an attack, action, or spell. */
+export interface DamageInfo {
+  /** Dice expression, e.g. "1d8"; empty when the damage is a flat value only. */
+  dice: string;
+  /** Damage type, e.g. "Piercing". */
+  type?: string;
+  /** Flat modifier added to the roll (ability mod, magic bonus, fixed value). */
+  bonus?: number;
+  /** What grows with level / upcasting, e.g. "+1d8 per slot above 1st". */
+  scaling?: string;
+}
+
+/** A weapon (or weapon-like) attack shown in the Attacks card. */
+export interface Attack {
+  name: string;
+  /** To-hit modifier (signed) for an attack-roll attack. */
+  toHit?: number;
+  /** Save prompt for a save-based attack, e.g. "DC 14 DEX". */
+  save?: string;
+  /** Damage dice + type + computed flat bonus. */
+  damage?: DamageInfo;
+  /** Range / reach shorthand, e.g. "5 ft." or "20/60 ft.". */
+  range?: string;
+  /** Property tags, e.g. ["Finesse", "Light"]. */
+  notes?: string[];
+}
+
 /** A known or prepared spell. */
 export interface SpellEntry {
   name: string;
@@ -172,6 +200,8 @@ export interface Character {
   skills: Skill[];
   /** Language and training proficiencies. */
   proficiencies: CharacterProficiencies;
+  /** Weapon and weapon-like attacks. */
+  attacks: Attack[];
   /** Attacks and other actions. */
   actions: CharacterAction[];
   /** Known/prepared spells. */

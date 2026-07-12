@@ -14,6 +14,7 @@ import {
 import type {
   RawAction,
   RawCharacter,
+  RawInventoryItem,
   RawModifier,
   RawSourceMap,
   RawSpell,
@@ -22,6 +23,7 @@ import type {
 import type {
   AbilityScore,
   ActionCategory,
+  Attack,
   Character,
   CharacterAction,
   CharacterBasics,
@@ -81,14 +83,6 @@ function countSpells(raw: RawCharacter): number {
     0,
   );
   return classSpells + sumSourceMap(raw.spells);
-}
-
-/** Weapon attacks plus every action (reactions, bonus actions, limited-use…). */
-function countActions(raw: RawCharacter): number {
-  const weaponAttacks = asArray(raw.inventory).filter(
-    (item) => item.displayAsAttack === true,
-  ).length;
-  return weaponAttacks + sumSourceMap(raw.actions);
 }
 
 /** Class features, racial traits, feats, and optional class features. */
@@ -351,25 +345,117 @@ function actionCategory(activationType: number | null | undefined): ActionCatego
   }
 }
 
-/** Weapon attacks plus every listed action, tagged with its activation category. */
+/** D&D Beyond weapon `attackType`: 2 = ranged (1 = melee). */
+const RANGED_WEAPON = 2;
+
+type WeaponDef = NonNullable<RawInventoryItem['definition']>;
+
+/** Flat magic to-hit / damage bonus granted by a weapon's own modifiers. */
+function weaponMagicBonus(def: WeaponDef): number {
+  return asArray(def.grantedModifiers)
+    .filter((mod) => mod.type === 'bonus')
+    .reduce((sum, mod) => sum + (mod.fixedValue ?? mod.value ?? 0), 0);
+}
+
+/** Whether the character is proficient with a weapon (specific or by category). */
+function isWeaponProficient(raw: RawCharacter, def: WeaponDef): boolean {
+  const slug = (def.name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (slug && hasModifier(raw, 'proficiency', slug)) return true;
+  if (def.categoryId === 2) return hasModifier(raw, 'proficiency', 'martial-weapons');
+  return hasModifier(raw, 'proficiency', 'simple-weapons');
+}
+
+/** One weapon's attack line: to-hit + damage + range + property notes. */
+function weaponAttack(
+  raw: RawCharacter,
+  def: WeaponDef,
+  modOf: (key: AbilityKey) => number,
+  prof: number,
+): Attack {
+  const properties = asArray(def.properties)
+    .map((property) => property.name)
+    .filter((name): name is string => Boolean(name));
+  const ranged = def.attackType === RANGED_WEAPON;
+  const finesse = properties.includes('Finesse');
+  // Ranged uses Dex; a Finesse weapon uses the better of Str/Dex; else Str.
+  const abilityMod = ranged
+    ? modOf('dex')
+    : finesse
+      ? Math.max(modOf('str'), modOf('dex'))
+      : modOf('str');
+  const magic = weaponMagicBonus(def);
+  const attack: Attack = {
+    name: def.name!,
+    toHit: abilityMod + (isWeaponProficient(raw, def) ? prof : 0) + magic,
+  };
+  if (def.damage?.diceString) {
+    attack.damage = {
+      dice: def.damage.diceString,
+      bonus: abilityMod + magic,
+      ...(def.damageType ? { type: def.damageType } : {}),
+    };
+  }
+  attack.range =
+    ranged || properties.includes('Thrown')
+      ? `${def.range ?? 0}/${def.longRange ?? def.range ?? 0} ft.`
+      : `${def.range ?? 5} ft.`;
+  if (properties.length) attack.notes = properties;
+  return attack;
+}
+
+/**
+ * Weapon and weapon-like attacks: every equipped (or attack-flagged) weapon,
+ * each with a computed to-hit and damage line. Unequipped backpack weapons are
+ * left in the Inventory, matching what D&D Beyond surfaces as attacks.
+ */
+function resolveAttacks(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): Attack[] {
+  const prof = proficiencyBonus(level);
+  const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
+  const modOf = (key: AbilityKey) => modByKey.get(key) ?? 0;
+
+  const attacks: Attack[] = [];
+  for (const item of asArray(raw.inventory)) {
+    const def = item.definition;
+    if (!def?.name) continue;
+    const isWeapon = def.filterType === 'Weapon';
+    const flagged = item.displayAsAttack === true;
+    // Include real weapons that are equipped (or explicitly attack-flagged), plus
+    // any item D&D Beyond flags as an attack. Unequipped backpack weapons stay in
+    // the Inventory, matching what the site surfaces as attacks.
+    if (!isWeapon && !flagged) continue;
+    if (isWeapon && item.equipped !== true && !flagged) continue;
+    attacks.push(weaponAttack(raw, def, modOf, prof));
+  }
+  return attacks;
+}
+
+/**
+ * Real action-economy options (Action / Bonus Action / Reaction) from every
+ * source, deduped. Weapon attacks now live in the Attacks card, and passive /
+ * special / no-action riders — which D&D Beyond doesn't list as actions — are
+ * dropped so the card mirrors the site instead of every internal entry.
+ */
 function resolveActions(raw: RawCharacter): CharacterAction[] {
-  const attacks: CharacterAction[] = asArray(raw.inventory)
-    .filter((item) => item.displayAsAttack === true && item.definition?.name)
-    .map((item) => ({ name: item.definition!.name!, category: 'action' }));
   const actions: CharacterAction[] = [];
+  const seen = new Set<string>();
   if (raw.actions) {
     for (const group of Object.values(raw.actions)) {
       for (const action of asArray<RawAction>(group)) {
-        if (action.name) {
-          actions.push({
-            name: action.name,
-            category: actionCategory(action.activation?.activationType),
-          });
-        }
+        const category = actionCategory(action.activation?.activationType);
+        if (!action.name || category === 'other' || seen.has(action.name)) continue;
+        seen.add(action.name);
+        actions.push({ name: action.name, category });
       }
     }
   }
-  return [...attacks, ...actions];
+  return actions;
 }
 
 /** Known/prepared spells from class spells and other sources, deduped and sorted. */
@@ -578,6 +664,8 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const abilities = resolveAbilities(raw);
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
+  const attacks = resolveAttacks(raw, abilities, level);
+  const actions = resolveActions(raw);
 
   const sections: CharacterSection[] = [
     toSection('portrait', 'Portrait', 0, { alwaysPresent: Boolean(avatarUrl) }),
@@ -587,7 +675,8 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('savingThrows', 'Saves & Defences', SAVE_COUNT, { alwaysPresent: true }),
     toSection('senses', 'Senses', senses.length, { alwaysPresent: true }),
     toSection('proficiencies', 'Proficiencies', countProficiencies(raw)),
-    toSection('actions', 'Actions', countActions(raw)),
+    toSection('attacks', 'Attacks', attacks.length),
+    toSection('actions', 'Actions', actions.length),
     toSection('spells', 'Spells', countSpells(raw)),
     toSection('inventory', 'Inventory', asArray(raw.inventory).length),
     toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
@@ -607,7 +696,8 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     senses,
     skills,
     proficiencies: resolveProficiencies(raw),
-    actions: resolveActions(raw),
+    attacks,
+    actions,
     spells: resolveSpells(raw),
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),

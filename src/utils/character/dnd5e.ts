@@ -29,6 +29,11 @@ export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/** The ability key for a D&D Beyond stat id (1 = STR … 6 = CHA), or undefined. */
+export function abilityKeyById(id: number | null | undefined): AbilityKey | undefined {
+  return ABILITIES.find((ability) => ability.id === id)?.key;
+}
+
 /**
  * The 5e proficiency bonus for a character level: ceil(level / 4) + 1. The level
  * is clamped to 1..20 so out-of-range input still yields a sane bonus.
@@ -128,6 +133,28 @@ export function conditionName(id: number | undefined): string | undefined {
  * (integer keys iterate in ascending order) so it never drifts from the map.
  */
 export const CONDITION_NAMES: readonly string[] = Object.values(CONDITIONS);
+
+/** Damage types keyed by their D&D Beyond definition id. */
+export const DAMAGE_TYPES: Readonly<Record<number, string>> = {
+  1: 'Bludgeoning',
+  2: 'Piercing',
+  3: 'Slashing',
+  4: 'Necrotic',
+  5: 'Acid',
+  6: 'Cold',
+  7: 'Fire',
+  8: 'Lightning',
+  9: 'Thunder',
+  10: 'Poison',
+  11: 'Psychic',
+  12: 'Radiant',
+  13: 'Force',
+};
+
+/** Look up a damage-type name by its D&D Beyond id, or undefined if unknown. */
+export function damageTypeName(id: number | null | undefined): string | undefined {
+  return id == null ? undefined : DAMAGE_TYPES[id];
+}
 
 /** How strongly a proficiency applies to a skill or save. */
 export type ProficiencyLevel = 'none' | 'half' | 'proficient' | 'expertise';

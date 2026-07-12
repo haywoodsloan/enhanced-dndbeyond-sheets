@@ -22,6 +22,7 @@ export function makeCharacter(overrides: Partial<Character> = {}): Character {
     savingThrows: [],
     skills: [],
     proficiencies: { languages: [], armor: [], weapons: [], tools: [] },
+    attacks: [],
     actions: [],
     spells: [],
     inventory: [],

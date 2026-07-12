@@ -149,7 +149,7 @@ describe('normalizeCharacter', () => {
     expect(portrait?.isEmpty).toBe(false);
   });
 
-  it('produces all thirteen sections in a stable order', () => {
+  it('produces all fourteen sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -159,6 +159,7 @@ describe('normalizeCharacter', () => {
       'savingThrows',
       'senses',
       'proficiencies',
+      'attacks',
       'actions',
       'spells',
       'inventory',
@@ -217,6 +218,28 @@ describe('normalizeCharacter', () => {
     expect(categoryOf.get('Gathered Whispers: Unearthly Scream')).toBe('reaction');
   });
 
+  it('resolves equipped weapons as attacks with to-hit and damage', () => {
+    const { attacks } = normalizeCharacter(raw);
+    const morningstar = attacks.find((attack) => attack.name === 'Morningstar');
+    expect(morningstar).toBeDefined();
+    // STR +2 plus martial-weapon proficiency (+2) -> +4 to hit; 1d8 + 2 Piercing.
+    expect(morningstar?.toHit).toBe(4);
+    expect(morningstar?.damage).toMatchObject({ dice: '1d8', bonus: 2, type: 'Piercing' });
+    expect(morningstar?.range).toBe('5 ft.');
+    // Unequipped backpack weapons (Dagger, Mace) are not surfaced as attacks.
+    expect(attacks.some((attack) => attack.name === 'Dagger')).toBe(false);
+  });
+
+  it('drops passive/special riders from the actions list', () => {
+    const names = normalizeCharacter(raw).actions.map((action) => action.name);
+    // Real action-economy options are kept…
+    expect(names).toContain('Channel Divinity');
+    // …but no-action / special riders D&D Beyond doesn't list as actions are not.
+    expect(names.some((name) => name.startsWith('Circle Spell:'))).toBe(false);
+    expect(names).not.toContain('Path to the Grave: End Curse');
+    expect(names).not.toContain('Pull of Death');
+  });
+
   it('never flags an empty section that still has entries', () => {
     const character = normalizeCharacter(raw);
     for (const section of character.sections) {
@@ -270,7 +293,7 @@ describe('normalizeCharacter', () => {
     expect(character.basics.conditions).toEqual([]);
   });
 
-  it('lists inventory weapons flagged displayAsAttack as actions, before other actions', () => {
+  it('surfaces displayAsAttack weapons as attacks, not actions', () => {
     const raider = {
       id: 2,
       name: 'Raider',
@@ -291,11 +314,11 @@ describe('normalizeCharacter', () => {
       actions: { class: [{ name: 'Rage', activation: { activationType: 1 } }] },
     } as unknown as RawCharacter;
 
-    const { actions } = normalizeCharacter(raider);
-    // The named weapon becomes an action; the unnamed + unflagged items are left
-    // out; weapon attacks are listed before the character's other actions.
-    expect(actions.map((action) => action.name)).toEqual(['Greataxe', 'Rage']);
-    expect(actions.find((action) => action.name === 'Greataxe')?.category).toBe('action');
+    const { attacks, actions } = normalizeCharacter(raider);
+    // The named weapon becomes an attack (not an action); the unnamed + unflagged
+    // items are left out. Other options stay in the Actions list.
+    expect(attacks.map((attack) => attack.name)).toEqual(['Greataxe']);
+    expect(actions.map((action) => action.name)).toEqual(['Rage']);
   });
 
   it('merges spells from non-class sources and de-duplicates by name', () => {

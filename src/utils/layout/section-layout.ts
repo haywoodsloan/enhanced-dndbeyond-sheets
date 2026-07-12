@@ -22,6 +22,7 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   savingThrows: { cols: 2, rows: 1 },
   senses: { cols: 1, rows: 1 },
   proficiencies: { cols: 2, rows: 1 },
+  attacks: { cols: 3, rows: 1 },
   actions: { cols: 3, rows: 2 },
   spells: { cols: 3, rows: 2 },
   inventory: { cols: 3, rows: 2 },
@@ -68,6 +69,11 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
   proficiencies: [
     { label: 'Wide', cols: 2, rows: 1 },
     { label: 'List', cols: 1, rows: 1 },
+  ],
+  attacks: [
+    { label: 'Wide', cols: 3, rows: 1, dynamic: { perRow: 8, maxRows: 4 } },
+    { label: 'Medium', cols: 2, rows: 1, dynamic: { perRow: 5, maxRows: 5 } },
+    { label: 'List', cols: 1, rows: 1, dynamic: { perRow: 3, maxRows: 6 } },
   ],
   actions: [
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 5 } },
@@ -198,6 +204,7 @@ export function canCycleLayout(
  * no content to shrink to).
  */
 export const CONTENT_FIT_SECTIONS: ReadonlySet<SectionKey> = new Set<SectionKey>([
+  'attacks',
   'actions',
   'spells',
   'features',
