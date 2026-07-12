@@ -25,31 +25,36 @@ const rows = computed<AttackRow[]>(() =>
     notes: attack.notes?.join(', ') ?? '',
   })),
 );
+
+// Only show the Properties column when at least one attack has properties, so an
+// all-unarmed list stays a tidy four columns.
+const hasNotes = computed(() => rows.value.some((row) => row.notes));
 </script>
 
 <template>
-  <div class="attacks">
+  <div class="attacks" :class="{ 'attacks--props': hasNotes }">
     <div class="attacks__head" aria-hidden="true">
       <span>Attack</span>
       <span class="attacks__hit">Hit/DC</span>
       <span>Damage</span>
       <span>Range</span>
+      <span v-if="hasNotes">Properties</span>
     </div>
     <div v-for="(row, index) in rows" :key="index" class="attacks__row" data-attack>
       <span class="attacks__name">{{ row.name }}</span>
       <span class="attacks__hit">{{ row.hit }}</span>
       <span class="attacks__damage">{{ row.damage }}</span>
       <span class="attacks__range">{{ row.range }}</span>
-      <span v-if="row.notes" class="attacks__notes">{{ row.notes }}</span>
+      <span v-if="hasNotes" class="attacks__notes">{{ row.notes }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
 /* One shared grid for the header and every row (via `subgrid`), so the column
-   headings line up with the data even when a cell's text wraps, and the four
-   columns spread proportionally across the full card width instead of leaving a
-   wide gap after the name. */
+   headings line up with the data even when a cell's text wraps, and the columns
+   spread proportionally across the full card width instead of leaving a wide gap
+   after the name. A fifth Properties column is added when any weapon has one. */
 .attacks {
   display: grid;
   grid-template-columns:
@@ -57,6 +62,13 @@ const rows = computed<AttackRow[]>(() =>
   row-gap: 3px;
   column-gap: 12px;
   font-size: 14px;
+}
+
+/* Weapon properties get their own column when present; otherwise the table stays
+   four columns and doesn't reserve empty space for them. */
+.attacks--props {
+  grid-template-columns:
+    minmax(0, 1.7fr) minmax(0, 0.8fr) minmax(0, 1.5fr) minmax(0, 0.9fr) minmax(0, 1.6fr);
 }
 
 .attacks__head,
@@ -90,9 +102,9 @@ const rows = computed<AttackRow[]>(() =>
   color: var(--p-text-muted-color, #888);
 }
 
-/* Properties wrap onto their own line beneath the row, spanning all columns. */
+/* Weapon properties (Finesse, Light, …) read as secondary to the core stats:
+   lighter, smaller, and wrapping within their own column. */
 .attacks__notes {
-  grid-column: 1 / -1;
   font-size: 12px;
   color: var(--p-text-muted-color, #888);
 }
