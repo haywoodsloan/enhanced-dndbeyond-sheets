@@ -438,6 +438,14 @@ function onCycleLayout(key: SectionKey) {
 // not live rects, so an in-flight glide never skews the drop target.
 useGridFlip(sheetRef, () => [orderedSections.value, anchors.value], () => layoutChanging.value);
 
+// Glide the profile rows to their new spots when the list order changes (drag
+// reorder, create, delete) — the same FLIP the cards use, keyed by profile id.
+const profilesListRef = ref<HTMLElement | null>(null);
+useGridFlip(profilesListRef, () => profiles.value.map((entry) => entry.id), undefined, {
+  selector: '.profiles__item',
+  key: (element) => element.dataset.profileId,
+});
+
 /** Open the browser's print dialog; the print stylesheet hides the settings
  * panel and desk so only the sheet prints. */
 function printSheet() {
@@ -580,10 +588,11 @@ onUnmounted(() => {
 
       <aside class="profiles">
       <h2 class="settings__title">Profiles</h2>
-      <ul class="profiles__list">
+      <ul class="profiles__list" ref="profilesListRef">
         <li
           v-for="profile in profiles"
           :key="profile.id"
+          :data-profile-id="profile.id"
           class="profiles__item"
           :class="{
             'profiles__item--active': profile.id === activeProfileId,

@@ -34,37 +34,40 @@ export function useGridFlip(
   container: Ref<HTMLElement | null>,
   order: WatchSource,
   isSuppressed?: () => boolean,
+  options?: { selector?: string; key?: (element: HTMLElement) => string | undefined },
 ) {
+  const selector = options?.selector ?? '.card';
+  const keyOf = options?.key ?? ((element: HTMLElement) => element.dataset.sectionKey);
   const reduceMotion =
     typeof window !== 'undefined' &&
     !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-  // Positions captured just before the re-render, keyed by the card's stable
-  // section key (NOT the element): a card that moves to another page's grid is
-  // unmounted+remounted as a NEW element, so matching by element would miss it —
-  // the section key pairs the old position with the new element.
+  // Positions captured just before the re-render, keyed by each element's stable
+  // id (NOT the element itself): an element that is unmounted+remounted (e.g. a
+  // card moving to another page's grid) would be missed if matched by element —
+  // the stable key pairs the old position with the new element.
   let first: Map<string, DOMRect> | null = null;
   const wired = new WeakSet<Element>();
 
-  function cards(): HTMLElement[] {
+  function items(): HTMLElement[] {
     const element = container.value;
-    return element ? Array.from(element.querySelectorAll<HTMLElement>('.card')) : [];
+    return element ? Array.from(element.querySelectorAll<HTMLElement>(selector)) : [];
   }
 
   function clearOnEnd(event: Event) {
-    const card = event.currentTarget as HTMLElement;
-    card.style.transition = '';
-    card.style.transform = '';
+    const element = event.currentTarget as HTMLElement;
+    element.style.transition = '';
+    element.style.transform = '';
   }
 
   function capture() {
     if (reduceMotion || isSuppressed?.()) return;
     const rects = new Map<string, DOMRect>();
-    // getBoundingClientRect (visual) so a card interrupted mid-glide starts its
-    // next glide from where it currently appears, not where it will rest.
-    for (const card of cards()) {
-      const key = card.dataset.sectionKey;
-      if (key) rects.set(key, card.getBoundingClientRect());
+    // getBoundingClientRect (visual) so an element interrupted mid-glide starts
+    // its next glide from where it currently appears, not where it will rest.
+    for (const element of items()) {
+      const key = keyOf(element);
+      if (key) rects.set(key, element.getBoundingClientRect());
     }
     first = rects;
   }
@@ -73,42 +76,42 @@ export function useGridFlip(
     if (!first) return;
     const before = first;
     first = null;
-    const list = cards();
+    const list = items();
 
-    // Clear any in-flight transform and read each card's RESTING rect, so the
+    // Clear any in-flight transform and read each element's RESTING rect, so the
     // glide is measured against the true new layout (not a mid-animation offset)
-    // and works even when a card moved between page containers.
+    // and works even when an element moved between containers.
     const after = new Map<Element, DOMRect>();
-    for (const card of list) {
-      card.style.transition = 'none';
-      card.style.transform = '';
-      after.set(card, card.getBoundingClientRect());
+    for (const element of list) {
+      element.style.transition = 'none';
+      element.style.transform = '';
+      after.set(element, element.getBoundingClientRect());
     }
 
     const moved: HTMLElement[] = [];
-    for (const card of list) {
-      const key = card.dataset.sectionKey;
+    for (const element of list) {
+      const key = keyOf(element);
       const from = key ? before.get(key) : undefined;
-      if (!from) continue; // a card that just appeared — nothing to glide from
-      const to = after.get(card)!;
+      if (!from) continue; // an element that just appeared — nothing to glide from
+      const to = after.get(element)!;
       const dx = from.left - to.left;
       const dy = from.top - to.top;
       if (Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON) continue;
-      // Invert: place the card back at its old spot with no transition.
-      card.style.transform = `translate(${dx}px, ${dy}px)`;
-      moved.push(card);
+      // Invert: place the element back at its old spot with no transition.
+      element.style.transform = `translate(${dx}px, ${dy}px)`;
+      moved.push(element);
     }
     if (!moved.length) return;
 
     // Play: on the next frame, transition the inverse offset back to zero.
     requestAnimationFrame(() => {
-      for (const card of moved) {
-        if (!wired.has(card)) {
-          card.addEventListener('transitionend', clearOnEnd);
-          wired.add(card);
+      for (const element of moved) {
+        if (!wired.has(element)) {
+          element.addEventListener('transitionend', clearOnEnd);
+          wired.add(element);
         }
-        card.style.transition = `transform ${DURATION}ms ${EASING}`;
-        card.style.transform = '';
+        element.style.transition = `transform ${DURATION}ms ${EASING}`;
+        element.style.transform = '';
       }
     });
   }
@@ -118,6 +121,6 @@ export function useGridFlip(
   watch(order, play, { flush: 'post' });
 
   onBeforeUnmount(() => {
-    for (const card of cards()) card.removeEventListener('transitionend', clearOnEnd);
+    for (const element of items()) element.removeEventListener('transitionend', clearOnEnd);
   });
 }
