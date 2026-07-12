@@ -70,6 +70,7 @@ export const THEME_COLOR_KEY = 'pref-theme-color';
 export const HIDDEN_SECTIONS_KEY = 'pref-hidden-sections';
 export const SECTION_LAYOUT_KEY = 'pref-section-layout';
 export const SECTION_ANCHORS_KEY = 'pref-section-anchors';
+export const SPELLS_EXPANDED_KEY = 'pref-spells-expanded';
 
 /** The storage key for a base preference under a given profile. The default
  * profile keeps the bare key (so pre-profiles saves map to it); other profiles

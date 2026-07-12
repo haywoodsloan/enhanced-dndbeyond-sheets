@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { fakeBrowser } from 'wxt/testing';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import {
+  DEFAULT_PROFILE_ID,
   hiddenSectionsPref,
   sectionAnchorsPref,
   sectionLayoutPref,
@@ -55,6 +56,50 @@ describe('useSectionLayout', () => {
     await flushPromises();
     expect(keys(result.hiddenSections.value)).not.toContain('notes');
     expect(await hiddenSectionsPref.get(['notes'])).toEqual([]);
+  });
+
+  it('expands the spells section into per-spell cards, keeping hidden state', async () => {
+    const character = ref<Character | null>(
+      makeCharacter({
+        classes: [{ name: 'Cleric', level: 4 }],
+        level: 4,
+        spells: [
+          { name: 'Guidance', level: 0 },
+          { name: 'Bless', level: 1 },
+        ],
+        sections: SECTION_KEYS.map((key) => ({
+          key,
+          title: key,
+          count: key === 'spells' ? 2 : 1,
+          isEmpty: false,
+        })),
+      }),
+    );
+    const expanded = ref(false);
+    const { result } = mountComposable(() =>
+      useSectionLayout(character, ref(DEFAULT_PROFILE_ID), expanded),
+    );
+    await flushPromises();
+    // Collapsed: a single spells card.
+    expect(keys(result.sections.value)).toContain('spells');
+    expect(keys(result.sections.value)).not.toContain('spell:guidance');
+
+    // Expanded: the spells card becomes one card per spell.
+    expanded.value = true;
+    await flushPromises();
+    expect(keys(result.sections.value)).not.toContain('spells');
+    expect(keys(result.sections.value)).toEqual(
+      expect.arrayContaining(['spell:guidance', 'spell:bless']),
+    );
+
+    // Hiding a spell card persists across a collapse + re-expand.
+    result.hide('spell:bless');
+    await flushPromises();
+    expanded.value = false;
+    await flushPromises();
+    expanded.value = true;
+    await flushPromises();
+    expect(keys(result.hiddenSections.value)).toContain('spell:bless');
   });
 
   it('sets a card layout and persists it, but ignores sections with one option', async () => {

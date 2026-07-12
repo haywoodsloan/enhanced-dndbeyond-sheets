@@ -22,6 +22,13 @@ describe('sectionSpan', () => {
     expect(sectionSpan('wealth')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('notes')).toEqual({ cols: 3, rows: 2 });
   });
+
+  it('gives a per-spell card a fixed 1x2 footprint with no layout options', () => {
+    expect(sectionSpan('spell:fire-bolt')).toEqual({ cols: 1, rows: 2 });
+    expect(sectionSpan('spell:fire-bolt', 99, 2, 6)).toEqual({ cols: 1, rows: 2 });
+    expect(sectionLayoutCount('spell:fire-bolt')).toBe(1);
+    expect(canCycleLayout('spell:fire-bolt', 0, 1, 6)).toBe(false);
+  });
 });
 
 describe('sectionSpan dynamic height', () => {

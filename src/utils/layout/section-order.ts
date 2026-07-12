@@ -88,7 +88,9 @@ function classStyle(character: Character): ClassStyle {
 export function defaultSectionOrder(character: Character): CharacterSection[] {
   const order = STYLE_ORDER[classStyle(character)];
   const rankOf = (section: CharacterSection): number => {
-    const index = order.indexOf(section.key);
+    // The default order runs before any spell-card expansion, so every key is a
+    // fixed SectionKey here; the cast satisfies the SectionKey[] lookup.
+    const index = order.indexOf(section.key as SectionKey);
     return index === -1 ? order.length : index;
   };
 

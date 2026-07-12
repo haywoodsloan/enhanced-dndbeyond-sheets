@@ -24,8 +24,15 @@ export const SECTION_KEYS = [
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
+/**
+ * A card's layout key: a fixed section, or a synthetic per-spell card
+ * (`spell:<slug>`) when the Spells section is expanded into individual cards.
+ * The layout system (packing, drag, hide, persistence) keys off this string.
+ */
+export type CardKey = SectionKey | `spell:${string}`;
+
 export interface CharacterSection {
-  key: SectionKey;
+  key: CardKey;
   title: string;
   /** Number of entries in the section. */
   count: number;

@@ -193,6 +193,34 @@ export function damageTypeName(id: number | null | undefined): string | undefine
   return id == null ? undefined : DAMAGE_TYPES[id];
 }
 
+/** A spell school's periodic-table symbol and accent colour. */
+export interface SpellSchoolStyle {
+  abbr: string;
+  color: string;
+}
+
+/** The eight schools of magic, each with a 2-letter symbol and accent colour. */
+export const SPELL_SCHOOLS: Readonly<Record<string, SpellSchoolStyle>> = {
+  Abjuration: { abbr: 'Ab', color: '#3b82f6' },
+  Conjuration: { abbr: 'Cj', color: '#f59e0b' },
+  Divination: { abbr: 'Dv', color: '#06b6d4' },
+  Enchantment: { abbr: 'En', color: '#ec4899' },
+  Evocation: { abbr: 'Ev', color: '#ef4444' },
+  Illusion: { abbr: 'Il', color: '#8b5cf6' },
+  Necromancy: { abbr: 'Nc', color: '#10b981' },
+  Transmutation: { abbr: 'Tr', color: '#84cc16' },
+};
+
+/** School symbol + colour, falling back to a neutral style for unknown schools. */
+export function spellSchoolStyle(school: string | undefined): SpellSchoolStyle {
+  return (
+    (school ? SPELL_SCHOOLS[school] : undefined) ?? {
+      abbr: school ? school.slice(0, 2) : '—',
+      color: '#6b7280',
+    }
+  );
+}
+
 /** How strongly a proficiency applies to a skill or save. */
 export type ProficiencyLevel = 'none' | 'half' | 'proficient' | 'expertise';
 

@@ -142,4 +142,33 @@ test.describe('sheet layout controls', () => {
     await expect(page.locator(`.hidden-tray [data-section-key="${key}"]`)).toBeVisible();
     expect(await page.locator(`.page [data-section-key="${key}"]`).count()).toBe(0);
   });
+
+  test('expands spells into individual cards and collapses back', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+
+    // Starts as one quick-sheet spells card with an expand control.
+    expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(1);
+    expect(await page.locator('.page [data-section-key^="spell:"]').count()).toBe(0);
+
+    await page.locator('.page [data-section-key="spells"] .spells__expand').click();
+    await settle(page);
+
+    // Each spell is now its own card; the single spells card is gone.
+    expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(0);
+    expect(
+      await page.locator('.page [data-section-key^="spell:"]').count(),
+    ).toBeGreaterThan(1);
+
+    // A spell card's collapse control returns to the quick sheet.
+    await page
+      .locator('.page [data-section-key^="spell:"] .spell-card__collapse')
+      .first()
+      .click();
+    await settle(page);
+    expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(1);
+    expect(await page.locator('.page [data-section-key^="spell:"]').count()).toBe(0);
+  });
 });

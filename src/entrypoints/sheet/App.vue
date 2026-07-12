@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, nextTick, onUnmounted, ref, toRef, watch, watchEffect } from 'vue';
+import { computed, nextTick, onUnmounted, provide, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
 import { palette, updatePrimaryPalette } from '@primevue/themes';
 import { useCharacter } from '@/composables/useCharacter';
@@ -30,7 +30,7 @@ import {
   placementStyle,
   type PositionedFootprint,
 } from '@/utils/layout/pack-sections';
-import type { CharacterSection, SectionKey } from '@/services/dndbeyond/model';
+import type { CardKey, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
 import {
   DEFAULT_FORMAT_ID,
   DEFAULT_MARGIN_ID,
@@ -46,9 +46,11 @@ import {
   PAGE_FORMAT_KEY,
   PAGE_MARGIN_KEY,
   PAGE_ORIENTATION_KEY,
+  SPELLS_EXPANDED_KEY,
   THEME_COLOR_KEY,
 } from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
+import { isSpellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */
 const PAGE_GUTTER = 20;
@@ -170,6 +172,14 @@ function onProfileDragEnd() {
   profileDragGeom = null;
 }
 
+// Whether the Spells section is shown as individual per-spell cards (per-profile,
+// reloads on a profile switch). Provided as a toggle so the Spells quick-sheet's
+// expand button and each spell card's collapse button can flip it.
+const spellsExpanded = useStoredRef(SPELLS_EXPANDED_KEY, false, activeProfileId);
+provide(ToggleSpellCardsKey, () => {
+  spellsExpanded.value = !spellsExpanded.value;
+});
+
 const {
   sections: orderedSections,
   hiddenSections,
@@ -181,7 +191,7 @@ const {
   hide,
   show,
   reset: resetLayout,
-} = useSectionLayout(character, activeProfileId);
+} = useSectionLayout(character, activeProfileId, spellsExpanded);
 
 // Page layout settings (page type, margins, theme color), scoped to the active
 // profile so each profile keeps its own paper + accent.
@@ -260,8 +270,9 @@ const sheetRef = ref<HTMLElement | null>(null);
 // height and reports it here; `footprints` shrinks that card to fit. Cards that
 // fill their height are ignored, so they keep their curated estimate.
 const measuredHeights = ref<Record<string, number>>({});
-function onMeasure(key: SectionKey, height: number) {
-  if (!CONTENT_FIT_SECTIONS.has(key)) return;
+function onMeasure(key: CardKey, height: number) {
+  // Spell cards have a fixed footprint; only content-fit sections shrink to text.
+  if (isSpellCardKey(key) || !CONTENT_FIT_SECTIONS.has(key)) return;
   if (Math.abs((measuredHeights.value[key] ?? 0) - height) < 1) return;
   measuredHeights.value = { ...measuredHeights.value, [key]: height };
 }
@@ -379,7 +390,7 @@ const { dragging } = useCardDrag(sheetRef, {
   // Move the dragged card's cell to wherever the pointer is and stamp it newest,
   // so the packer seats it first: it takes that cell and any card already there
   // flows aside. Any spot on the grid is a valid drop.
-  onPlace: (key, cell) => placeCard(key as SectionKey, cell),
+  onPlace: (key, cell) => placeCard(key as CardKey, cell),
   // Resolve the cell under the pointer, clamped so the card stays whole and
   // within the existing pages (no blank page from dropping past the last sheet).
   // Returns null when the card already sits there, so we don't churn its recency.
@@ -410,7 +421,7 @@ const { dragging } = useCardDrag(sheetRef, {
 // neighbours flow to make room, instead of the card jumping to a fresh default
 // position.
 const layoutChanging = ref(false);
-function onCycleLayout(key: SectionKey) {
+function onCycleLayout(key: CardKey) {
   const index = orderedSections.value.findIndex((section) => section.key === key);
   if (index < 0) return;
   const perPage = rowsPerPage.value;

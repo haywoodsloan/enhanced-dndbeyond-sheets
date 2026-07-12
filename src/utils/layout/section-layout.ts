@@ -1,4 +1,5 @@
-import type { SectionKey } from '@/services/dndbeyond/model';
+import type { CardKey, SectionKey } from '@/services/dndbeyond/model';
+import { isSpellCardKey, SPELL_CARD_SPAN } from '@/utils/layout/spell-cards';
 
 /** How many grid columns and row-units a section's card spans. */
 export interface SectionSpan {
@@ -110,12 +111,14 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
 };
 
 /** How many layout options a section offers (1 = no toggle). */
-export function sectionLayoutCount(key: SectionKey): number {
+export function sectionLayoutCount(key: CardKey): number {
+  if (isSpellCardKey(key)) return 1;
   return SECTION_LAYOUTS[key]?.length ?? 1;
 }
 
 /** The label of a section's chosen layout option (empty when it has none). */
-export function sectionLayoutLabel(key: SectionKey, layoutIndex = 0): string {
+export function sectionLayoutLabel(key: CardKey, layoutIndex = 0): string {
+  if (isSpellCardKey(key)) return '';
   const options = SECTION_LAYOUTS[key];
   if (!options || options.length === 0) return '';
   return options[clampIndex(layoutIndex, options.length)].label;
@@ -135,11 +138,13 @@ function clampIndex(index: number, length: number): number {
  * rows (one page tall). Sections without curated layouts keep a fixed footprint.
  */
 export function sectionSpan(
-  key: SectionKey,
+  key: CardKey,
   count = 0,
   layoutIndex = 0,
   rowsPerPage?: number,
 ): SectionSpan {
+  // A per-spell card has a fixed 1×2 footprint and no layout options.
+  if (isSpellCardKey(key)) return { ...SPELL_CARD_SPAN };
   const options = SECTION_LAYOUTS[key];
   if (options && options.length > 0) {
     const option = options[clampIndex(layoutIndex, options.length)];
@@ -167,7 +172,7 @@ export function sectionSpan(
  * disabled.
  */
 export function nextViableLayoutIndex(
-  key: SectionKey,
+  key: CardKey,
   current: number,
   count: number,
   rowsPerPage: number,
@@ -186,7 +191,7 @@ export function nextViableLayoutIndex(
  * other option would overflow a page), the toggle is disabled.
  */
 export function canCycleLayout(
-  key: SectionKey,
+  key: CardKey,
   current: number,
   count: number,
   rowsPerPage: number,

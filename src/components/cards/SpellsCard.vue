@@ -1,11 +1,15 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
+import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 
 const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
+
+// Injected by App: flip this section into individual per-spell cards.
+const expand = inject(ToggleSpellCardsKey, undefined);
 
 const groups = computed(() => {
   const byLevel = new Map<number, SpellEntry[]>();
@@ -51,6 +55,23 @@ function spellTags(spell: SpellEntry): string {
 
 <template>
   <div class="spells">
+    <div v-if="expand" class="spells__toolbar">
+      <button
+        type="button"
+        class="spells__expand"
+        title="Show individual spell cards"
+        aria-label="Show individual spell cards"
+        @click="expand"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+          <rect x="14" y="16" width="7" height="5" rx="1" />
+        </svg>
+        <span>Cards</span>
+      </button>
+    </div>
     <div v-if="spellcasting" class="spells__casting" data-spellcasting>
       <span class="spells__stat">Atk <b>{{ formatModifier(spellcasting.attack) }}</b></span>
       <span class="spells__stat">Save <b>DC {{ spellcasting.saveDc }}</b></span>
@@ -92,6 +113,45 @@ function spellTags(spell: SpellEntry): string {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Top-right toolbar holding the expand-to-cards control. */
+.spells__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}
+
+.spells__expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--p-text-muted-color, #71717a);
+  background: none;
+  border: 1px solid var(--p-primary-200, #e4e4e7);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.spells__expand:hover {
+  border-color: var(--p-primary-400, #9ca3af);
+  color: var(--p-primary-600, #52525b);
+}
+
+.spells__expand svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+/* The expand control is a screen-only affordance. */
+@media print {
+  .spells__toolbar {
+    display: none;
+  }
 }
 
 /* Spell attack / save DC / ability modifier summary. */

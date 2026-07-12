@@ -1,7 +1,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
-import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
+import type { CardKey, Character, CharacterSection } from '@/services/dndbeyond/model';
 import { defaultSectionOrder } from '@/utils/layout/section-order';
 import { sectionLayoutCount } from '@/utils/layout/section-layout';
+import { spellCardKey } from '@/utils/layout/spell-cards';
 import {
   DEFAULT_PROFILE_ID,
   HIDDEN_SECTIONS_KEY,
@@ -23,12 +24,34 @@ const PLACEMENT_PERSIST_DELAY = 500;
  * to move a section into (or out of) the not-printed tray, and `setLayout` to
  * change a card's density — all persisted to `storage.sync`.
  */
+/**
+ * Replace the single `spells` section with one card per spell (`spell:<slug>`),
+ * in the same slot, so each spell participates in the grid as a first-class
+ * card. Returns the list unchanged when there's no spells section or no spells.
+ */
+function expandSpellSection(
+  sections: CharacterSection[],
+  character: Character,
+): CharacterSection[] {
+  if (!character.spells.length) return sections;
+  const index = sections.findIndex((section) => section.key === 'spells');
+  if (index === -1) return sections;
+  const spellCards: CharacterSection[] = character.spells.map((spell) => ({
+    key: spellCardKey(spell.name),
+    title: spell.name,
+    count: 1,
+    isEmpty: false,
+  }));
+  return [...sections.slice(0, index), ...spellCards, ...sections.slice(index + 1)];
+}
+
 export function useSectionLayout(
   character: Ref<Character | null>,
   profileId: Ref<string> = ref(DEFAULT_PROFILE_ID),
+  spellsExpanded: Ref<boolean> = ref(false),
 ) {
   const sections = ref<CharacterSection[]>([]);
-  const hiddenKeys = ref<SectionKey[]>([]);
+  const hiddenKeys = ref<CardKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
   /** Card placements: section key → the cell (page, col, row-in-page) the user
    * moved it to, plus a `seq` recency stamp (higher = moved more recently). A
@@ -40,7 +63,7 @@ export function useSectionLayout(
 
   // The active profile's scoped settings (the default profile uses the original,
   // unscoped keys). Recomputed per call so a profile switch takes effect.
-  const hiddenPref = () => scopedPreference<SectionKey[]>(HIDDEN_SECTIONS_KEY, profileId.value);
+  const hiddenPref = () => scopedPreference<CardKey[]>(HIDDEN_SECTIONS_KEY, profileId.value);
   const layoutPref = () =>
     scopedPreference<Record<string, number>>(SECTION_LAYOUT_KEY, profileId.value);
   const anchorsPref = (id = profileId.value) =>
@@ -50,7 +73,13 @@ export function useSectionLayout(
     );
 
   function rebuild() {
-    sections.value = character.value ? defaultSectionOrder(character.value) : [];
+    const char = character.value;
+    if (!char) {
+      sections.value = [];
+      return;
+    }
+    const ordered = defaultSectionOrder(char);
+    sections.value = spellsExpanded.value ? expandSpellSection(ordered, char) : ordered;
   }
 
   async function load() {
@@ -68,6 +97,9 @@ export function useSectionLayout(
 
   onMounted(load);
   watch(character, rebuild);
+  // Expanding/collapsing the spells section swaps the single card for N spell
+  // cards (or back), keeping every card's saved placement/hidden state.
+  watch(spellsExpanded, rebuild);
   // Switching the active profile swaps in a whole different saved layout. Flush
   // any pending anchor save (to the profile it belongs to) first, then reload.
   watch(profileId, () => {
@@ -85,7 +117,7 @@ export function useSectionLayout(
     sections.value.filter((section) => hiddenSet.value.has(section.key)),
   );
 
-  function setHidden(key: SectionKey, hidden: boolean) {
+  function setHidden(key: CardKey, hidden: boolean) {
     if (hiddenKeys.value.includes(key) === hidden) return;
     hiddenKeys.value = hidden
       ? [...hiddenKeys.value, key]
@@ -99,7 +131,7 @@ export function useSectionLayout(
   /** Set a section's layout option directly. The sheet passes the next VIABLE
    * index (an option that would overflow a page is skipped), so this just stores
    * and persists the chosen index. */
-  function setLayout(key: SectionKey, index: number) {
+  function setLayout(key: CardKey, index: number) {
     const count = sectionLayoutCount(key);
     if (count <= 1) return;
     const clamped = Math.min(Math.max(0, Math.floor(index)), count - 1);
@@ -136,7 +168,7 @@ export function useSectionLayout(
    * most recently moved so it's seated first and keeps that cell. The caller (the
    * drag) skips this when the card already renders at that cell, so the seq only
    * bumps on a real move. */
-  function placeCard(key: SectionKey, cell: { page: number; col: number; row: number }) {
+  function placeCard(key: CardKey, cell: { page: number; col: number; row: number }) {
     anchors.value = {
       ...anchors.value,
       [key]: { page: cell.page, col: cell.col, row: cell.row, seq: nextSeq },
@@ -161,7 +193,7 @@ export function useSectionLayout(
   }
 
   /** Drop a card's manual placement so it rejoins the normal flow. */
-  function clearAnchor(key: SectionKey) {
+  function clearAnchor(key: CardKey) {
     if (!(key in anchors.value)) return;
     const next = { ...anchors.value };
     delete next[key];
@@ -201,7 +233,7 @@ export function useSectionLayout(
     compact,
     setLayout,
     reset,
-    hide: (key: SectionKey) => setHidden(key, true),
-    show: (key: SectionKey) => setHidden(key, false),
+    hide: (key: CardKey) => setHidden(key, true),
+    show: (key: CardKey) => setHidden(key, false),
   };
 }

@@ -14,6 +14,7 @@ import {
   PAGE_ORIENTATION_KEY,
   SECTION_ANCHORS_KEY,
   SECTION_LAYOUT_KEY,
+  SPELLS_EXPANDED_KEY,
   THEME_COLOR_KEY,
   scopedKey,
 } from './preferences';
@@ -42,6 +43,7 @@ const PROFILE_SCOPED_BASES = [
   HIDDEN_SECTIONS_KEY,
   SECTION_LAYOUT_KEY,
   SECTION_ANCHORS_KEY,
+  SPELLS_EXPANDED_KEY,
 ];
 
 /** A unique id for a new profile. */

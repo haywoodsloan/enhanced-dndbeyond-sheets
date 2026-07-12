@@ -10,12 +10,14 @@ import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
 import AttacksCard from '@/components/cards/AttacksCard.vue';
 import ActionsCard from '@/components/cards/ActionsCard.vue';
 import SpellsCard from '@/components/cards/SpellsCard.vue';
+import SpellCard from '@/components/cards/SpellCard.vue';
 import InventoryCard from '@/components/cards/InventoryCard.vue';
 import WealthCard from '@/components/cards/WealthCard.vue';
 import FeaturesCard from '@/components/cards/FeaturesCard.vue';
 import NotesCard from '@/components/cards/NotesCard.vue';
-import type { Character, CharacterSection, SectionKey } from '@/services/dndbeyond/model';
+import type { CardKey, Character, CharacterSection } from '@/services/dndbeyond/model';
 import { inventoryListColumns, type SectionSpan } from '@/utils/layout/section-layout';
+import { isSpellCardKey, spellCardKey } from '@/utils/layout/spell-cards';
 import { characterSubtitle } from '@/utils/character/character-summary';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -44,12 +46,12 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  hide: [key: SectionKey];
-  show: [key: SectionKey];
-  cycleLayout: [key: SectionKey];
+  hide: [key: CardKey];
+  show: [key: CardKey];
+  cycleLayout: [key: CardKey];
   /** The card's natural content height (px), so the sheet can shrink a
    * content-fit card's footprint to fit its text. */
-  measure: [key: SectionKey, height: number];
+  measure: [key: CardKey, height: number];
 }>();
 
 const cardStyle = computed(() => {
@@ -75,6 +77,15 @@ const cardSubtitle = computed(() =>
   props.section.key === 'basics' && props.character
     ? characterSubtitle(props.character)
     : '',
+);
+
+// For a synthetic per-spell card, the SpellEntry it renders (matched by key).
+const spell = computed(() =>
+  isSpellCardKey(props.section.key)
+    ? props.character?.spells.find(
+        (entry) => spellCardKey(entry.name) === props.section.key,
+      )
+    : undefined,
 );
 
 // Report the card's natural content height so the sheet can shrink a
@@ -250,6 +261,7 @@ watch(
         v-else-if="section.key === 'notes' && character"
         :notes="character.notes"
       />
+      <SpellCard v-else-if="spell" :spell="spell" />
       <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
       <p v-else class="card__note">Details coming soon.</p>
       <span v-if="!hidden" ref="endRef" class="card__end" aria-hidden="true"></span>
