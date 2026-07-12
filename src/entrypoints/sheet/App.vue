@@ -12,7 +12,6 @@ import {
   GRID_COLUMNS,
   GRID_GAP,
   CONTENT_FIT_SECTIONS,
-  canCycleLayout,
   gridRowsPerPage,
   nextViableLayoutIndex,
   rowsForHeight,
@@ -51,6 +50,12 @@ import {
 } from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
 import { isSpellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
+import {
+  continuationKey,
+  isContinuationKey,
+  sliceContent,
+  type CardMeasurement,
+} from '@/utils/layout/card-continuation';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */
 const PAGE_GUTTER = 20;
@@ -61,6 +66,9 @@ interface PageEntry {
   index: number;
   span: SectionSpan;
   place: { gridColumn: string; gridRow: string };
+  /** Body-relative px to translate this card's slice up by (0 unless a
+   * continuation of an overflowing content-fit card). */
+  sliceOffset: number;
 }
 
 const props = defineProps<{ characterId: number | null }>();
@@ -266,43 +274,105 @@ const pageStyle = computed(() => ({
 
 const sheetRef = ref<HTMLElement | null>(null);
 
-// A content-fit card (actions/spells/features/notes) measures its real content
-// height and reports it here; `footprints` shrinks that card to fit. Cards that
-// fill their height are ignored, so they keep their curated estimate.
-const measuredHeights = ref<Record<string, number>>({});
-function onMeasure(key: CardKey, height: number) {
-  // Spell cards have a fixed footprint; only content-fit sections shrink to text.
-  if (isSpellCardKey(key) || !CONTENT_FIT_SECTIONS.has(key)) return;
-  if (Math.abs((measuredHeights.value[key] ?? 0) - height) < 1) return;
-  measuredHeights.value = { ...measuredHeights.value, [key]: height };
+// A content-fit card (attacks/actions/spells/features) measures its body
+// geometry and reports it here; `plannedCards` sizes that card to its content
+// and slices an over-tall one onto continuation cards. Cards that fill their
+// height (and per-spell cards) are ignored, so they keep their curated estimate.
+const measuredHeights = ref<Record<string, CardMeasurement>>({});
+function onMeasure(key: CardKey, measurement: CardMeasurement) {
+  // Only content-fit base sections size to their text: ignore spell cards,
+  // continuation cards (they mirror their base), and fill cards.
+  if (isSpellCardKey(key) || isContinuationKey(key) || !CONTENT_FIT_SECTIONS.has(key)) return;
+  const prev = measuredHeights.value[key];
+  if (
+    prev &&
+    Math.abs(prev.total - measurement.total) < 1 &&
+    Math.abs(prev.chrome - measurement.chrome) < 1
+  ) {
+    return;
+  }
+  measuredHeights.value = { ...measuredHeights.value, [key]: measurement };
 }
 
-// Footprint (columns × row-units) of each visible card, packed into the grid.
+// Extra body room (px) beyond the measured content when sizing a card, so its
+// last line isn't cut flush at the card edge (mirrors the old measurement pad).
+const CARD_CONTENT_PAD = 12;
+
+// The body content height (px) that fits inside a full-page-tall card, after its
+// title/padding `chrome` — the ceiling a slice may reach before it continues.
+function pageBodyHeight(chrome: number): number {
+  const perPage = rowsPerPage.value;
+  return perPage * rowUnit.value + (perPage - 1) * GRID_GAP - chrome - CARD_CONTENT_PAD;
+}
+
+/** A card queued for layout — a section, or a continuation slice of one. */
+interface PlannedCard {
+  key: CardKey;
+  section: CharacterSection;
+  cols: number;
+  rows: number;
+  /** Body-relative px this card's slice is translated up by (0 for the first). */
+  sliceOffset: number;
+  /** The base section's entry count (for layout viability). */
+  count: number;
+}
+
+// The cards actually laid out: every visible section, plus continuation cards for
+// any content-fit section whose measured body is too tall for one page. A
+// content-fit card grows to its measured text (up to a page); beyond that, the
+// overflow spills onto `<title> (cont.)` cards that flow in reading order right
+// after it. Everything downstream (footprints, packing, pages, drag) keys off
+// this list, so continuations pack and paginate like any other card.
+const plannedCards = computed<PlannedCard[]>(() => {
+  const perPage = rowsPerPage.value;
+  const ru = rowUnit.value;
+  const cards: PlannedCard[] = [];
+  for (const section of orderedSections.value) {
+    const layoutIndex = layoutIndices.value[section.key] ?? 0;
+    const estimate = sectionSpan(section.key, section.count, layoutIndex, perPage);
+    const measured = measuredHeights.value[section.key];
+    // No measurement (fill cards, per-spell cards, pre-measure, and tests without
+    // a layout engine): keep the curated count-based estimate as a single card.
+    if (measured === undefined) {
+      cards.push({
+        key: section.key,
+        section,
+        cols: estimate.cols,
+        rows: estimate.rows,
+        sliceOffset: 0,
+        count: section.count,
+      });
+      continue;
+    }
+    // Size to the measured text, splitting into page-tall slices at item
+    // boundaries when it's taller than a page.
+    const { chrome, total, breaks } = measured;
+    const slices = sliceContent(breaks, total, Math.max(1, pageBodyHeight(chrome)));
+    slices.forEach((slice, sliceIndex) => {
+      const rows = rowsForHeight(chrome + slice.height + CARD_CONTENT_PAD, ru, GRID_GAP, perPage);
+      const key = sliceIndex === 0 ? section.key : continuationKey(section.key, sliceIndex);
+      cards.push({
+        key,
+        section:
+          sliceIndex === 0 ? section : { ...section, key, title: `${section.title} (cont.)` },
+        cols: estimate.cols,
+        rows,
+        sliceOffset: slice.offset,
+        count: section.count,
+      });
+    });
+  }
+  return cards;
+});
+
+// Footprint (columns × row-units) of each planned card, packed into the grid.
 // This replaces the margin-push paginator: cards are placed explicitly on real
 // multi-row tracks, so a tall card's shorter neighbours fill the space beside it
 // (no dead gaps) and a card that would straddle a page break is bumped whole to
 // the next page. Page count, the row template, and each card's grid position all
 // derive from this one pure computation, so a reorder reflows deterministically.
 const footprints = computed(() =>
-  orderedSections.value.map((section) => {
-    const estimate = sectionSpan(
-      section.key,
-      section.count,
-      layoutIndices.value[section.key] ?? 0,
-      rowsPerPage.value,
-    );
-    // A content-fit card reports its real content height; shrink its footprint to
-    // fit so a short list doesn't reserve a tall, half-empty card. Others fill
-    // their height by design and have no measured entry (kept at the estimate);
-    // so does every card before it measures (and in tests without a layout
-    // engine).
-    const measured = measuredHeights.value[section.key];
-    if (measured === undefined) return estimate;
-    return {
-      cols: estimate.cols,
-      rows: rowsForHeight(measured, rowUnit.value, GRID_GAP, estimate.rows),
-    };
-  }),
+  plannedCards.value.map((card) => ({ cols: card.cols, rows: card.rows })),
 );
 // Every card has a cell AND a recency — no placed-vs-regular distinction. A card
 // the user moved uses its saved cell as its `home`; a card left alone uses its
@@ -315,10 +385,23 @@ const defaultPlacements = computed(() =>
 );
 const positionedFootprints = computed<PositionedFootprint[]>(() => {
   const perPage = rowsPerPage.value;
-  const count = orderedSections.value.length;
-  return orderedSections.value.map((section, index) => {
-    const base = footprints.value[index];
-    const moved = anchors.value[section.key];
+  const cards = plannedCards.value;
+  const count = cards.length;
+  // A continuation trails its base card: it borrows the base's resolved home and
+  // a priority just below it, so the packer seats it in the free cell right after
+  // the base — following it even when the base was dragged or compacted. A base
+  // left alone keeps its own default-flow home (reading-order correct), and its
+  // continuations then flow naturally at their own default cells.
+  let base = { anchored: false, home: { col: 0, row: 0 }, priority: 0, run: 0 };
+  return cards.map((card, index) => {
+    if (isContinuationKey(card.key)) {
+      base.run += 1;
+      const fallback = defaultPlacements.value.placements[index];
+      const home = base.anchored ? { ...base.home } : { col: fallback.col, row: fallback.row };
+      const priority = base.anchored ? base.priority - base.run * 0.001 : index - count;
+      return { cols: card.cols, rows: card.rows, home, priority };
+    }
+    const moved = anchors.value[card.key];
     const home = moved
       ? { col: moved.col, row: moved.page * perPage + moved.row }
       : defaultPlacements.value.placements[index];
@@ -327,9 +410,10 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
     // card always outranks the stationary ones — it takes its cell and they flow
     // aside.
     const priority = moved ? moved.seq : index - count;
+    base = { anchored: !!moved, home: { col: home.col, row: home.row }, priority, run: 0 };
     return {
-      cols: base.cols,
-      rows: base.rows,
+      cols: card.cols,
+      rows: card.rows,
       home: { col: home.col, row: home.row },
       priority,
     };
@@ -350,11 +434,13 @@ const pages = computed<PageEntry[][]>(() => {
   const perPage = rowsPerPage.value;
   const grouped: PageEntry[][] = Array.from({ length: pageCount.value }, () => []);
   packed.value.placements.forEach((placement, index) => {
+    const card = plannedCards.value[index];
     grouped[placementPage(placement, perPage)].push({
-      section: orderedSections.value[index],
+      section: card.section,
       index,
       span: footprints.value[index],
       place: placementStyle(placement, perPage),
+      sliceOffset: card.sliceOffset,
     });
   });
   return grouped;
@@ -397,7 +483,7 @@ const { dragging } = useCardDrag(sheetRef, {
   resolveCell: (pointer, key) => {
     const geometry = dragGeometry();
     if (!geometry) return null;
-    const index = orderedSections.value.findIndex((section) => section.key === key);
+    const index = plannedCards.value.findIndex((card) => card.key === key);
     const footprint = footprints.value[index];
     if (!footprint) return null;
     const perPage = rowsPerPage.value;
@@ -421,15 +507,62 @@ const { dragging } = useCardDrag(sheetRef, {
 // neighbours flow to make room, instead of the card jumping to a fresh default
 // position.
 const layoutChanging = ref(false);
+
+// Whether a content-fit card's measured content would overflow a page at a given
+// column count — estimated by conserving area (a narrower card is proportionally
+// taller). Lets the layout toggle avoid switching to a narrower option that would
+// only force an overflow/continuation card.
+function overflowsAtCols(section: CharacterSection, cols: number): boolean {
+  const measured = measuredHeights.value[section.key];
+  if (!measured || cols <= 0) return false;
+  const currentCols = sectionSpan(
+    section.key,
+    section.count,
+    layoutIndices.value[section.key] ?? 0,
+    rowsPerPage.value,
+  ).cols;
+  const estContent = (measured.total * currentCols) / cols;
+  return estContent > Math.max(1, pageBodyHeight(measured.chrome));
+}
+
+// The layout index the toggle advances to. For a measured content-fit card it's
+// overflow-aware: the next option (cycle order) whose content still fits a page,
+// treating overflow as a last resort — if no other option avoids it, stay put.
+// Other cards (fill cards, unmeasured) use the estimate-based page-fit rule.
+function cardNextLayout(section: CharacterSection): number {
+  const key = section.key;
+  const current = layoutIndices.value[key] ?? 0;
+  if (isContinuationKey(key)) return current;
+  if (CONTENT_FIT_SECTIONS.has(key as SectionKey) && measuredHeights.value[key]) {
+    const total = sectionLayoutCount(key);
+    for (let step = 1; step < total; step += 1) {
+      const candidate = (current + step) % total;
+      const cols = sectionSpan(key, section.count, candidate, rowsPerPage.value).cols;
+      if (!overflowsAtCols(section, cols)) return candidate;
+    }
+    return current;
+  }
+  return nextViableLayoutIndex(key, current, section.count, rowsPerPage.value);
+}
+
+// Whether the layout toggle can switch to a better-fitting option than the
+// current one (measured-aware for content-fit cards).
+function cardCanCycle(section: CharacterSection): boolean {
+  if (isContinuationKey(section.key)) return false;
+  return cardNextLayout(section) !== (layoutIndices.value[section.key] ?? 0);
+}
+
 function onCycleLayout(key: CardKey) {
-  const index = orderedSections.value.findIndex((section) => section.key === key);
+  const index = plannedCards.value.findIndex((card) => card.key === key);
   if (index < 0) return;
+  const section = plannedCards.value[index].section;
   const perPage = rowsPerPage.value;
   const current = layoutIndices.value[key] ?? 0;
-  // Skip any layout that would overflow a page — advance to the next option that
-  // still fits. If none does, there's nothing to switch to (the toggle is
-  // disabled), so bail.
-  const nextIndex = nextViableLayoutIndex(key, current, orderedSections.value[index].count, perPage);
+  // Advance to the next layout that still fits a page. For a measured content-fit
+  // card this is overflow-aware (`cardNextLayout`) so it won't switch to a
+  // narrower option that would only force a continuation; overflow stays the last
+  // resort. If nothing better fits, there's nothing to switch to, so bail.
+  const nextIndex = cardNextLayout(section);
   if (nextIndex === current) return;
 
   // Capture where the card sits RIGHT NOW (its top-left) — the cell the user
@@ -503,7 +636,11 @@ function compactLayout() {
   const compacted = compactPlacements(packed.value.placements, gridColumns.value, perPage);
   const cells: Record<string, { page: number; col: number; row: number }> = {};
   compacted.forEach((placement, index) => {
-    cells[orderedSections.value[index].key] = {
+    const card = plannedCards.value[index];
+    // Continuations aren't anchored — they trail their base automatically, and
+    // their keys shift as slice counts change (a stale anchor would misplace them).
+    if (isContinuationKey(card.key)) return;
+    cells[card.key] = {
       page: Math.floor(placement.row / perPage),
       col: placement.col,
       row: placement.row % perPage,
@@ -795,10 +932,11 @@ onUnmounted(() => {
                 :section="entry.section"
                 :span="entry.span"
                 :place="entry.place"
+                :slice-offset="entry.sliceOffset"
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
-                :can-cycle-layout="canCycleLayout(entry.section.key, layoutIndices[entry.section.key] ?? 0, entry.section.count, rowsPerPage)"
+                :can-cycle-layout="cardCanCycle(entry.section)"
                 @hide="hide"
                 @cycle-layout="onCycleLayout"
                 @measure="onMeasure"

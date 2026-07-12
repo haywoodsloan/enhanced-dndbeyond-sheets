@@ -171,4 +171,70 @@ test.describe('sheet layout controls', () => {
     expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(1);
     expect(await page.locator('.page [data-section-key^="spell:"]').count()).toBe(0);
   });
+
+  test('the spells card grows to fit its full list without clipping', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+    await settle(page);
+
+    // The reported bug: the spells card didn't grow to include the whole list and
+    // clipped the bottom. It should now be tall enough to show every spell.
+    const base = page.locator('.page [data-section-key="spells"]');
+    const cardBox = await base.boundingBox();
+    const bodyBox = await base.locator('.card__body').boundingBox();
+    // The card is at least as tall as its content — nothing is cut off.
+    expect(cardBox!.height).toBeGreaterThanOrEqual(bodyBox!.height);
+    // And the last spell row sits within the card's visible bounds.
+    const lastSpell = base.locator('[data-spell]').last();
+    const spellBox = await lastSpell.boundingBox();
+    expect(spellBox!.y + spellBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 2);
+  });
+
+  test('an over-tall card continues on a follow-up card', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+
+    // Compress the layout to A5 so the Features list is taller than one page.
+    await page
+      .locator('.settings__field', { hasText: 'Page type' })
+      .locator('.settings__control')
+      .click();
+    await page.getByRole('option', { name: /A5/ }).click();
+    await settle(page);
+    await page.waitForTimeout(300);
+
+    // The base Features card stays, and the overflow spills onto a continuation
+    // card titled "… (cont.)".
+    const base = page.locator('.page [data-section-key="features"]').first();
+    await expect(base).toBeVisible();
+    const cont = page.locator('.page [data-section-key="features~cont~1"]');
+    await expect(cont).toBeVisible();
+    await expect(cont).toContainText('(cont.)');
+
+    // Every narrower layout would overflow even more, so the layout toggle is
+    // disabled — overflow is the last resort, not a reason to shrink the card.
+    await expect(base.locator('.card__layout')).toBeDisabled();
+
+    // The continuation reveals a LATER slice of the same body (translated up),
+    // while the base shows the top (no transform).
+    const baseTransform = await base
+      .locator('.card__body')
+      .evaluate((el) => getComputedStyle(el).transform);
+    const contTransform = await cont
+      .locator('.card__body')
+      .evaluate((el) => getComputedStyle(el).transform);
+    expect(['none', 'matrix(1, 0, 0, 1, 0, 0)']).toContain(baseTransform);
+    expect(contTransform).not.toBe('none');
+
+    // The base card is capped at one printable page (it grew to fit, not beyond),
+    // so nothing is clipped off the bottom of an over-tall single card.
+    const gridBox = await page.locator('.page__grid').first().boundingBox();
+    const baseBox = await base.boundingBox();
+    expect(baseBox!.height).toBeLessThanOrEqual(gridBox!.height + 3);
+
+    // Continuations are display-only: no drag handle or hide/layout controls.
+    expect(await cont.locator('.card__drag-handle').count()).toBe(0);
+    expect(await cont.locator('.card__toggle').count()).toBe(0);
+  });
 });

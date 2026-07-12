@@ -202,21 +202,21 @@ describe('SectionCard', () => {
   });
 
   it('measures its content height and emits it for the sheet to shrink to fit', async () => {
-    // happy-dom has no layout, so feed geometry: the end sentinel sits 120px
-    // below the card top (the card top itself reads 0).
+    // happy-dom has no layout, so feed geometry: the card body reads 120px tall
+    // (its natural content height) with its top flush to the card top.
     const gbcr = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: HTMLElement) {
-        const top = this.classList?.contains('card__end') ? 120 : 0;
+        const height = this.classList?.contains('card__body') ? 120 : 0;
         return {
-          top,
-          bottom: top,
+          top: 0,
+          bottom: height,
           left: 0,
           right: 0,
           width: 0,
-          height: 0,
+          height,
           x: 0,
-          y: top,
+          y: 0,
           toJSON: () => ({}),
         } as DOMRect;
       });
@@ -238,10 +238,14 @@ describe('SectionCard', () => {
 
     const measured = wrapper.emitted('measure');
     expect(measured).toBeTruthy();
-    // Reports [key, contentHeight]: sentinel top − card top (120) plus the pad.
+    // Reports [key, { chrome, total, breaks }]: the body's natural height (120),
+    // the title/padding chrome above it, and the item break offsets.
     const last = measured![measured!.length - 1];
     expect(last[0]).toBe('actions');
-    expect(last[1] as number).toBeGreaterThanOrEqual(120);
+    const geometry = last[1] as { chrome: number; total: number; breaks: number[] };
+    expect(geometry.total).toBeGreaterThanOrEqual(120);
+    expect(geometry.chrome).toBe(0);
+    expect(Array.isArray(geometry.breaks)).toBe(true);
 
     wrapper.unmount();
     gbcr.mockRestore();

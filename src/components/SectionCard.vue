@@ -18,6 +18,11 @@ import NotesCard from '@/components/cards/NotesCard.vue';
 import type { CardKey, Character, CharacterSection } from '@/services/dndbeyond/model';
 import { inventoryListColumns, type SectionSpan } from '@/utils/layout/section-layout';
 import { isSpellCardKey, spellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
+import {
+  continuationBaseKey,
+  isContinuationKey,
+  type CardMeasurement,
+} from '@/utils/layout/card-continuation';
 import { characterSubtitle } from '@/utils/character/character-summary';
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -41,17 +46,20 @@ const props = withDefaults(
     /** False when no layout OTHER than the current one fits a page — the toggle
      * is then rendered disabled. Defaults to true (enabled). */
     canCycleLayout?: boolean;
+    /** Body-relative px this card's body is translated up by when it's a
+     * continuation slice of an overflowing card (0 for a normal/base card). */
+    sliceOffset?: number;
   }>(),
-  { canCycleLayout: true },
+  { canCycleLayout: true, sliceOffset: 0 },
 );
 
 const emit = defineEmits<{
   hide: [key: CardKey];
   show: [key: CardKey];
   cycleLayout: [key: CardKey];
-  /** The card's natural content height (px), so the sheet can shrink a
-   * content-fit card's footprint to fit its text. */
-  measure: [key: CardKey, height: number];
+  /** The card's measured body geometry, so the sheet can size a content-fit
+   * card's footprint to its text and split it across continuation cards. */
+  measure: [key: CardKey, measurement: CardMeasurement];
 }>();
 
 const cardStyle = computed(() => {
@@ -79,12 +87,18 @@ const cardSubtitle = computed(() =>
     : '',
 );
 
+// A continuation card renders the SAME body as its base card, shifted up to show
+// the overflow slice; `bodyKey` is the base key its content dispatches on.
+const bodyKey = computed(() => continuationBaseKey(props.section.key));
+const isContinuation = computed(() => isContinuationKey(props.section.key));
+const bodyStyle = computed(() =>
+  props.sliceOffset ? { transform: `translateY(-${props.sliceOffset}px)` } : {},
+);
+
 // For a synthetic per-spell card, the SpellEntry it renders (matched by key).
 const spell = computed(() =>
-  isSpellCardKey(props.section.key)
-    ? props.character?.spells.find(
-        (entry) => spellCardKey(entry.name) === props.section.key,
-      )
+  isSpellCardKey(bodyKey.value)
+    ? props.character?.spells.find((entry) => spellCardKey(entry.name) === bodyKey.value)
     : undefined,
 );
 
@@ -93,7 +107,7 @@ const spell = computed(() =>
 // and sits in the header control group next to the layout/hide buttons.
 const toggleSpellCards = inject(ToggleSpellCardsKey, undefined);
 const spellControl = computed<'expand' | 'collapse' | null>(() => {
-  if (props.hidden || !toggleSpellCards) return null;
+  if (props.hidden || isContinuation.value || !toggleSpellCards) return null;
   if (props.section.key === 'spells' && (props.character?.spells.length ?? 0) > 0) {
     return 'expand';
   }
@@ -102,24 +116,34 @@ const spellControl = computed<'expand' | 'collapse' | null>(() => {
 // Sits left of the layout button when one is present, else in the layout slot.
 const spellControlRight = computed(() => ((props.layoutCount ?? 1) > 1 ? '52px' : '28px'));
 
-// Report the card's natural content height so the sheet can shrink a
-// content-fit card's footprint to its text (the packer otherwise reserves a
-// count-based estimate that can leave a tall, half-empty card). Measured from
-// the card's top to a zero-height sentinel just after the body: a card that
-// FILLS its height keeps the sentinel at the bottom (≈ the allocated height, so
-// nothing shrinks), a shorter list puts it at the content's end. No-ops without
-// a layout engine (happy-dom returns 0), so tests keep the estimate.
-const endRef = ref<HTMLElement | null>(null);
-const CARD_CONTENT_PAD = 12;
+// Report the card's body geometry so the sheet can size a content-fit card's
+// footprint to its text and split an over-tall card across continuation cards.
+// We measure the wrapping `.card__body`: its height is the natural content
+// height (the packer otherwise reserves a count-based estimate that can clip a
+// tall body or leave a half-empty card), `chrome` is the title/padding above it,
+// and `breaks` are the item boundaries a slice may end on. No-ops without a
+// layout engine (happy-dom returns 0), so tests keep the estimate.
+const bodyRef = ref<HTMLElement | null>(null);
+
+// The per-item elements a card may break between when its content overflows
+// onto a continuation card (one selector across every content-fit card type).
+const BREAK_ITEMS = '[data-spell],[data-action],[data-attack],[data-feature]';
 
 function measure() {
-  if (props.hidden) return;
-  const end = endRef.value;
-  const card = end?.closest('.card');
-  if (!end || !card) return;
-  const height = end.getBoundingClientRect().top - card.getBoundingClientRect().top;
-  if (height <= 0) return;
-  emit('measure', props.section.key, height + CARD_CONTENT_PAD);
+  // Continuations mirror their base card's body, so only the base card measures.
+  if (props.hidden || isContinuation.value) return;
+  const body = bodyRef.value;
+  const card = body?.closest('.card');
+  if (!body || !card) return;
+  const bodyRect = body.getBoundingClientRect();
+  const total = bodyRect.height;
+  if (total <= 0) return;
+  const chrome = bodyRect.top - card.getBoundingClientRect().top;
+  const breaks = Array.from(body.querySelectorAll(BREAK_ITEMS))
+    .map((el) => el.getBoundingClientRect().bottom - bodyRect.top)
+    .filter((offset) => offset > 0)
+    .sort((a, b) => a - b);
+  emit('measure', props.section.key, { chrome, total, breaks });
 }
 
 let resizeObserver: ResizeObserver | null = null;
@@ -127,7 +151,7 @@ onMounted(() => {
   void nextTick(measure);
   // Re-measure once webfonts settle (they change text heights).
   if (typeof document !== 'undefined') void document.fonts?.ready?.then(measure);
-  const card = endRef.value?.closest('.card');
+  const card = bodyRef.value?.closest('.card');
   if (typeof ResizeObserver !== 'undefined' && card) {
     resizeObserver = new ResizeObserver(() => measure());
     resizeObserver.observe(card);
@@ -164,7 +188,7 @@ watch(
     </template>
     <template #content>
       <span
-        v-if="!hidden"
+        v-if="!hidden && !isContinuation"
         v-tooltip.bottom="{ value: 'Drag to reorder', showDelay: 500 }"
         class="card__drag-handle"
         aria-hidden="true"
@@ -202,7 +226,7 @@ watch(
         </svg>
       </button>
       <button
-        v-if="!hidden && (layoutCount ?? 1) > 1"
+        v-if="!hidden && !isContinuation && (layoutCount ?? 1) > 1"
         type="button"
         class="card__layout"
         :disabled="!canCycleLayout"
@@ -226,6 +250,7 @@ watch(
         </svg>
       </button>
       <button
+        v-if="!isContinuation"
         type="button"
         class="card__toggle"
         v-tooltip.bottom="{ value: hidden ? 'Show section' : 'Hide section', showDelay: 500 }"
@@ -244,73 +269,74 @@ watch(
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
-      <PortraitCard
-        v-if="section.key === 'portrait' && character?.avatarUrl"
-        :avatar-url="character.avatarUrl"
-      />
-      <AbilityScores
-        v-else-if="section.key === 'attributes' && character"
-        :abilities="character.abilities"
-        :cols="span.cols"
-        :rows="span.rows"
-      />
-      <BasicsCard
-        v-else-if="section.key === 'basics' && character"
-        :basics="character.basics"
-      />
-      <SavingThrowsCard
-        v-else-if="section.key === 'savingThrows' && character"
-        :saves="character.savingThrows"
-        :defences="character.defences"
-      />
-      <SensesCard
-        v-else-if="section.key === 'senses' && character"
-        :senses="character.senses"
-      />
-      <SkillsCard
-        v-else-if="section.key === 'skills' && character"
-        :skills="character.skills"
-        :columns="span.cols"
-      />
-      <ProficienciesCard
-        v-else-if="section.key === 'proficiencies' && character"
-        :proficiencies="character.proficiencies"
-        :columns="span.cols"
-      />
-      <AttacksCard
-        v-else-if="section.key === 'attacks' && character"
-        :attacks="character.attacks"
-      />
-      <ActionsCard
-        v-else-if="section.key === 'actions' && character"
-        :actions="character.actions"
-      />
-      <SpellsCard
-        v-else-if="section.key === 'spells' && character"
-        :spells="character.spells"
-        :spellcasting="character.spellcasting"
-      />
-      <InventoryCard
-        v-else-if="section.key === 'inventory' && character"
-        :inventory="character.inventory"
-        :columns="inventoryListColumns(section.count, span)"
-      />
-      <WealthCard
-        v-else-if="section.key === 'wealth' && character"
-        :wealth="character.wealth"
-      />
-      <FeaturesCard
-        v-else-if="section.key === 'features' && character"
-        :features="character.features"
-      />
-      <NotesCard
-        v-else-if="section.key === 'notes' && character"
-        :notes="character.notes"
-      />
-      <SpellCard v-else-if="spell" :spell="spell" />
-      <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
-      <p v-else class="card__note">Details coming soon.</p>
-      <span v-if="!hidden" ref="endRef" class="card__end" aria-hidden="true"></span>
+      <div ref="bodyRef" class="card__body" :style="bodyStyle">
+        <PortraitCard
+          v-if="bodyKey === 'portrait' && character?.avatarUrl"
+          :avatar-url="character.avatarUrl"
+        />
+        <AbilityScores
+          v-else-if="bodyKey === 'attributes' && character"
+          :abilities="character.abilities"
+          :cols="span.cols"
+          :rows="span.rows"
+        />
+        <BasicsCard
+          v-else-if="bodyKey === 'basics' && character"
+          :basics="character.basics"
+        />
+        <SavingThrowsCard
+          v-else-if="bodyKey === 'savingThrows' && character"
+          :saves="character.savingThrows"
+          :defences="character.defences"
+        />
+        <SensesCard
+          v-else-if="bodyKey === 'senses' && character"
+          :senses="character.senses"
+        />
+        <SkillsCard
+          v-else-if="bodyKey === 'skills' && character"
+          :skills="character.skills"
+          :columns="span.cols"
+        />
+        <ProficienciesCard
+          v-else-if="bodyKey === 'proficiencies' && character"
+          :proficiencies="character.proficiencies"
+          :columns="span.cols"
+        />
+        <AttacksCard
+          v-else-if="bodyKey === 'attacks' && character"
+          :attacks="character.attacks"
+        />
+        <ActionsCard
+          v-else-if="bodyKey === 'actions' && character"
+          :actions="character.actions"
+        />
+        <SpellsCard
+          v-else-if="bodyKey === 'spells' && character"
+          :spells="character.spells"
+          :spellcasting="character.spellcasting"
+        />
+        <InventoryCard
+          v-else-if="bodyKey === 'inventory' && character"
+          :inventory="character.inventory"
+          :columns="inventoryListColumns(section.count, span)"
+        />
+        <WealthCard
+          v-else-if="bodyKey === 'wealth' && character"
+          :wealth="character.wealth"
+        />
+        <FeaturesCard
+          v-else-if="bodyKey === 'features' && character"
+          :features="character.features"
+        />
+        <NotesCard
+          v-else-if="bodyKey === 'notes' && character"
+          :notes="character.notes"
+        />
+        <SpellCard v-else-if="spell" :spell="spell" />
+        <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
+        <p v-else class="card__note">Details coming soon.</p>
+      </div>
     </template>
   </Card>
 </template>
@@ -323,11 +349,13 @@ watch(
   box-shadow: none;
 }
 
-/* Zero-height marker after the card body; its position IS the content's bottom,
-   which the sheet measures to shrink a content-fit card down to its text. */
-.card__end {
+/* Wraps the card body. Its natural height is what the sheet measures to size a
+   content-fit card and to slice an over-tall one onto continuation cards; a
+   continuation translates it up to reveal its slice and `overflow: hidden`
+   clips the earlier slices (so they don't bleed up over the title). */
+.card__body {
   display: block;
-  height: 0;
+  overflow: hidden;
 }
 
 /* Drag handle: a grip bar at the top-center that appears on hover; the only
@@ -492,6 +520,20 @@ watch(
 .card[data-section-key='wealth'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
+}
+
+/* These "fill" cards size to the card (not their text), and their inner card
+   uses height:100%, so the body wrapper must fill the content area too. */
+.card[data-section-key='portrait'] .card__body,
+.card[data-section-key='skills'] .card__body,
+.card[data-section-key='proficiencies'] .card__body,
+.card[data-section-key='attributes'] .card__body,
+.card[data-section-key='inventory'] .card__body,
+.card[data-section-key='wealth'] .card__body {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* The inventory's write-in rows run to the bottom edge, so trim the card's

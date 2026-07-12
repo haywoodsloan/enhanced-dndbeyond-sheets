@@ -27,6 +27,8 @@ export type SectionKey = (typeof SECTION_KEYS)[number];
 /**
  * A card's layout key: a fixed section, or a synthetic per-spell card
  * (`spell:<slug>`) when the Spells section is expanded into individual cards.
+ * Continuation cards for overflowing content reuse this string with a
+ * `<key>~cont~<n>` suffix (see `card-continuation.ts`), cast back to `CardKey`.
  * The layout system (packing, drag, hide, persistence) keys off this string.
  */
 export type CardKey = SectionKey | `spell:${string}`;

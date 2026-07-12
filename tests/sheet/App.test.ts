@@ -188,22 +188,22 @@ describe('sheet App', () => {
   });
 
   it('shrinks a content-fit card to its measured content height', async () => {
-    // Feed geometry so every card's end sentinel sits just 40px below its top:
-    // the content-fit cards (actions/spells/features/notes) then report a short
-    // height and shrink to a single row instead of their multi-row estimate.
+    // Feed geometry so every card body reads just 40px tall (flush to the card
+    // top): the content-fit cards (attacks/actions/spells/features) then report a
+    // short height and shrink to a single row instead of their multi-row estimate.
     const gbcr = vi
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: HTMLElement) {
-        const top = this.classList?.contains('card__end') ? 40 : 0;
+        const height = this.classList?.contains('card__body') ? 40 : 0;
         return {
-          top,
-          bottom: top,
+          top: 0,
+          bottom: height,
           left: 0,
           right: 0,
           width: 0,
-          height: 0,
+          height,
           x: 0,
-          y: top,
+          y: 0,
           toJSON: () => ({}),
         } as DOMRect;
       });
@@ -227,6 +227,69 @@ describe('sheet App', () => {
     // multi-row estimate even though its (empty) content measures short.
     const notesStyle = wrapper.get('[data-section-key="notes"]').attributes('style') ?? '';
     expect(notesStyle).toMatch(/grid-row:\s*\d+\s*\/\s*span 2/);
+
+    wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('overflows a tall content-fit card onto a continuation card', async () => {
+    const actions = Array.from({ length: 6 }, (_, i) => ({
+      name: `Action ${i + 1}`,
+      category: 'action' as const,
+    }));
+    const tallCharacter: Character = { ...sampleCharacter, actions };
+
+    // Feed geometry: the Actions body is 3000px tall (far taller than a page)
+    // with its six items 500px apart, so the sheet slices it onto continuations.
+    const rect = (top: number, height: number) =>
+      ({
+        top,
+        bottom: top + height,
+        left: 0,
+        right: 0,
+        width: 0,
+        height,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const card = this.closest?.('[data-section-key="actions"]');
+        if (card) {
+          if (this.classList?.contains('card__body')) return rect(0, 3000);
+          if (this.matches?.('[data-action]')) {
+            const items = Array.from(card.querySelectorAll('[data-action]'));
+            return rect((Math.max(0, items.indexOf(this)) + 1) * 500, 0);
+          }
+        }
+        return rect(0, 0);
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    mockedLoad.mockResolvedValue(tallCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await nextTick();
+    await flushPromises();
+    await nextTick();
+
+    // The base Actions card stays, and a continuation card appears in reading
+    // order, titled "Actions (cont.)" and rendered from the same section body.
+    expect(wrapper.find('[data-section-key="actions"]').exists()).toBe(true);
+    const continuation = wrapper.find('[data-section-key="actions~cont~1"]');
+    expect(continuation.exists()).toBe(true);
+    expect(continuation.text()).toContain('Actions (cont.)');
+    // Continuations carry no drag handle or hide/layout controls.
+    expect(continuation.find('.card__drag-handle').exists()).toBe(false);
+    expect(continuation.find('.card__toggle').exists()).toBe(false);
 
     wrapper.unmount();
     gbcr.mockRestore();
