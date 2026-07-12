@@ -63,3 +63,24 @@ export async function deleteProfileData(id: string): Promise<void> {
     // Best-effort cleanup; ignore storage errors.
   }
 }
+
+/**
+ * Copy every stored setting from one profile to another (best-effort) — used to
+ * duplicate a profile so the copy starts identical to its source.
+ */
+export async function copyProfileData(fromId: string, toId: string): Promise<void> {
+  if (fromId === toId) return;
+  try {
+    const stored = await browser.storage.sync.get(
+      PROFILE_SCOPED_BASES.map((base) => scopedKey(base, fromId)),
+    );
+    const writes: Record<string, unknown> = {};
+    for (const base of PROFILE_SCOPED_BASES) {
+      const value = stored[scopedKey(base, fromId)];
+      if (value !== undefined) writes[scopedKey(base, toId)] = value;
+    }
+    if (Object.keys(writes).length) await browser.storage.sync.set(writes);
+  } catch {
+    // Best-effort copy; ignore storage errors.
+  }
+}

@@ -68,9 +68,34 @@ const {
   profiles,
   activeId: activeProfileId,
   create: createProfile,
+  duplicate: duplicateProfile,
+  rename: renameProfile,
   switchTo: switchProfile,
   remove: removeProfile,
 } = useProfiles();
+
+// Inline profile renaming: which row is being edited + its draft name. Commit on
+// Enter or blur; cancel (discard) on Escape.
+const editingProfileId = ref<string | null>(null);
+const editingName = ref('');
+
+async function startRename(id: string, name: string) {
+  editingProfileId.value = id;
+  editingName.value = name;
+  await nextTick();
+  const input = document.querySelector<HTMLInputElement>('.profiles__rename-input');
+  input?.focus();
+  input?.select();
+}
+
+function commitRename() {
+  if (editingProfileId.value) renameProfile(editingProfileId.value, editingName.value);
+  editingProfileId.value = null;
+}
+
+function cancelRename() {
+  editingProfileId.value = null;
+}
 
 const {
   sections: orderedSections,
@@ -419,51 +444,8 @@ onUnmounted(() => {
 
 <template>
   <div class="workspace">
-    <aside class="profiles">
-      <h2 class="settings__title">Profiles</h2>
-      <ul class="profiles__list">
-        <li
-          v-for="profile in profiles"
-          :key="profile.id"
-          class="profiles__item"
-          :class="{ 'profiles__item--active': profile.id === activeProfileId }"
-        >
-          <button
-            type="button"
-            class="profiles__switch"
-            :aria-current="profile.id === activeProfileId ? 'true' : undefined"
-            @click="switchProfile(profile.id)"
-          >
-            {{ profile.name }}
-          </button>
-          <button
-            v-if="profiles.length > 1"
-            type="button"
-            class="profiles__delete"
-            v-tooltip.top="{ value: 'Delete profile', showDelay: 500 }"
-            :aria-label="`Delete profile ${profile.name}`"
-            @click="removeProfile(profile.id)"
-          >
-            <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-          </button>
-        </li>
-      </ul>
-      <button type="button" class="settings__button profiles__new" @click="createProfile()">
-        <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        <span>New profile</span>
-      </button>
-    </aside>
-
-    <aside class="settings">
+    <div class="sidebar">
+      <aside class="settings">
       <h2 class="settings__title">Page layout</h2>
 
       <label class="settings__field">
@@ -542,6 +524,86 @@ onUnmounted(() => {
         </button>
       </div>
     </aside>
+
+      <aside class="profiles">
+      <h2 class="settings__title">Profiles</h2>
+      <ul class="profiles__list">
+        <li
+          v-for="profile in profiles"
+          :key="profile.id"
+          class="profiles__item"
+          :class="{ 'profiles__item--active': profile.id === activeProfileId }"
+        >
+          <input
+            v-if="editingProfileId === profile.id"
+            v-model="editingName"
+            class="profiles__rename-input"
+            type="text"
+            :aria-label="`Rename profile ${profile.name}`"
+            @keyup.enter="commitRename"
+            @keyup.esc="cancelRename"
+            @blur="commitRename"
+          />
+          <template v-else>
+            <button
+              type="button"
+              class="profiles__switch"
+              :aria-current="profile.id === activeProfileId ? 'true' : undefined"
+              @click="switchProfile(profile.id)"
+            >
+              {{ profile.name }}
+            </button>
+            <button
+              type="button"
+              class="profiles__rename"
+              v-tooltip.top="{ value: 'Rename profile', showDelay: 500 }"
+              :aria-label="`Rename profile ${profile.name}`"
+              @click="startRename(profile.id, profile.name)"
+            >
+              <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="profiles__dupe"
+              v-tooltip.top="{ value: 'Duplicate profile', showDelay: 500 }"
+              :aria-label="`Duplicate profile ${profile.name}`"
+              @click="duplicateProfile(profile.id)"
+            >
+              <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="12" height="12" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="profiles__delete"
+              :disabled="profiles.length <= 1"
+              v-tooltip.top="{ value: 'Delete profile', showDelay: 500 }"
+              :aria-label="`Delete profile ${profile.name}`"
+              @click="removeProfile(profile.id)"
+            >
+              <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          </template>
+        </li>
+      </ul>
+      <button type="button" class="settings__button profiles__new" @click="createProfile()">
+        <svg class="settings__button-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>New profile</span>
+      </button>
+      </aside>
+    </div>
 
     <div class="sheet-area">
       <main class="sheet" ref="sheetRef" :style="pageStyle">
@@ -623,16 +685,23 @@ body {
   min-height: 100vh;
 }
 
-.settings,
-.profiles {
+.sidebar {
   position: sticky;
   top: 24px;
   flex: none;
   box-sizing: border-box;
-  width: 240px;
+  width: 280px;
   margin: 24px;
   max-height: calc(100vh - 48px);
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings,
+.profiles {
+  box-sizing: border-box;
   padding: 20px 16px;
   background: var(--paper);
   border-radius: 10px;
@@ -703,10 +772,6 @@ body {
 
 /* Profiles panel: the list of saved layout profiles, a switch button per row
    (the active one filled), a delete button, and a New profile button. */
-.profiles {
-  margin-right: 0;
-}
-
 .profiles__list {
   list-style: none;
   margin: 0 0 12px;
@@ -749,9 +814,11 @@ body {
   font-weight: 600;
 }
 
+.profiles__rename,
+.profiles__dupe,
 .profiles__delete {
   flex: none;
-  width: 36px;
+  width: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -763,9 +830,32 @@ body {
   transition: border-color 0.12s ease, color 0.12s ease;
 }
 
-.profiles__delete:hover {
+.profiles__rename:hover,
+.profiles__dupe:hover {
+  border-color: var(--p-primary-400, #a1a1aa);
+  color: var(--p-primary-color);
+}
+
+.profiles__delete:enabled:hover {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.profiles__delete:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.profiles__rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--p-primary-color);
+  border-radius: 8px;
+  background: var(--paper);
+  color: #1c1c1e;
+  font: inherit;
+  outline: none;
 }
 
 .profiles__new {
@@ -902,8 +992,7 @@ body {
     display: block;
   }
 
-  .settings,
-  .profiles {
+  .sidebar {
     display: none;
   }
 

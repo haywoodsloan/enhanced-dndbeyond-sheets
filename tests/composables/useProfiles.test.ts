@@ -74,6 +74,54 @@ describe('useProfiles', () => {
     expect(result.profiles.value).toHaveLength(1);
   });
 
+  it('duplicates a profile, copying its settings into a new active one', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+
+    // Give the Default profile some settings to copy.
+    const sourceKey = scopedKey(SECTION_ANCHORS_KEY, 'default');
+    await fakeBrowser.storage.sync.set({
+      [sourceKey]: { basics: { page: 0, col: 1, row: 2, seq: 3 } },
+    });
+
+    await result.duplicate('default');
+    await flushPromises();
+
+    expect(result.profiles.value).toHaveLength(2);
+    const copy = result.profiles.value[1];
+    expect(copy.name).toBe('Default copy');
+    expect(result.activeId.value).toBe(copy.id);
+
+    // The copy's scoped settings mirror the source profile's.
+    const copyKey = scopedKey(SECTION_ANCHORS_KEY, copy.id);
+    expect((await fakeBrowser.storage.sync.get(copyKey))[copyKey]).toEqual({
+      basics: { page: 0, col: 1, row: 2, seq: 3 },
+    });
+
+    // Duplicating an unknown id is a no-op.
+    await result.duplicate('nope');
+    expect(result.profiles.value).toHaveLength(2);
+  });
+
+  it('renames a profile, trimming and ignoring blank names', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+    result.create('Screen');
+    await flushPromises();
+    const id = result.activeId.value;
+
+    result.rename(id, '  Tablet  ');
+    expect(result.profiles.value.find((profile) => profile.id === id)?.name).toBe('Tablet');
+
+    // Blank names are ignored (keeps the previous name).
+    result.rename(id, '   ');
+    expect(result.profiles.value.find((profile) => profile.id === id)?.name).toBe('Tablet');
+
+    // The rename is persisted.
+    const saved = await profilesPref.get({ activeId: 'default', profiles: [] });
+    expect(saved.profiles.find((profile) => profile.id === id)?.name).toBe('Tablet');
+  });
+
   it('loads a persisted profile list and active id', async () => {
     await profilesPref.set({
       activeId: 'p2',

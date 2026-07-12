@@ -2,6 +2,7 @@ import { computed, onMounted, ref } from 'vue';
 import { profilesPref } from '@/utils/settings/preferences';
 import {
   DEFAULT_PROFILE,
+  copyProfileData,
   deleteProfileData,
   generateProfileId,
   type ProfileMeta,
@@ -52,6 +53,30 @@ export function useProfiles() {
     persist();
   }
 
+  /** Duplicate a profile: copy its settings into a new profile, then switch to
+   * it. Copies BEFORE switching so the reload reads the copied data. */
+  async function duplicate(id: string) {
+    const source = profiles.value.find((profile) => profile.id === id);
+    if (!source) return;
+    const newId = generateProfileId();
+    await copyProfileData(id, newId);
+    profiles.value = [...profiles.value, { id: newId, name: `${source.name} copy` }];
+    activeId.value = newId;
+    persist();
+  }
+
+  /** Rename a profile, ignoring blank names and no-op renames. */
+  function rename(id: string, name: string) {
+    const label = name.trim();
+    if (!label) return;
+    const target = profiles.value.find((profile) => profile.id === id);
+    if (!target || target.name === label) return;
+    profiles.value = profiles.value.map((profile) =>
+      profile.id === id ? { ...profile, name: label } : profile,
+    );
+    persist();
+  }
+
   /** Make an existing profile the active one. */
   function switchTo(id: string) {
     if (id === activeId.value || !profiles.value.some((profile) => profile.id === id)) return;
@@ -69,5 +94,5 @@ export function useProfiles() {
     void deleteProfileData(id);
   }
 
-  return { profiles, activeId, activeProfile, create, switchTo, remove };
+  return { profiles, activeId, activeProfile, create, duplicate, rename, switchTo, remove };
 }
