@@ -368,14 +368,16 @@ function isWeaponProficient(raw: RawCharacter, def: WeaponDef): boolean {
 }
 
 /**
- * Plain text from a D&D Beyond rules string: strips HTML tags and the `[tag]…`
- * markup D&D Beyond wraps around cross-references, decodes the common entities,
- * and collapses whitespace.
+ * Plain text from a D&D Beyond rules string: strips HTML tags, the `[tag]…`
+ * markup D&D Beyond wraps around cross-references, and its `{{…}}` dynamic-value
+ * placeholders (which we can't resolve here), decodes the common entities, and
+ * collapses whitespace.
  */
 function plainText(html: string): string {
   return html
     .replace(/<[^>]*>/g, ' ')
     .replace(/\[\/?[^\]]+\]/g, '')
+    .replace(/\{\{[^}]*\}\}/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -384,6 +386,23 @@ function plainText(html: string): string {
     .replace(/&#39;|&rsquo;|&apos;/g, "'")
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * A one-line blurb from a rules string: prefers the whole text when it's already
+ * short (a curated snippet), else the first sentence, else a word-boundary cut —
+ * so spells/features get a little description without dumping the full rules.
+ */
+function summarize(text: string | null | undefined, maxLength = 200): string {
+  const plain = plainText(text ?? '');
+  if (!plain || plain.length <= maxLength) return plain;
+  // The first sentence (a ./!/? before a capital or the end) reads cleanly and
+  // skips mid-sentence abbreviations like "ft."; fall back to a word cut.
+  const sentence = plain.match(/^.*?[.!?](?=\s+[A-Z(]|$)/)?.[0];
+  if (sentence && sentence.length <= maxLength) return sentence;
+  const slice = plain.slice(0, maxLength);
+  const lastSpace = slice.lastIndexOf(' ');
+  return `${slice.slice(0, lastSpace > 0 ? lastSpace : maxLength).trimEnd()}…`;
 }
 
 /** One weapon's attack line: to-hit + damage + range + property notes. */
@@ -697,6 +716,8 @@ function resolveSpells(raw: RawCharacter, level: number): SpellEntry[] {
     const damage = spellDamage(def, level);
     if (damage) entry.damage = damage;
     if (spell.prepared) entry.prepared = true;
+    const summary = summarize(def.snippet || def.description);
+    if (summary) entry.summary = summary;
     entries.push(entry);
   };
   for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(add);
@@ -781,27 +802,34 @@ function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
 ): FeatureGroup[] {
-  const toItem = (name: string, id: number | undefined): FeatureItem => {
+  const toItem = (name: string, id: number | undefined, summary?: string): FeatureItem => {
+    const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
-    return resource ? { name, resource } : { name };
+    if (resource) item.resource = resource;
+    if (summary) item.summary = summary;
+    return item;
   };
 
   const classItems: FeatureItem[] = [];
   const seen = new Set<string>();
-  const addClass = (name: string | undefined, id: number | undefined) => {
+  const addClass = (name: string | undefined, id: number | undefined, summary?: string) => {
     if (!name || seen.has(name) || STRUCTURAL_FEATURE.test(name)) return;
     seen.add(name);
-    classItems.push(toItem(name, id));
+    classItems.push(toItem(name, id, summary));
   };
   for (const cls of asArray(raw.classes)) {
     for (const feature of asArray(cls.definition?.classFeatures)) {
       if (feature.requiredLevel == null || feature.requiredLevel <= cls.level) {
-        addClass(feature.name, feature.id);
+        addClass(feature.name, feature.id, summarize(feature.snippet || feature.description));
       }
     }
     for (const feature of asArray(cls.classFeatures)) {
       if (feature.definition?.hideInSheet !== true) {
-        addClass(feature.definition?.name, feature.definition?.id);
+        addClass(
+          feature.definition?.name,
+          feature.definition?.id,
+          summarize(feature.definition?.snippet || feature.definition?.description),
+        );
       }
     }
   }
@@ -812,12 +840,24 @@ function resolveFeatures(
     const name = trait.definition?.name;
     if (!name || trait.definition?.hideInSheet === true || seenTrait.has(name)) continue;
     seenTrait.add(name);
-    racialTraits.push(toItem(name, trait.definition?.id));
+    racialTraits.push(
+      toItem(
+        name,
+        trait.definition?.id,
+        summarize(trait.definition?.snippet || trait.definition?.description),
+      ),
+    );
   }
 
   const feats = asArray(raw.feats)
     .filter((feat) => feat.definition?.name)
-    .map((feat) => toItem(feat.definition!.name!, feat.definition?.id));
+    .map((feat) =>
+      toItem(
+        feat.definition!.name!,
+        feat.definition?.id,
+        summarize(feat.definition?.snippet || feat.definition?.description),
+      ),
+    );
 
   const groups: FeatureGroup[] = [];
   if (classItems.length) groups.push({ label: 'Class Features', items: classItems });

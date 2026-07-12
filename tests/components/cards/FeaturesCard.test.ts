@@ -43,4 +43,27 @@ describe('FeaturesCard', () => {
     // …a passive feature has none.
     expect(items[1].find('[data-resource]').exists()).toBe(false);
   });
+
+  it('renders a feature summary blurb when present', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Racial Traits',
+            items: [
+              { name: 'Fey Ancestry', summary: 'You have Advantage against being Charmed.' },
+              { name: 'Trance' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const items = wrapper.findAll('[data-feature]');
+    expect(items[0].find('.features__summary').text()).toBe(
+      'You have Advantage against being Charmed.',
+    );
+    // A feature without a summary shows no blurb line.
+    expect(items[1].find('.features__summary').exists()).toBe(false);
+  });
 });

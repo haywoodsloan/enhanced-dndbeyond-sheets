@@ -16,8 +16,9 @@ defineProps<{ features: FeatureGroup[] }>();
       <span class="features__label">{{ group.label }}</span>
       <ul class="features__list">
         <li v-for="(item, index) in group.items" :key="index" data-feature>
-          {{ item.name
-          }}<ResourceBoxes v-if="item.resource" :resource="item.resource" />
+          <span class="features__name">{{ item.name }}</span
+          ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
+          <span v-if="item.summary" class="features__summary">{{ item.summary }}</span>
         </li>
       </ul>
     </div>
@@ -41,10 +42,22 @@ defineProps<{ features: FeatureGroup[] }>();
 
 .features__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 2px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 20px;
   margin: 0;
   padding-left: 18px;
   font-size: 14px;
+}
+
+.features__name {
+  font-weight: 600;
+}
+
+/* One-line blurb of what the feature does, beneath its name. */
+.features__summary {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
 }
 </style>

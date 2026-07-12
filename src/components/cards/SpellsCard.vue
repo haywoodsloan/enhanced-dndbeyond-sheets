@@ -79,6 +79,7 @@ function spellTags(spell: SpellEntry): string {
           <span class="spells__name">{{ spell.name }}</span>
           <span v-if="spellTags(spell)" class="spells__spell-tags">{{ spellTags(spell) }}</span>
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
+          <span v-if="spell.summary" class="spells__summary">{{ spell.summary }}</span>
         </li>
       </ul>
     </div>
@@ -160,6 +161,14 @@ function spellTags(spell: SpellEntry): string {
 .spells__meta {
   margin-left: 6px;
   font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+}
+
+/* One-line blurb of the spell's effect, on its own line beneath the shorthand. */
+.spells__summary {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
   color: var(--p-text-muted-color, #888);
 }
 </style>

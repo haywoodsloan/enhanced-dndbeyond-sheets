@@ -182,6 +182,8 @@ export interface SpellEntry {
   damage?: DamageInfo;
   /** True when the spell is prepared (vs merely known/available). */
   prepared?: boolean;
+  /** A one-line blurb of what the spell does. */
+  summary?: string;
 }
 
 /** At-a-glance spellcasting stats shown at the top of the Spells card. */
@@ -228,6 +230,8 @@ export interface FeatureItem {
   name: string;
   /** Limited-use pool rendered as empty checkboxes, when the feature is rationed. */
   resource?: ResourcePool;
+  /** A one-line blurb of what the feature does. */
+  summary?: string;
 }
 
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */

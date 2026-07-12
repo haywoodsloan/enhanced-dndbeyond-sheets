@@ -150,6 +150,9 @@ describe('normalizeCharacter', () => {
       concentration: true,
       duration: 'Conc, 1 minute',
     });
+    // A one-line summary = the first sentence of the description, nothing more.
+    expect(dancingLights?.summary).toContain('You create up to four torch-size lights within range');
+    expect(dancingLights?.summary).not.toContain('Bonus Action');
   });
 
   it('lists inventory items and coins', () => {
@@ -169,6 +172,19 @@ describe('normalizeCharacter', () => {
     // Structural placeholders (the ASI bump, the subclass choice) are dropped.
     expect(names).not.toContain('Ability Score Improvement');
     expect(names.some((name) => name.endsWith('Subclass'))).toBe(false);
+  });
+
+  it('gives features a plain-text summary with placeholders stripped', () => {
+    const { features } = normalizeCharacter(raw);
+    const items = features.flatMap((group) => group.items);
+    // Some features carry a blurb, and none leak raw HTML or {{…}} placeholders.
+    expect(items.some((item) => (item.summary?.length ?? 0) > 0)).toBe(true);
+    for (const item of items) {
+      expect(item.summary ?? '').not.toContain('{{');
+      expect(item.summary ?? '').not.toContain('<');
+    }
+    const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
+    expect(channelDivinity?.summary).toContain('channel divine energy');
   });
 
   it('attaches limited-use checkboxes to a feature from its action', () => {

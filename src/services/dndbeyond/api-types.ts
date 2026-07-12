@@ -36,10 +36,18 @@ export interface RawClassFeature {
   id?: number;
   name?: string;
   requiredLevel?: number;
+  snippet?: string | null;
+  description?: string | null;
 }
 
 export interface RawGrantedFeature {
-  definition?: { id?: number; name?: string; hideInSheet?: boolean };
+  definition?: {
+    id?: number;
+    name?: string;
+    hideInSheet?: boolean;
+    snippet?: string | null;
+    description?: string | null;
+  };
 }
 
 export interface RawCharacterClass {
@@ -50,7 +58,13 @@ export interface RawCharacterClass {
 }
 
 export interface RawRacialTrait {
-  definition?: { id?: number; name?: string; hideInSheet?: boolean };
+  definition?: {
+    id?: number;
+    name?: string;
+    hideInSheet?: boolean;
+    snippet?: string | null;
+    description?: string | null;
+  };
 }
 
 export interface RawRace {
@@ -138,6 +152,9 @@ export interface RawSpellDefinition {
   name?: string;
   level?: number;
   school?: string | null;
+  /** Full rules text (HTML) and a short summary, for the spell blurb. */
+  description?: string | null;
+  snippet?: string | null;
   duration?: {
     durationInterval?: number | null;
     durationUnit?: string | null;
@@ -174,7 +191,12 @@ export interface RawSpell {
 }
 
 export interface RawFeat {
-  definition?: { id?: number; name?: string };
+  definition?: {
+    id?: number;
+    name?: string;
+    snippet?: string | null;
+    description?: string | null;
+  };
 }
 
 export interface RawClassSpellGroup {

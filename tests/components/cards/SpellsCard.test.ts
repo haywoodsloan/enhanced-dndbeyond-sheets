@@ -80,4 +80,20 @@ describe('SpellsCard', () => {
     // The concentration spell shows a "C" tag.
     expect(spells[1].text()).toContain('C');
   });
+
+  it('renders a spell summary blurb when present', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          { name: 'Guidance', level: 0, summary: 'You touch a creature and add 1d4 to a check.' },
+          { name: 'Message', level: 0 },
+        ],
+      },
+    });
+    const spells = wrapper.findAll('[data-spell]');
+    expect(spells[0].find('.spells__summary').text()).toBe(
+      'You touch a creature and add 1d4 to a check.',
+    );
+    expect(spells[1].find('.spells__summary').exists()).toBe(false);
+  });
 });
