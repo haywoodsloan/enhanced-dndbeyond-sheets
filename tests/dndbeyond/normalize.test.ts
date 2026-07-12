@@ -228,6 +228,10 @@ describe('normalizeCharacter', () => {
     expect(morningstar?.range).toBe('5 ft.');
     // Unequipped backpack weapons (Dagger, Mace) are not surfaced as attacks.
     expect(attacks.some((attack) => attack.name === 'Dagger')).toBe(false);
+    // Unarmed Strike is always available (1 + STR bludgeoning): +4, 3 bludgeoning.
+    const unarmed = attacks.find((attack) => attack.name === 'Unarmed Strike');
+    expect(unarmed?.toHit).toBe(4);
+    expect(unarmed?.damage).toMatchObject({ dice: '', bonus: 3, type: 'Bludgeoning' });
   });
 
   it('drops passive/special riders from the actions list', () => {
@@ -316,8 +320,9 @@ describe('normalizeCharacter', () => {
 
     const { attacks, actions } = normalizeCharacter(raider);
     // The named weapon becomes an attack (not an action); the unnamed + unflagged
-    // items are left out. Other options stay in the Actions list.
-    expect(attacks.map((attack) => attack.name)).toEqual(['Greataxe']);
+    // items are left out. Unarmed Strike is always appended. Other options stay
+    // in the Actions list.
+    expect(attacks.map((attack) => attack.name)).toEqual(['Greataxe', 'Unarmed Strike']);
     expect(actions.map((action) => action.name)).toEqual(['Rage']);
   });
 

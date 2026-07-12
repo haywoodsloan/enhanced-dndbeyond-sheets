@@ -407,9 +407,10 @@ function weaponAttack(
 }
 
 /**
- * Weapon and weapon-like attacks: every equipped (or attack-flagged) weapon,
- * each with a computed to-hit and damage line. Unequipped backpack weapons are
- * left in the Inventory, matching what D&D Beyond surfaces as attacks.
+ * Weapon and weapon-like attacks: a base Unarmed Strike plus every equipped (or
+ * attack-flagged) weapon, each with a computed to-hit and damage line. Unequipped
+ * backpack weapons are left in the Inventory, matching what D&D Beyond surfaces
+ * as attacks.
  */
 function resolveAttacks(
   raw: RawCharacter,
@@ -433,6 +434,14 @@ function resolveAttacks(
     if (isWeapon && item.equipped !== true && !flagged) continue;
     attacks.push(weaponAttack(raw, def, modOf, prof));
   }
+  // Every creature can make an Unarmed Strike (2024 rules: 1 + Str bludgeoning),
+  // so keep it as an always-available fallback at the end of the list.
+  attacks.push({
+    name: 'Unarmed Strike',
+    toHit: modOf('str') + prof,
+    damage: { dice: '', bonus: 1 + modOf('str'), type: 'Bludgeoning' },
+    range: '5 ft.',
+  });
   return attacks;
 }
 
