@@ -151,9 +151,12 @@ function onProfileDragStart(id: string, event: DragEvent) {
 }
 
 function onProfileDragOver(event: DragEvent) {
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   const draggedId = draggingProfileId.value;
   if (!draggedId || !profileDragGeom) return;
+  // Allow the drop across the whole panel so the cursor stays a "move" icon — a
+  // dragover that isn't preventDefault'd flickers to the "no-drop" cursor.
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   const slot = Math.round((event.clientY - profileDragGeom.top) / profileDragGeom.pitch);
   moveToProfile(draggedId, Math.max(0, Math.min(slot, profileDragGeom.count - 1)));
 }
@@ -598,14 +601,9 @@ onUnmounted(() => {
       </div>
     </aside>
 
-      <aside class="profiles">
+      <aside class="profiles" @dragover="onProfileDragOver" @drop.prevent>
       <h2 class="settings__title">Profiles</h2>
-      <ul
-        class="profiles__list"
-        ref="profilesListRef"
-        @dragover.prevent="onProfileDragOver"
-        @drop.prevent
-      >
+      <ul class="profiles__list" ref="profilesListRef">
         <li
           v-for="profile in profiles"
           :key="profile.id"
