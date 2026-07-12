@@ -157,10 +157,25 @@ export interface Coins {
   pp: number;
 }
 
+/** A limited-use resource shown as N empty print checkboxes to tick by hand. */
+export interface ResourcePool {
+  /** Number of empty checkboxes to print (the maximum uses). */
+  max: number;
+  /** Recharge shorthand: 'SR' (short rest), 'LR' (long rest), or '' (none). */
+  recharge?: string;
+}
+
+/** A single feature/trait, with an optional limited-use resource tracker. */
+export interface FeatureItem {
+  name: string;
+  /** Limited-use pool rendered as empty checkboxes, when the feature is rationed. */
+  resource?: ResourcePool;
+}
+
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */
 export interface FeatureGroup {
   label: string;
-  items: string[];
+  items: FeatureItem[];
 }
 
 /** A labeled free-text note (backstory, allies, possessions, etc.). */

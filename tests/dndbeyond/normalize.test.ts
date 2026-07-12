@@ -136,7 +136,24 @@ describe('normalizeCharacter', () => {
     const { features } = normalizeCharacter(raw);
     expect(features.map((group) => group.label)).toContain('Class Features');
     const classFeatures = features.find((group) => group.label === 'Class Features');
-    expect(classFeatures?.items).toContain('Spellcasting');
+    const names = classFeatures?.items.map((item) => item.name) ?? [];
+    expect(names).toContain('Spellcasting');
+    // Structural placeholders (the ASI bump, the subclass choice) are dropped.
+    expect(names).not.toContain('Ability Score Improvement');
+    expect(names.some((name) => name.endsWith('Subclass'))).toBe(false);
+  });
+
+  it('attaches limited-use checkboxes to a feature from its action', () => {
+    const { features } = normalizeCharacter(raw);
+    const classFeatures = features.find((group) => group.label === 'Class Features');
+    const channelDivinity = classFeatures?.items.find(
+      (item) => item.name === 'Channel Divinity',
+    );
+    // Channel Divinity is usable twice per long rest (from its action's limitedUse).
+    expect(channelDivinity?.resource).toEqual({ max: 2, recharge: 'LR' });
+    // A passive feature has no resource tracker.
+    const passive = classFeatures?.items.find((item) => item.name === 'Circle of Mortality');
+    expect(passive?.resource).toBeUndefined();
   });
 
   it('resolves the portrait section and an uncropped avatar url', () => {
@@ -204,7 +221,9 @@ describe('normalizeCharacter', () => {
     expect(counts.savingThrows).toBe(6);
     expect(counts.spells).toBe(18);
     expect(counts.inventory).toBe(24);
-    expect(counts.features).toBe(39);
+    // The count is the distinct features actually shown (deduped, minus hidden
+    // traits and structural placeholders like ASI / the subclass choice).
+    expect(counts.features).toBe(30);
     expect(counts.basics).toBe(0); // Noct has no active conditions
     expect(counts.proficiencies).toBeGreaterThan(0);
     expect(counts.actions).toBeGreaterThan(0);

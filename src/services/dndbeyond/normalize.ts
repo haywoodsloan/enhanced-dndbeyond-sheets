@@ -15,6 +15,7 @@ import type {
   RawAction,
   RawCharacter,
   RawInventoryItem,
+  RawLimitedUse,
   RawModifier,
   RawSourceMap,
   RawSpell,
@@ -32,8 +33,10 @@ import type {
   CharacterSection,
   Coins,
   FeatureGroup,
+  FeatureItem,
   InventoryEntry,
   NoteEntry,
+  ResourcePool,
   SavingThrow,
   SectionKey,
   SenseEntry,
@@ -83,18 +86,6 @@ function countSpells(raw: RawCharacter): number {
     0,
   );
   return classSpells + sumSourceMap(raw.spells);
-}
-
-/** Class features, racial traits, feats, and optional class features. */
-function countFeatures(raw: RawCharacter): number {
-  const classFeatures = asArray(raw.classes).reduce(
-    (total, cls) => total + asArray(cls.classFeatures).length,
-    0,
-  );
-  const racialTraits = asArray(raw.race?.racialTraits).length;
-  const feats = asArray(raw.feats).length;
-  const optional = asArray(raw.optionalClassFeatures).length;
-  return classFeatures + racialTraits + feats + optional;
 }
 
 /** Tool/weapon/armor/language proficiencies granted by modifiers. */
@@ -509,33 +500,94 @@ function resolveWealth(raw: RawCharacter): Coins {
   };
 }
 
-/** Features and traits grouped by source. */
-function resolveFeatures(raw: RawCharacter): FeatureGroup[] {
-  const classFeatures: string[] = [];
+/** Resolve a raw limited-use block into a checkbox pool, or nothing when the
+ * feature/action isn't actually rationed. A pool whose size scales with the
+ * proficiency bonus (`maxUses` 0) is expanded to that bonus. */
+function limitedUseToPool(
+  limitedUse: RawLimitedUse | null | undefined,
+  level: number,
+): ResourcePool | undefined {
+  if (!limitedUse) return undefined;
+  let max = limitedUse.maxUses ?? 0;
+  if (max <= 0 && limitedUse.useProficiencyBonus) max = proficiencyBonus(level);
+  if (max < 1) return undefined;
+  const recharge =
+    limitedUse.resetType === 1 ? 'SR' : limitedUse.resetType === 2 ? 'LR' : '';
+  return recharge ? { max, recharge } : { max };
+}
+
+/**
+ * Map each feature/feat/trait id to its limited-use pool, taken from the ACTION
+ * the feature grants (the actions carry the authoritative use counts — e.g.
+ * Channel Divinity's "twice per long rest" lives on its action, not the
+ * feature). Features with no rationed action get no checkboxes.
+ */
+function resolveResourceMap(raw: RawCharacter, level: number): Map<number, ResourcePool> {
+  const map = new Map<number, ResourcePool>();
+  if (!raw.actions) return map;
+  for (const group of Object.values(raw.actions)) {
+    for (const action of asArray<RawAction>(group)) {
+      if (action.componentId == null) continue;
+      const pool = limitedUseToPool(action.limitedUse, level);
+      if (pool) map.set(action.componentId, pool);
+    }
+  }
+  return map;
+}
+
+/**
+ * Structural placeholder entries in a class's feature list that aren't real
+ * features — a stat bump ("Ability Score Improvement"), the subclass CHOICE
+ * ("Cleric Subclass"), or an epic boon slot — so they're dropped to match what
+ * D&D Beyond actually lists.
+ */
+const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$/;
+
+/** Features and traits grouped by source, each with its limited-use resource. */
+function resolveFeatures(
+  raw: RawCharacter,
+  resources: Map<number, ResourcePool>,
+): FeatureGroup[] {
+  const toItem = (name: string, id: number | undefined): FeatureItem => {
+    const resource = id != null ? resources.get(id) : undefined;
+    return resource ? { name, resource } : { name };
+  };
+
+  const classItems: FeatureItem[] = [];
+  const seen = new Set<string>();
+  const addClass = (name: string | undefined, id: number | undefined) => {
+    if (!name || seen.has(name) || STRUCTURAL_FEATURE.test(name)) return;
+    seen.add(name);
+    classItems.push(toItem(name, id));
+  };
   for (const cls of asArray(raw.classes)) {
     for (const feature of asArray(cls.definition?.classFeatures)) {
-      if (
-        feature.name &&
-        (feature.requiredLevel == null || feature.requiredLevel <= cls.level)
-      ) {
-        pushUnique(classFeatures, feature.name);
+      if (feature.requiredLevel == null || feature.requiredLevel <= cls.level) {
+        addClass(feature.name, feature.id);
       }
     }
     for (const feature of asArray(cls.classFeatures)) {
-      if (feature.definition?.name && feature.definition.hideInSheet !== true) {
-        pushUnique(classFeatures, feature.definition.name);
+      if (feature.definition?.hideInSheet !== true) {
+        addClass(feature.definition?.name, feature.definition?.id);
       }
     }
   }
-  const racialTraits = asArray(raw.race?.racialTraits)
-    .filter((trait) => trait.definition?.hideInSheet !== true && trait.definition?.name)
-    .map((trait) => trait.definition!.name!);
+
+  const racialTraits: FeatureItem[] = [];
+  const seenTrait = new Set<string>();
+  for (const trait of asArray(raw.race?.racialTraits)) {
+    const name = trait.definition?.name;
+    if (!name || trait.definition?.hideInSheet === true || seenTrait.has(name)) continue;
+    seenTrait.add(name);
+    racialTraits.push(toItem(name, trait.definition?.id));
+  }
+
   const feats = asArray(raw.feats)
     .filter((feat) => feat.definition?.name)
-    .map((feat) => feat.definition!.name!);
+    .map((feat) => toItem(feat.definition!.name!, feat.definition?.id));
 
   const groups: FeatureGroup[] = [];
-  if (classFeatures.length) groups.push({ label: 'Class Features', items: classFeatures });
+  if (classItems.length) groups.push({ label: 'Class Features', items: classItems });
   if (racialTraits.length) groups.push({ label: 'Racial Traits', items: racialTraits });
   if (feats.length) groups.push({ label: 'Feats', items: feats });
   return groups;
@@ -675,6 +727,9 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
   const actions = resolveActions(raw);
+  const resources = resolveResourceMap(raw, level);
+  const features = resolveFeatures(raw, resources);
+  const featureCount = features.reduce((total, group) => total + group.items.length, 0);
 
   const sections: CharacterSection[] = [
     toSection('portrait', 'Portrait', 0, { alwaysPresent: Boolean(avatarUrl) }),
@@ -689,7 +744,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('spells', 'Spells', countSpells(raw)),
     toSection('inventory', 'Inventory', asArray(raw.inventory).length),
     toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
-    toSection('features', 'Features & Traits', countFeatures(raw)),
+    toSection('features', 'Features & Traits', featureCount),
     toSection('notes', 'Notes', resolveNotes(raw).length, { alwaysPresent: true }),
   ];
 
@@ -710,7 +765,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     spells: resolveSpells(raw),
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),
-    features: resolveFeatures(raw),
+    features,
     notes: resolveNotes(raw),
     sections,
   };

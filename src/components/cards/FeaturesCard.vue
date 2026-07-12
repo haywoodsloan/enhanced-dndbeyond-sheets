@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { FeatureGroup } from '@/services/dndbeyond/model';
+import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 
 defineProps<{ features: FeatureGroup[] }>();
 </script>
@@ -14,7 +15,10 @@ defineProps<{ features: FeatureGroup[] }>();
     >
       <span class="features__label">{{ group.label }}</span>
       <ul class="features__list">
-        <li v-for="(item, index) in group.items" :key="index">{{ item }}</li>
+        <li v-for="(item, index) in group.items" :key="index" data-feature>
+          {{ item.name
+          }}<ResourceBoxes v-if="item.resource" :resource="item.resource" />
+        </li>
       </ul>
     </div>
   </div>

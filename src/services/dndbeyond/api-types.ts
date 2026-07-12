@@ -31,12 +31,13 @@ export interface RawSubclassDefinition {
 }
 
 export interface RawClassFeature {
+  id?: number;
   name?: string;
   requiredLevel?: number;
 }
 
 export interface RawGrantedFeature {
-  definition?: { name?: string; hideInSheet?: boolean };
+  definition?: { id?: number; name?: string; hideInSheet?: boolean };
 }
 
 export interface RawCharacterClass {
@@ -47,7 +48,7 @@ export interface RawCharacterClass {
 }
 
 export interface RawRacialTrait {
-  definition?: { name?: string; hideInSheet?: boolean };
+  definition?: { id?: number; name?: string; hideInSheet?: boolean };
 }
 
 export interface RawRace {
@@ -136,7 +137,7 @@ export interface RawSpell {
 }
 
 export interface RawFeat {
-  definition?: { name?: string };
+  definition?: { id?: number; name?: string };
 }
 
 export interface RawClassSpellGroup {
@@ -146,6 +147,8 @@ export interface RawClassSpellGroup {
 
 export interface RawAction {
   name?: string;
+  /** Id of the feature/feat/trait this action comes from (see resource pools). */
+  componentId?: number | null;
   displayAsAttack?: boolean | null;
   activation?: { activationType?: number | null } | null;
   /** Limited-use pool (checkbox resource) when the action is rationed. */
