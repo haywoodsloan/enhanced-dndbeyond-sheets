@@ -146,6 +146,26 @@ export interface SpellEntry {
   name: string;
   /** Spell level; 0 for cantrips. */
   level: number;
+  /** School of magic, e.g. "Evocation". */
+  school?: string;
+  /** Casting-time shorthand: "A", "BA", "R", "1m", "1h". */
+  castingTime?: string;
+  /** Range shorthand, e.g. "60 ft.", "Self", "Touch", "Self (15-ft. cone)". */
+  range?: string;
+  /** Components present, e.g. "V, S, M". */
+  components?: string;
+  /** Duration shorthand, e.g. "Instant", "1 min", "Conc, 1 min". */
+  duration?: string;
+  concentration?: boolean;
+  ritual?: boolean;
+  /** Save ability abbreviation (e.g. "DEX") when the spell forces a save. */
+  save?: string;
+  /** True when the spell requires an attack roll. */
+  attack?: boolean;
+  /** Damage dice + type + upcast scaling. */
+  damage?: DamageInfo;
+  /** True when the spell is prepared (vs merely known/available). */
+  prepared?: boolean;
 }
 
 /** At-a-glance spellcasting stats shown at the top of the Spells card. */

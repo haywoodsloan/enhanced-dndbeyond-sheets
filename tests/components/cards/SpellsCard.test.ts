@@ -45,4 +45,38 @@ describe('SpellsCard', () => {
     expect(wrapper.find('[data-spellcasting]').exists()).toBe(false);
     expect(wrapper.find('[data-slots]').exists()).toBe(false);
   });
+
+  it('renders per-spell shorthand, damage, and a concentration tag', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          {
+            name: 'Fire Bolt',
+            level: 0,
+            castingTime: 'A',
+            range: '120 ft.',
+            components: 'V, S',
+            attack: true,
+            damage: { dice: '1d10', type: 'Fire' },
+          },
+          {
+            name: 'Bless',
+            level: 1,
+            castingTime: 'A',
+            range: '30 ft.',
+            concentration: true,
+            duration: 'Conc, 1 min',
+          },
+        ],
+      },
+    });
+
+    const spells = wrapper.findAll('[data-spell]');
+    expect(spells).toHaveLength(2);
+    expect(spells[0].text()).toContain('Fire Bolt');
+    expect(spells[0].text()).toContain('1d10 Fire');
+    expect(spells[0].text()).toContain('Spell atk');
+    // The concentration spell shows a "C" tag.
+    expect(spells[1].text()).toContain('C');
+  });
 });

@@ -131,11 +131,44 @@ export interface RawActionRange {
   aoeSize?: number | null;
 }
 
+/** A spell's rich definition (only the fields the sheet surfaces). */
+export interface RawSpellDefinition {
+  name?: string;
+  level?: number;
+  school?: string | null;
+  duration?: {
+    durationInterval?: number | null;
+    durationUnit?: string | null;
+    durationType?: string | null;
+  } | null;
+  activation?: { activationTime?: number | null; activationType?: number | null } | null;
+  range?: {
+    origin?: string | null;
+    rangeValue?: number | null;
+    aoeType?: string | number | null;
+    aoeValue?: number | null;
+  } | null;
+  /** Component ids: 1 = Verbal, 2 = Somatic, 3 = Material. */
+  components?: number[] | null;
+  componentsDescription?: string | null;
+  concentration?: boolean;
+  ritual?: boolean;
+  requiresSavingThrow?: boolean;
+  requiresAttackRoll?: boolean;
+  /** Ability id the target saves with (see ABILITIES). */
+  saveDcAbilityId?: number | null;
+  /** Effect modifiers; the damage ones carry a `die`. */
+  modifiers?: RawModifier[] | null;
+  /** Upcast scaling: dice added per slot level above the spell's own. */
+  atHigherLevels?: { higherLevelDefinitions?: { dice?: RawDice | null }[] | null } | null;
+  /** "characterlevel" (cantrip), "spellscale"/"spelllevel" (upcast), or null. */
+  scaleType?: string | null;
+  tags?: string[] | null;
+}
+
 export interface RawSpell {
-  definition?: {
-    name?: string;
-    level?: number;
-  };
+  definition?: RawSpellDefinition;
+  prepared?: boolean;
 }
 
 export interface RawFeat {
@@ -196,6 +229,8 @@ export interface RawModifier {
   friendlyTypeName?: string;
   friendlySubtypeName?: string;
   restriction?: string | null;
+  /** Dice for a damage/healing modifier (e.g. a spell's damage). */
+  die?: RawDice | null;
 }
 
 /** An active condition entry; `id` maps to a standard 5e condition. */

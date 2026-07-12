@@ -137,6 +137,21 @@ describe('normalizeCharacter', () => {
     });
   });
 
+  it('enriches spells with school, casting time, range, components, and duration', () => {
+    const dancingLights = normalizeCharacter(raw).spells.find(
+      (spell) => spell.name === 'Dancing Lights',
+    );
+    expect(dancingLights).toMatchObject({
+      level: 0,
+      school: 'Illusion',
+      castingTime: 'A',
+      range: '120 ft.',
+      components: 'V, S, M',
+      concentration: true,
+      duration: 'Conc, 1 minute',
+    });
+  });
+
   it('lists inventory items and coins', () => {
     const character = normalizeCharacter(raw);
     expect(

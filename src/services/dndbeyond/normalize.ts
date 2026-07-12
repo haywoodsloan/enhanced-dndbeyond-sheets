@@ -22,6 +22,7 @@ import type {
   RawModifier,
   RawSourceMap,
   RawSpell,
+  RawSpellDefinition,
   RawStat,
 } from './api-types';
 import type {
@@ -560,13 +561,108 @@ function resolveActions(
   return actions;
 }
 
+/** Casting-time shorthand from a spell's activation (A / BA / R / 1m / 1h). */
+function spellCastingTime(activation: RawSpellDefinition['activation']): string {
+  const time = activation?.activationTime ?? 1;
+  switch (activation?.activationType) {
+    case 1:
+      return 'A';
+    case 3:
+      return 'BA';
+    case 4:
+      return 'R';
+    case 6:
+      return `${time}m`;
+    case 7:
+      return `${time}h`;
+    default:
+      return '';
+  }
+}
+
+/** Range shorthand including any area of effect, e.g. "Self (15-ft. cone)". */
+function spellRangeLabel(range: RawSpellDefinition['range']): string {
+  if (!range) return '';
+  const origin = range.origin ?? '';
+  let base: string;
+  if (origin === 'Self') base = 'Self';
+  else if (origin === 'Touch') base = 'Touch';
+  else if (range.rangeValue) base = `${range.rangeValue} ft.`;
+  else base = origin;
+  if (range.aoeValue) {
+    const shape = typeof range.aoeType === 'string' ? ` ${range.aoeType.toLowerCase()}` : '';
+    base = base ? `${base} (${range.aoeValue}-ft.${shape})` : `${range.aoeValue}-ft.${shape}`;
+  }
+  return base;
+}
+
+/** Component letters present, e.g. "V, S, M". */
+const COMPONENT_LABEL: Record<number, string> = { 1: 'V', 2: 'S', 3: 'M' };
+function spellComponents(components: number[] | null | undefined): string {
+  return asArray(components)
+    .map((id) => COMPONENT_LABEL[id])
+    .filter(Boolean)
+    .join(', ');
+}
+
+/** Duration shorthand, prefixed with "Conc," when the spell needs concentration. */
+function spellDuration(
+  duration: RawSpellDefinition['duration'],
+  concentration: boolean | undefined,
+): string {
+  if (!duration) return '';
+  if (duration.durationType === 'Instantaneous') return 'Instant';
+  const base =
+    duration.durationInterval && duration.durationUnit
+      ? `${duration.durationInterval} ${duration.durationUnit.toLowerCase()}`
+      : (duration.durationType ?? '');
+  if (!base) return '';
+  return concentration ? `Conc, ${base}` : base;
+}
+
+/** Base damage dice + type + upcast scaling from a spell's modifiers. */
+function spellDamage(def: RawSpellDefinition): DamageInfo | undefined {
+  const mod = asArray(def.modifiers).find(
+    (entry) => entry.type === 'damage' && entry.die?.diceString,
+  );
+  if (!mod?.die?.diceString) return undefined;
+  const damage: DamageInfo = { dice: mod.die.diceString };
+  if (mod.friendlySubtypeName) damage.type = mod.friendlySubtypeName;
+  const higher = asArray(def.atHigherLevels?.higherLevelDefinitions).find(
+    (entry) => entry.dice?.diceString,
+  );
+  if (higher?.dice?.diceString) damage.scaling = `+${higher.dice.diceString}/slot`;
+  else if (def.scaleType === 'characterlevel') damage.scaling = 'scales with level';
+  return damage;
+}
+
 /** Known/prepared spells from class spells and other sources, deduped and sorted. */
 function resolveSpells(raw: RawCharacter): SpellEntry[] {
   const entries: SpellEntry[] = [];
   const add = (spell: RawSpell) => {
-    if (spell.definition?.name != null) {
-      entries.push({ name: spell.definition.name, level: spell.definition.level ?? 0 });
+    const def = spell.definition;
+    if (def?.name == null) return;
+    const entry: SpellEntry = { name: def.name, level: def.level ?? 0 };
+    if (def.school) entry.school = def.school;
+    const castingTime = spellCastingTime(def.activation);
+    if (castingTime) entry.castingTime = castingTime;
+    const range = spellRangeLabel(def.range);
+    if (range) entry.range = range;
+    const components = spellComponents(def.components);
+    if (components) entry.components = components;
+    const duration = spellDuration(def.duration, def.concentration);
+    if (duration) entry.duration = duration;
+    if (def.concentration) entry.concentration = true;
+    if (def.ritual) entry.ritual = true;
+    if (def.requiresSavingThrow) {
+      const saveKey = abilityKeyById(def.saveDcAbilityId);
+      if (saveKey) entry.save = saveKey.toUpperCase();
     }
+    if (def.requiresAttackRoll) entry.attack = true;
+    const damage = spellDamage(def);
+    if (damage) entry.damage = damage;
+    if (spell.prepared) entry.prepared = true;
+    entries.push(entry);
   };
   for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(add);
   if (raw.spells) {
