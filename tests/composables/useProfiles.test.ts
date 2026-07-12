@@ -152,7 +152,7 @@ describe('useProfiles', () => {
     expect(result.activeId.value).toBe(id);
   });
 
-  it('moves a profile up and down, clamping at the ends', async () => {
+  it('moves a profile to a target index, clamping out-of-range', async () => {
     const { result } = mountComposable(() => useProfiles());
     await flushPromises();
     result.create('B');
@@ -162,16 +162,14 @@ describe('useProfiles', () => {
     expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'B', 'C']);
 
     const cId = result.profiles.value[2].id;
-    result.move(cId, -1);
+    result.moveTo(cId, 0); // C to the front
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
+    result.moveTo(cId, 1); // C to the middle
     expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'C', 'B']);
-    result.move(cId, -1);
-    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
-    result.move(cId, -1); // already first → clamp
-    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
-
-    const lastId = result.profiles.value[2].id;
-    result.move(lastId, 1); // already last → clamp
-    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['C', 'Default', 'B']);
+    result.moveTo(cId, 99); // clamps to the last slot
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'B', 'C']);
+    result.moveTo('nope', 0); // unknown id → no-op
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Default', 'B', 'C']);
   });
 
   it('loads a persisted profile list and active id', async () => {

@@ -70,7 +70,7 @@ const {
   create: createProfile,
   duplicate: duplicateProfile,
   rename: renameProfile,
-  move: moveProfile,
+  moveTo: moveToProfile,
   switchTo: switchProfile,
   remove: removeProfile,
 } = useProfiles();
@@ -121,6 +121,34 @@ async function onNewProfile() {
   const id = createProfile();
   const profile = profiles.value.find((entry) => entry.id === id);
   if (profile) await startRename(id, profile.name);
+}
+
+// Drag-to-reorder the profile list via each row's grip handle.
+const draggingProfileId = ref<string | null>(null);
+
+function onProfileDragStart(id: string, event: DragEvent) {
+  draggingProfileId.value = id;
+  if (!event.dataTransfer) return;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', id);
+  const row = (event.currentTarget as HTMLElement).closest('.profiles__item');
+  if (row) event.dataTransfer.setDragImage(row, 10, 10);
+}
+
+function onProfileDragOver(event: DragEvent) {
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function onProfileDrop(targetId: string) {
+  const draggedId = draggingProfileId.value;
+  draggingProfileId.value = null;
+  if (!draggedId || draggedId === targetId) return;
+  const targetIndex = profiles.value.findIndex((entry) => entry.id === targetId);
+  if (targetIndex >= 0) moveToProfile(draggedId, targetIndex);
+}
+
+function onProfileDragEnd() {
+  draggingProfileId.value = null;
 }
 
 const {
@@ -555,10 +583,15 @@ onUnmounted(() => {
       <h2 class="settings__title">Profiles</h2>
       <ul class="profiles__list">
         <li
-          v-for="(profile, index) in profiles"
+          v-for="profile in profiles"
           :key="profile.id"
           class="profiles__item"
-          :class="{ 'profiles__item--active': profile.id === activeProfileId }"
+          :class="{
+            'profiles__item--active': profile.id === activeProfileId,
+            'profiles__item--dragging': draggingProfileId === profile.id,
+          }"
+          @dragover.prevent="onProfileDragOver"
+          @drop.prevent="onProfileDrop(profile.id)"
         >
           <input
             v-if="editingProfileId === profile.id"
@@ -595,32 +628,23 @@ onUnmounted(() => {
             </button>
           </div>
           <template v-else>
-            <div class="profiles__reorder">
-              <button
-                type="button"
-                class="profiles__move"
-                :disabled="index === 0"
-                v-tooltip.top="{ value: 'Move up', showDelay: 500 }"
-                :aria-label="`Move profile ${profile.name} up`"
-                @click="moveProfile(profile.id, -1)"
-              >
-                <svg class="profiles__move-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <polyline points="6 15 12 9 18 15" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                class="profiles__move"
-                :disabled="index === profiles.length - 1"
-                v-tooltip.bottom="{ value: 'Move down', showDelay: 500 }"
-                :aria-label="`Move profile ${profile.name} down`"
-                @click="moveProfile(profile.id, 1)"
-              >
-                <svg class="profiles__move-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-            </div>
+            <span
+              class="profiles__grip"
+              draggable="true"
+              v-tooltip.top="{ value: 'Drag to reorder', showDelay: 500 }"
+              :aria-label="`Drag to reorder profile ${profile.name}`"
+              @dragstart="onProfileDragStart(profile.id, $event)"
+              @dragend="onProfileDragEnd"
+            >
+              <svg class="profiles__grip-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="9" cy="6" r="1.6" />
+                <circle cx="15" cy="6" r="1.6" />
+                <circle cx="9" cy="12" r="1.6" />
+                <circle cx="15" cy="12" r="1.6" />
+                <circle cx="9" cy="18" r="1.6" />
+                <circle cx="15" cy="18" r="1.6" />
+              </svg>
+            </span>
             <button
               type="button"
               class="profiles__switch"
@@ -924,48 +948,34 @@ body {
   opacity: 0.4;
 }
 
-/* Up/down reorder controls stacked at the left of each row. */
-.profiles__reorder {
+/* Drag handle to reorder each row (a narrow grip, not a button). */
+.profiles__grip {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-}
-
-.profiles__move {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 16px;
-  padding: 0;
-  border: 1px solid var(--p-primary-300, #d4d4d8);
-  border-radius: 5px;
-  background: var(--paper);
+  width: 14px;
   color: var(--p-primary-700, #6b7280);
-  cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
+  cursor: grab;
+  transition: color 0.12s ease;
 }
 
-.profiles__move:enabled:hover {
-  border-color: var(--p-primary-400, #a1a1aa);
+.profiles__grip:hover {
   color: var(--p-primary-color);
 }
 
-.profiles__move:disabled {
-  cursor: default;
-  opacity: 0.35;
+.profiles__grip:active {
+  cursor: grabbing;
 }
 
-.profiles__move-icon {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.profiles__grip-icon {
+  width: 12px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.profiles__item--dragging {
+  opacity: 0.5;
 }
 
 /* Inline delete confirmation bar (replaces the row while confirming). */

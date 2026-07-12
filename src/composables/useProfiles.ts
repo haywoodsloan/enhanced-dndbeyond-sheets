@@ -83,14 +83,15 @@ export function useProfiles() {
     persist();
   }
 
-  /** Move a profile up (delta -1) or down (delta +1) in the list. */
-  function move(id: string, delta: number) {
-    const index = profiles.value.findIndex((profile) => profile.id === id);
-    const target = index + delta;
-    if (index < 0 || target < 0 || target >= profiles.value.length) return;
+  /** Move a profile to a target index in the list (for drag-reordering). */
+  function moveTo(id: string, index: number) {
+    const from = profiles.value.findIndex((profile) => profile.id === id);
+    if (from < 0) return;
+    const to = Math.max(0, Math.min(index, profiles.value.length - 1));
+    if (from === to) return;
     const next = [...profiles.value];
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
     profiles.value = next;
     persist();
   }
@@ -119,7 +120,7 @@ export function useProfiles() {
     create,
     duplicate,
     rename,
-    move,
+    moveTo,
     switchTo,
     remove,
   };

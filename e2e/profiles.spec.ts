@@ -127,7 +127,7 @@ test.describe('layout profiles', () => {
     await expect(page.locator('.profiles__switch', { hasText: 'Screen Layout' })).toBeVisible();
   });
 
-  test('reorders profiles with the up control', async ({ context, extensionId }) => {
+  test('reorders profiles by dragging the grip handle', async ({ context, extensionId }) => {
     const page = await openSheet(context, extensionId);
 
     // Add a "Second" profile → order is [Default, Second].
@@ -140,8 +140,12 @@ test.describe('layout profiles', () => {
       'Second',
     ]);
 
-    // Move "Second" up → order becomes [Second, Default].
-    await page.getByRole('button', { name: 'Move profile Second up' }).click();
+    // Drag "Second"'s grip onto the "Default" row → order becomes [Second, Default].
+    const secondGrip = page
+      .locator('.profiles__item', { hasText: 'Second' })
+      .locator('.profiles__grip');
+    const defaultRow = page.locator('.profiles__item', { hasText: 'Default' });
+    await secondGrip.dragTo(defaultRow);
     expect((await page.locator('.profiles__switch').allInnerTexts()).map((t) => t.trim())).toEqual([
       'Second',
       'Default',
