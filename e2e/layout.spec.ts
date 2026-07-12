@@ -101,9 +101,15 @@ test.describe('sheet layout controls', () => {
             h: style.getPropertyValue('--page-height').trim(),
           };
         });
+    const columnCount = () =>
+      page
+        .locator('.page__grid')
+        .first()
+        .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
 
-    // Letter portrait by default.
+    // Letter portrait by default: 3-column grid.
     expect(await dims()).toEqual({ w: '215.9mm', h: '279.4mm' });
+    expect(await columnCount()).toBe(3);
 
     // Pick Landscape from the Orientation dropdown.
     await page
@@ -113,8 +119,9 @@ test.describe('sheet layout controls', () => {
     await page.getByRole('option', { name: 'Landscape' }).click();
     await settle(page);
 
-    // Width and height are swapped.
+    // Width and height are swapped, and the grid transposes to 4 columns.
     expect(await dims()).toEqual({ w: '279.4mm', h: '215.9mm' });
+    expect(await columnCount()).toBe(4);
   });
 
   test('a hidden section stays hidden across a reload', async ({ context, extensionId }) => {

@@ -248,7 +248,7 @@ describe('sheet App', () => {
     }
   });
 
-  it('swaps the sheet dimensions when landscape orientation is chosen', async () => {
+  it('swaps the sheet dimensions and transposes the grid tracks in landscape', async () => {
     await pageOrientationPref.set('landscape');
     try {
       mockedLoad.mockResolvedValue(sampleCharacter);
@@ -258,6 +258,10 @@ describe('sheet App', () => {
       const style = wrapper.get('.sheet').attributes('style') ?? '';
       expect(style).toMatch(/--page-width:\s*279\.4mm/);
       expect(style).toMatch(/--page-height:\s*215\.9mm/);
+      // The 3-col × 4-row portrait grid transposes to 4 cols × 3 rows.
+      const gridStyle = wrapper.get('.page__grid').attributes('style') ?? '';
+      expect(gridStyle).toMatch(/grid-template-columns:\s*repeat\(4,/);
+      expect(gridStyle).toMatch(/grid-template-rows:\s*repeat\(3,/);
     } finally {
       await pageOrientationPref.set(DEFAULT_ORIENTATION_ID);
     }

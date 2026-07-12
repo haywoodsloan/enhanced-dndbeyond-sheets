@@ -205,13 +205,19 @@ const margin = computed(
 // The paper's width/height in mm, swapped when landscape is selected.
 const pageSize = computed(() => orientedSize(format.value, orientationId.value));
 
-// How many grid row-units fit on one printed page (varies with format/margin).
-const rowsPerPage = computed(() => {
+// The grid tracks. Portrait uses GRID_COLUMNS columns with the row count derived
+// (from the PORTRAIT print area) to keep cells ~square; landscape TRANSPOSES them
+// — columns and rows swap — so the now-wider page gets more columns and fewer
+// rows (cells stay square because the page dimensions swapped too).
+const portraitRows = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
-  const printWidth = mmToPx(pageSize.value.width) - 2 * marginPx;
-  const printHeight = mmToPx(pageSize.value.height) - 2 * marginPx;
+  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  const printHeight = mmToPx(format.value.height) - 2 * marginPx;
   return gridRowsPerPage(printWidth, printHeight);
 });
+const isLandscape = computed(() => orientationId.value === 'landscape');
+const gridColumns = computed(() => (isLandscape.value ? portraitRows.value : GRID_COLUMNS));
+const rowsPerPage = computed(() => (isLandscape.value ? GRID_COLUMNS : portraitRows.value));
 
 // Row height chosen so the grid's rows:columns ratio matches the print area's
 // height:width (margins removed) — i.e. roughly square cells.
@@ -228,7 +234,8 @@ const rowUnit = computed(() => {
 const cellSize = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
   const printWidth = mmToPx(pageSize.value.width) - 2 * marginPx;
-  const colWidth = (printWidth - (GRID_COLUMNS - 1) * GRID_GAP) / GRID_COLUMNS;
+  const cols = gridColumns.value;
+  const colWidth = (printWidth - (cols - 1) * GRID_GAP) / cols;
   return { width: colWidth + GRID_GAP, height: rowUnit.value + GRID_GAP };
 });
 
@@ -293,7 +300,7 @@ const footprints = computed(() =>
 // free else just after — so a freshly-dragged card takes its cell and the others
 // flow aside, while the blank a moved card leaves behind stays empty.
 const defaultPlacements = computed(() =>
-  packSections(footprints.value, GRID_COLUMNS, rowsPerPage.value),
+  packSections(footprints.value, gridColumns.value, rowsPerPage.value),
 );
 const positionedFootprints = computed<PositionedFootprint[]>(() => {
   const perPage = rowsPerPage.value;
@@ -318,7 +325,7 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
   });
 });
 const packed = computed(() =>
-  packPositioned(positionedFootprints.value, GRID_COLUMNS, rowsPerPage.value, cellSize.value),
+  packPositioned(positionedFootprints.value, gridColumns.value, rowsPerPage.value, cellSize.value),
 );
 const pageCount = computed(() => packed.value.pages);
 
@@ -345,6 +352,7 @@ const pages = computed<PageEntry[][]>(() => {
 // One page's grid is exactly `rowsPerPage` row-unit tracks tall (its in-row
 // `row-gap`s make them sum to the page's printable height).
 const pageGridRows = computed(() => `repeat(${rowsPerPage.value}, var(--row-unit))`);
+const pageGridColumns = computed(() => `repeat(${gridColumns.value}, 1fr)`);
 
 // Drag placement of the section cards. Dragging moves the card's cell live as
 // the pointer moves; the packed placements recompute reactively, so the preview
@@ -359,7 +367,7 @@ function dragGeometry() {
     left: rect.left,
     top: rect.top,
     width: rect.width,
-    columns: GRID_COLUMNS,
+    columns: gridColumns.value,
     rowsPerPage: rowsPerPage.value,
     rowUnit: rowUnit.value,
     gap: GRID_GAP,
@@ -383,9 +391,10 @@ const { dragging } = useCardDrag(sheetRef, {
     if (!footprint) return null;
     const perPage = rowsPerPage.value;
     const cell = cellAtPoint(pointer, geometry);
-    const w = Math.min(Math.max(1, footprint.cols), GRID_COLUMNS);
+    const cols = gridColumns.value;
+    const w = Math.min(Math.max(1, footprint.cols), cols);
     const h = Math.min(Math.max(1, footprint.rows), perPage);
-    const col = Math.min(Math.max(0, cell.col), GRID_COLUMNS - w);
+    const col = Math.min(Math.max(0, cell.col), cols - w);
     const page = Math.min(Math.floor(cell.row / perPage), Math.max(0, pageCount.value - 1));
     const rowInPage = Math.min(Math.max(0, cell.row % perPage), perPage - h);
     const current = packed.value.placements[index];
@@ -440,11 +449,12 @@ function onCycleLayout(key: SectionKey) {
   setLayout(key, nextIndex);
   if (topLeft) {
     const span = footprints.value[index];
-    const w = Math.min(Math.max(1, span.cols), GRID_COLUMNS);
+    const cols = gridColumns.value;
+    const w = Math.min(Math.max(1, span.cols), cols);
     const h = Math.min(Math.max(1, span.rows), perPage);
     placeCard(key, {
       page: topLeft.page,
-      col: Math.min(topLeft.col, GRID_COLUMNS - w),
+      col: Math.min(topLeft.col, cols - w),
       row: Math.min(topLeft.rowInPage, perPage - h),
     });
   }
@@ -479,7 +489,7 @@ function printSheet() {
  * sheet uses the fewest pages, keeping each card's current reading order. */
 function compactLayout() {
   const perPage = rowsPerPage.value;
-  const compacted = compactPlacements(packed.value.placements, GRID_COLUMNS, perPage);
+  const compacted = compactPlacements(packed.value.placements, gridColumns.value, perPage);
   const cells: Record<string, { page: number; col: number; row: number }> = {};
   compacted.forEach((placement, index) => {
     cells[orderedSections.value[index].key] = {
@@ -764,7 +774,10 @@ onUnmounted(() => {
                grid; a `break-after: page` (in print) puts each on its own
                physical sheet, so no grid is ever split across a page break. -->
           <section v-for="(pageCards, p) in pages" :key="`page-${p}`" class="page">
-            <div class="page__grid" :style="{ gridTemplateRows: pageGridRows }">
+            <div
+              class="page__grid"
+              :style="{ gridTemplateColumns: pageGridColumns, gridTemplateRows: pageGridRows }"
+            >
               <SectionCard
                 v-for="entry in pageCards"
                 :key="entry.section.key"
