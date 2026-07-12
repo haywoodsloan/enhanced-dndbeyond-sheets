@@ -37,7 +37,7 @@ export function isContinuationKey(key: CardKey | string): boolean {
 }
 
 /** The base card key a continuation belongs to (unchanged for non-continuations). */
-export function continuationBaseKey(key: CardKey): CardKey {
+export function continuationBaseKey(key: CardKey | string): CardKey {
   return key.replace(CONTINUATION_RE, '') as CardKey;
 }
 

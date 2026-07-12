@@ -10,76 +10,70 @@ interface AttackRow {
   name: string;
   /** To-hit (e.g. "+4") or a save prompt (e.g. "DC 14 DEX"). */
   hit: string;
-  damage: string;
-  range: string;
-  notes: string;
+  /** Damage, range, and properties joined into one trailing detail line. */
+  meta: string;
 }
 
 const rows = computed<AttackRow[]>(() =>
   props.attacks.map((attack) => ({
     name: attack.name,
     hit: attack.toHit != null ? formatModifier(attack.toHit) : (attack.save ?? ''),
-    damage: formatDamage(attack.damage),
-    range: attack.range ?? '',
-    notes: attack.notes?.join(', ') ?? '',
+    meta: [formatDamage(attack.damage), attack.range, attack.notes?.join(', ')]
+      .filter(Boolean)
+      .join(' · '),
   })),
 );
 </script>
 
 <template>
-  <div class="attacks">
-    <div class="attacks__head" aria-hidden="true">
-      <span>Attack</span>
-      <span class="attacks__hit">Hit/DC</span>
-      <span>Damage</span>
-      <span class="attacks__range">Range</span>
-    </div>
-    <div v-for="(row, index) in rows" :key="index" class="attacks__row" data-attack>
-      <span class="attacks__name">{{ row.name }}</span>
-      <span class="attacks__hit">{{ row.hit }}</span>
-      <span class="attacks__damage">{{ row.damage }}</span>
-      <span class="attacks__range">{{ row.range }}</span>
-      <span v-if="row.notes" class="attacks__notes">{{ row.notes }}</span>
-    </div>
-  </div>
+  <ul class="attacks">
+    <li v-for="(row, index) in rows" :key="index" class="attacks__item" data-attack>
+      <span class="attacks__line">
+        <span class="attacks__name">{{ row.name }}</span>
+        <span v-if="row.hit" class="attacks__hit">{{ row.hit }}</span>
+      </span>
+      <span v-if="row.meta" class="attacks__meta">{{ row.meta }}</span>
+    </li>
+  </ul>
 </template>
 
 <style scoped>
+/* Attacks flow into as many ~even columns as the card width allows (like the
+   Actions card), so a few attacks fill the row instead of leaving a wide gap,
+   and there are no fixed columns to misalign when the damage text runs long. */
 .attacks {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 14px;
 }
 
-/* Shared 4-column track: name grows, the stat columns hug their content. */
-.attacks__head,
-.attacks__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+.attacks__item {
+  position: relative;
+  padding-left: 14px;
+}
+
+/* A disc marker matching the other list cards (the grid suppresses the native
+   bullet, so draw one). */
+.attacks__item::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.7em;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.attacks__line {
+  display: flex;
   align-items: baseline;
-  column-gap: 12px;
-}
-
-.attacks__head {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--p-text-muted-color, #888);
-  border-bottom: 1px solid var(--p-primary-200, #e4e4e7);
-  padding-bottom: 2px;
-}
-
-.attacks__row {
-  padding: 1px 0;
-}
-
-/* Notes wrap onto their own line beneath the row, spanning all four columns. */
-.attacks__notes {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: var(--p-text-muted-color, #888);
+  gap: 6px;
 }
 
 .attacks__name {
@@ -87,17 +81,14 @@ const rows = computed<AttackRow[]>(() =>
 }
 
 .attacks__hit {
-  text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.attacks__range {
-  text-align: right;
-  white-space: nowrap;
   color: var(--p-text-muted-color, #888);
 }
 
-.attacks__damage {
-  white-space: nowrap;
+/* Damage / range / properties trail on their own line, lighter and smaller. */
+.attacks__meta {
+  display: block;
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
 }
 </style>
