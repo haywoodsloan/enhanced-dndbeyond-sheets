@@ -4,6 +4,7 @@ import {
   abilityKeyById,
   abilityModifier,
   armorClass,
+  cantripDiceMultiplier,
   conditionName,
   damageTypeName,
   maxHitPoints,
@@ -621,23 +622,34 @@ function spellDuration(
 }
 
 /** Base damage dice + type + upcast scaling from a spell's modifiers. */
-function spellDamage(def: RawSpellDefinition): DamageInfo | undefined {
+function spellDamage(def: RawSpellDefinition, characterLevel: number): DamageInfo | undefined {
   const mod = asArray(def.modifiers).find(
     (entry) => entry.type === 'damage' && entry.die?.diceString,
   );
   if (!mod?.die?.diceString) return undefined;
   const damage: DamageInfo = { dice: mod.die.diceString };
   if (mod.friendlySubtypeName) damage.type = mod.friendlySubtypeName;
+
+  // A cantrip scales with CHARACTER level: show its dice at the current level
+  // (no "increases with level" note — just the value it's at now).
+  if ((def.level ?? 0) === 0 && def.scaleType === 'characterlevel') {
+    const multiplier = cantripDiceMultiplier(characterLevel);
+    if (multiplier > 1 && mod.die.diceValue) {
+      damage.dice = `${(mod.die.diceCount ?? 1) * multiplier}d${mod.die.diceValue}`;
+    }
+    return damage;
+  }
+
+  // A leveled spell notes the extra dice per slot level above its own.
   const higher = asArray(def.atHigherLevels?.higherLevelDefinitions).find(
     (entry) => entry.dice?.diceString,
   );
   if (higher?.dice?.diceString) damage.scaling = `+${higher.dice.diceString}/slot`;
-  else if (def.scaleType === 'characterlevel') damage.scaling = 'scales with level';
   return damage;
 }
 
 /** Known/prepared spells from class spells and other sources, deduped and sorted. */
-function resolveSpells(raw: RawCharacter): SpellEntry[] {
+function resolveSpells(raw: RawCharacter, level: number): SpellEntry[] {
   const entries: SpellEntry[] = [];
   const add = (spell: RawSpell) => {
     const def = spell.definition;
@@ -659,7 +671,7 @@ function resolveSpells(raw: RawCharacter): SpellEntry[] {
       if (saveKey) entry.save = saveKey.toUpperCase();
     }
     if (def.requiresAttackRoll) entry.attack = true;
-    const damage = spellDamage(def);
+    const damage = spellDamage(def, level);
     if (damage) entry.damage = damage;
     if (spell.prepared) entry.prepared = true;
     entries.push(entry);
@@ -960,7 +972,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     proficiencies: resolveProficiencies(raw),
     attacks,
     actions,
-    spells: resolveSpells(raw),
+    spells: resolveSpells(raw, level),
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),
     features,

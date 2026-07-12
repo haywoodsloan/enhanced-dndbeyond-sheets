@@ -153,7 +153,7 @@ test.describe('sheet layout controls', () => {
     expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(1);
     expect(await page.locator('.page [data-section-key^="spell:"]').count()).toBe(0);
 
-    await page.locator('.page [data-section-key="spells"] .spells__expand').click();
+    await page.locator('.page [data-section-key="spells"] .card__spell-toggle').click();
     await settle(page);
 
     // Each spell is now its own card; the single spells card is gone.
@@ -164,7 +164,7 @@ test.describe('sheet layout controls', () => {
 
     // A spell card's collapse control returns to the quick sheet.
     await page
-      .locator('.page [data-section-key^="spell:"] .spell-card__collapse')
+      .locator('.page [data-section-key^="spell:"] .card__spell-toggle')
       .first()
       .click();
     await settle(page);

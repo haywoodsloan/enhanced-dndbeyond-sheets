@@ -34,8 +34,9 @@ describe('SpellsCard', () => {
     expect(header.text()).toContain('+6');
     expect(header.text()).toContain('DC 14');
     expect(header.text()).toContain('WIS');
-    // 1st-level (4) + 2nd-level (3) = 7 empty slot boxes.
-    expect(wrapper.get('[data-slots]').findAll('.resource__box')).toHaveLength(7);
+    // Slots sit at the start of their level: 1st (4) + 2nd (3) = 7 boxes total.
+    expect(wrapper.findAll('[data-slots]')).toHaveLength(2);
+    expect(wrapper.findAll('.resource__box')).toHaveLength(7);
   });
 
   it('omits the header and slots for a non-caster', () => {

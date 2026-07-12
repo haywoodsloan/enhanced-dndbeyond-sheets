@@ -1,16 +1,17 @@
 <script lang="ts" setup>
-import { computed, inject } from 'vue';
+import { computed } from 'vue';
 import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
-import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 
 const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
 
-// Injected by App: flip this section into individual per-spell cards.
-const expand = inject(ToggleSpellCardsKey, undefined);
-
+/**
+ * Spell levels to show: every level with spells or slots. Each carries its spell
+ * list and its slot count, so the slot checkboxes sit at the START of their
+ * level rather than all bunched at the top.
+ */
 const groups = computed(() => {
   const byLevel = new Map<number, SpellEntry[]>();
   for (const spell of props.spells) {
@@ -18,26 +19,22 @@ const groups = computed(() => {
     list.push(spell);
     byLevel.set(spell.level, list);
   }
-  return [...byLevel.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([level, spells]) => ({
+  const slots = props.spellcasting?.slots ?? [];
+  const maxLevel = Math.max(slots.length, 0, ...byLevel.keys());
+  const result: { level: number; label: string; spells: SpellEntry[]; slots: number }[] = [];
+  for (let level = 0; level <= maxLevel; level += 1) {
+    const levelSpells = byLevel.get(level) ?? [];
+    const levelSlots = level >= 1 ? (slots[level - 1] ?? 0) : 0;
+    if (levelSpells.length === 0 && levelSlots === 0) continue;
+    result.push({
       level,
       label: level === 0 ? 'Cantrips' : `Level ${level}`,
-      spells,
-    }));
+      spells: levelSpells,
+      slots: levelSlots,
+    });
+  }
+  return result;
 });
-
-/** Spell levels that actually have slots, paired with an ordinal label. */
-const slotLevels = computed(() =>
-  (props.spellcasting?.slots ?? [])
-    .map((count, index) => ({ level: index + 1, count }))
-    .filter((slot) => slot.count > 0),
-);
-
-function ordinal(n: number): string {
-  const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
-  return `${n}${suffix}`;
-}
 
 /** Compact per-spell shorthand: "A · 60 ft. · V,S · 1d8 Radiant · DEX save". */
 function spellMeta(spell: SpellEntry): string {
@@ -55,34 +52,11 @@ function spellTags(spell: SpellEntry): string {
 
 <template>
   <div class="spells">
-    <div v-if="expand" class="spells__toolbar">
-      <button
-        type="button"
-        class="spells__expand"
-        title="Show individual spell cards"
-        aria-label="Show individual spell cards"
-        @click="expand"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="9" rx="1" />
-          <rect x="14" y="3" width="7" height="9" rx="1" />
-          <rect x="3" y="16" width="7" height="5" rx="1" />
-          <rect x="14" y="16" width="7" height="5" rx="1" />
-        </svg>
-        <span>Cards</span>
-      </button>
-    </div>
     <div v-if="spellcasting" class="spells__casting" data-spellcasting>
       <span class="spells__stat">Atk <b>{{ formatModifier(spellcasting.attack) }}</b></span>
       <span class="spells__stat">Save <b>DC {{ spellcasting.saveDc }}</b></span>
       <span class="spells__stat">
         {{ spellcasting.ability }} <b>{{ formatModifier(spellcasting.modifier) }}</b>
-      </span>
-    </div>
-    <div v-if="slotLevels.length" class="spells__slots" data-slots>
-      <span v-for="slot in slotLevels" :key="slot.level" class="spells__slot">
-        <span class="spells__slot-level">{{ ordinal(slot.level) }}</span>
-        <ResourceBoxes :resource="{ max: slot.count }" />
       </span>
     </div>
     <div
@@ -91,8 +65,11 @@ function spellTags(spell: SpellEntry): string {
       class="spells__group"
       :data-level="group.level"
     >
-      <span class="spells__label">{{ group.label }}</span>
-      <ul class="spells__list">
+      <div class="spells__group-head">
+        <span class="spells__label">{{ group.label }}</span>
+        <ResourceBoxes v-if="group.slots > 0" :resource="{ max: group.slots }" data-slots />
+      </div>
+      <ul v-if="group.spells.length" class="spells__list">
         <li
           v-for="(spell, index) in group.spells"
           :key="index"
@@ -112,46 +89,7 @@ function spellTags(spell: SpellEntry): string {
 .spells {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-/* Top-right toolbar holding the expand-to-cards control. */
-.spells__toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: -4px;
-}
-
-.spells__expand {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--p-text-muted-color, #71717a);
-  background: none;
-  border: 1px solid var(--p-primary-200, #e4e4e7);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.spells__expand:hover {
-  border-color: var(--p-primary-400, #9ca3af);
-  color: var(--p-primary-600, #52525b);
-}
-
-.spells__expand svg {
-  width: 13px;
-  height: 13px;
-  fill: currentColor;
-}
-
-/* The expand control is a screen-only affordance. */
-@media print {
-  .spells__toolbar {
-    display: none;
-  }
+  gap: 6px;
 }
 
 /* Spell attack / save DC / ability modifier summary. */
@@ -173,27 +111,16 @@ function spellTags(spell: SpellEntry): string {
   font-weight: 700;
 }
 
-/* One row of slot checkboxes per spell level. */
-.spells__slots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 14px;
-}
-
-.spells__slot {
-  display: inline-flex;
-  align-items: center;
-}
-
-.spells__slot-level {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--p-text-muted-color, #888);
-}
-
 .spells__group {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+
+/* Level heading with its slot checkboxes at the start of the level. */
+.spells__group-head {
+  display: flex;
+  align-items: center;
   gap: 2px;
 }
 

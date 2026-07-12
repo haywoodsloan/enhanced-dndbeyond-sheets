@@ -3,6 +3,7 @@ import {
   ABILITIES,
   abilityModifier,
   armorClass,
+  cantripDiceMultiplier,
   CONDITION_NAMES,
   conditionName,
   formatModifier,
@@ -112,5 +113,17 @@ describe('conditionName', () => {
     expect(CONDITION_NAMES[0]).toBe('Blinded');
     expect(CONDITION_NAMES[CONDITION_NAMES.length - 1]).toBe('Unconscious');
     expect(CONDITION_NAMES).toContain('Poisoned');
+  });
+});
+
+describe('cantripDiceMultiplier', () => {
+  it('scales at levels 5, 11, and 17', () => {
+    expect(cantripDiceMultiplier(1)).toBe(1);
+    expect(cantripDiceMultiplier(4)).toBe(1);
+    expect(cantripDiceMultiplier(5)).toBe(2);
+    expect(cantripDiceMultiplier(10)).toBe(2);
+    expect(cantripDiceMultiplier(11)).toBe(3);
+    expect(cantripDiceMultiplier(17)).toBe(4);
+    expect(cantripDiceMultiplier(20)).toBe(4);
   });
 });

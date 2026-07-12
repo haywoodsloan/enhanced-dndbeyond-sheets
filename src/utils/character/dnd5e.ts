@@ -85,6 +85,14 @@ export function spellSlotsForCasterLevel(casterLevel: number): number[] {
   return [...SPELL_SLOTS_BY_CASTER_LEVEL[clamped]];
 }
 
+/**
+ * How many times a cantrip's base damage dice roll at a character level. Cantrips
+ * scale at levels 5, 11, and 17 (×1 / ×2 / ×3 / ×4).
+ */
+export function cantripDiceMultiplier(characterLevel: number): number {
+  return characterLevel >= 17 ? 4 : characterLevel >= 11 ? 3 : characterLevel >= 5 ? 2 : 1;
+}
+
 /** Broad armor categories that determine how Dexterity applies to AC. */
 export type ArmorCategory = 'none' | 'light' | 'medium' | 'heavy';
 

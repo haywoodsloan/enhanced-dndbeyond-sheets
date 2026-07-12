@@ -1,7 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
 import SpellCard from '@/components/cards/SpellCard.vue';
-import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import type { SpellEntry } from '@/services/dndbeyond/model';
 
 const fireBolt: SpellEntry = {
@@ -25,20 +24,5 @@ describe('SpellCard', () => {
     expect(text).toContain('V, S');
     expect(text).toContain('1d10 Fire');
     expect(text).toContain('Spell attack');
-  });
-
-  it('collapses back to the quick sheet via the injected toggle', async () => {
-    const toggle = vi.fn();
-    const wrapper = mount(SpellCard, {
-      props: { spell: fireBolt },
-      global: { provide: { [ToggleSpellCardsKey as symbol]: toggle } },
-    });
-    await wrapper.get('.spell-card__collapse').trigger('click');
-    expect(toggle).toHaveBeenCalledTimes(1);
-  });
-
-  it('hides the collapse button when no toggle is provided', () => {
-    const wrapper = mount(SpellCard, { props: { spell: fireBolt } });
-    expect(wrapper.find('.spell-card__collapse').exists()).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import SectionCard from '@/components/SectionCard.vue';
+import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import { makeCharacter } from '../fixtures/character';
 
 describe('SectionCard', () => {
@@ -16,6 +17,34 @@ describe('SectionCard', () => {
     expect(wrapper.text()).toContain('Spells');
     expect(wrapper.attributes('style')).toContain('grid-column: span 3');
     expect(wrapper.attributes('data-section-key')).toBe('spells');
+  });
+
+  it('expands the Spells card and collapses a spell card via the injected toggle', async () => {
+    const toggle = vi.fn();
+    const character = makeCharacter({ spells: [{ name: 'Guidance', level: 0 }] });
+    const provide = { [ToggleSpellCardsKey as symbol]: toggle };
+
+    const spells = mount(SectionCard, {
+      props: {
+        section: { key: 'spells', title: 'Spells', count: 1, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        character,
+      },
+      global: { provide },
+    });
+    await spells.get('.card__spell-toggle').trigger('click');
+    expect(toggle).toHaveBeenCalledTimes(1);
+
+    const spellCard = mount(SectionCard, {
+      props: {
+        section: { key: 'spell:guidance', title: 'Guidance', count: 1, isEmpty: false },
+        span: { cols: 1, rows: 2 },
+        character,
+      },
+      global: { provide },
+    });
+    await spellCard.get('.card__spell-toggle').trigger('click');
+    expect(toggle).toHaveBeenCalledTimes(2);
   });
 
   it('shows an empty note when the section is empty', () => {

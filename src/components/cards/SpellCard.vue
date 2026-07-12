@@ -1,14 +1,10 @@
 <script lang="ts" setup>
-import { computed, inject } from 'vue';
+import { computed } from 'vue';
 import type { SpellEntry } from '@/services/dndbeyond/model';
 import { spellSchoolStyle } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
-import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 
 const props = defineProps<{ spell: SpellEntry }>();
-
-// Injected by App so any card can collapse the whole set back to the quick sheet.
-const collapse = inject(ToggleSpellCardsKey, undefined);
 
 const school = computed(() => spellSchoolStyle(props.spell.school));
 const levelLabel = computed(() => (props.spell.level === 0 ? '0' : String(props.spell.level)));
@@ -46,23 +42,6 @@ const rows = computed(() => {
         <dd class="spell-card__value">{{ value }}</dd>
       </div>
     </dl>
-    <button
-      v-if="collapse"
-      type="button"
-      class="spell-card__collapse"
-      title="Back to the spell list"
-      aria-label="Back to the spell list"
-      @click="collapse"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <line x1="8" y1="6" x2="21" y2="6" />
-        <line x1="8" y1="12" x2="21" y2="12" />
-        <line x1="8" y1="18" x2="21" y2="18" />
-        <line x1="3" y1="6" x2="3.01" y2="6" />
-        <line x1="3" y1="12" x2="3.01" y2="12" />
-        <line x1="3" y1="18" x2="3.01" y2="18" />
-      </svg>
-    </button>
   </div>
 </template>
 
@@ -120,36 +99,5 @@ const rows = computed(() => {
 
 .spell-card__value {
   margin: 0;
-}
-
-/* Collapse-to-quick-sheet control, pinned to the card's bottom-right. */
-.spell-card__collapse {
-  margin: auto 0 0 auto;
-  padding: 2px;
-  display: inline-flex;
-  color: var(--p-text-muted-color, #a1a1aa);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.spell-card__collapse:hover {
-  color: var(--school-color);
-}
-
-.spell-card__collapse svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-
-/* Print keeps the card but drops the interactive collapse control. */
-@media print {
-  .spell-card__collapse {
-    display: none;
-  }
 }
 </style>

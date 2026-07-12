@@ -17,9 +17,9 @@ import FeaturesCard from '@/components/cards/FeaturesCard.vue';
 import NotesCard from '@/components/cards/NotesCard.vue';
 import type { CardKey, Character, CharacterSection } from '@/services/dndbeyond/model';
 import { inventoryListColumns, type SectionSpan } from '@/utils/layout/section-layout';
-import { isSpellCardKey, spellCardKey } from '@/utils/layout/spell-cards';
+import { isSpellCardKey, spellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import { characterSubtitle } from '@/utils/character/character-summary';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 // `span` controls the card footprint (columns × row-units). A future `expanded`
 // prop will swap between a compact and a detailed body. `hidden` renders the
@@ -88,6 +88,20 @@ const spell = computed(() =>
     : undefined,
 );
 
+// The expand-to-cards / collapse-to-list control (injected toggle from App). It
+// shows on the Spells quick-sheet (expand) and on each spell card (collapse),
+// and sits in the header control group next to the layout/hide buttons.
+const toggleSpellCards = inject(ToggleSpellCardsKey, undefined);
+const spellControl = computed<'expand' | 'collapse' | null>(() => {
+  if (props.hidden || !toggleSpellCards) return null;
+  if (props.section.key === 'spells' && (props.character?.spells.length ?? 0) > 0) {
+    return 'expand';
+  }
+  return isSpellCardKey(props.section.key) ? 'collapse' : null;
+});
+// Sits left of the layout button when one is present, else in the layout slot.
+const spellControlRight = computed(() => ((props.layoutCount ?? 1) > 1 ? '52px' : '28px'));
+
 // Report the card's natural content height so the sheet can shrink a
 // content-fit card's footprint to its text (the packer otherwise reserves a
 // count-based estimate that can leave a tall, half-empty card). Measured from
@@ -155,6 +169,38 @@ watch(
         class="card__drag-handle"
         aria-hidden="true"
       ></span>
+      <button
+        v-if="spellControl"
+        type="button"
+        class="card__toggle card__spell-toggle"
+        :style="{ right: spellControlRight }"
+        v-tooltip.bottom="{
+          value: spellControl === 'expand' ? 'Show spell cards' : 'Back to spell list',
+          showDelay: 500,
+        }"
+        :aria-label="spellControl === 'expand' ? 'Show spell cards' : 'Back to spell list'"
+        @click="toggleSpellCards?.()"
+      >
+        <svg
+          v-if="spellControl === 'expand'"
+          class="card__toggle-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+        <svg v-else class="card__toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      </button>
       <button
         v-if="!hidden && (layoutCount ?? 1) > 1"
         type="button"
