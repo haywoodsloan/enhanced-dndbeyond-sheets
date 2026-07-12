@@ -48,6 +48,43 @@ export function formatModifier(modifier: number): string {
   return modifier >= 0 ? `+${modifier}` : `${modifier}`;
 }
 
+/**
+ * Spell slots by effective caster level (index 0 = caster level 0). Each row is
+ * the slot count per spell level (index 0 = 1st-level slots). This is the
+ * standard 5e Multiclass Spellcaster table, which also covers single-class
+ * casters. D&D Beyond's payload doesn't reliably store max slots, so they're
+ * derived from the caster level instead.
+ */
+export const SPELL_SLOTS_BY_CASTER_LEVEL: readonly (readonly number[])[] = [
+  [],
+  [2],
+  [3],
+  [4, 2],
+  [4, 3],
+  [4, 3, 2],
+  [4, 3, 3],
+  [4, 3, 3, 1],
+  [4, 3, 3, 2],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+];
+
+/** Spell slots per spell level for an effective caster level (clamped 0..20). */
+export function spellSlotsForCasterLevel(casterLevel: number): number[] {
+  const clamped = Math.max(0, Math.min(20, Math.floor(casterLevel)));
+  return [...SPELL_SLOTS_BY_CASTER_LEVEL[clamped]];
+}
+
 /** Broad armor categories that determine how Dexterity applies to AC. */
 export type ArmorCategory = 'none' | 'light' | 'medium' | 'heavy';
 

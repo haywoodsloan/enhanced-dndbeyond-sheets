@@ -231,6 +231,7 @@ watch(
       <SpellsCard
         v-else-if="section.key === 'spells' && character"
         :spells="character.spells"
+        :spellcasting="character.spellcasting"
       />
       <InventoryCard
         v-else-if="section.key === 'inventory' && character"

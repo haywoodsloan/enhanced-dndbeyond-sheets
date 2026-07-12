@@ -148,6 +148,20 @@ export interface SpellEntry {
   level: number;
 }
 
+/** At-a-glance spellcasting stats shown at the top of the Spells card. */
+export interface Spellcasting {
+  /** Spellcasting ability abbreviation, e.g. "WIS". */
+  ability: string;
+  /** Spell modifier (signed). */
+  modifier: number;
+  /** Spell attack bonus (modifier + proficiency). */
+  attack: number;
+  /** Spell save DC. */
+  saveDc: number;
+  /** Max slots per spell level; index 0 = 1st-level. Trailing zero levels trimmed. */
+  slots: number[];
+}
+
 /** A carried inventory item. */
 export interface InventoryEntry {
   name: string;
@@ -229,6 +243,8 @@ export interface Character {
   actions: CharacterAction[];
   /** Known/prepared spells. */
   spells: SpellEntry[];
+  /** Spellcasting stats (modifier, attack, save DC, slots); absent for non-casters. */
+  spellcasting?: Spellcasting;
   /** Carried items. */
   inventory: InventoryEntry[];
   /** Coins held. */

@@ -9,6 +9,7 @@ import {
   maxHitPoints,
   proficiencyBonus,
   proficiencyContribution,
+  spellSlotsForCasterLevel,
   type AbilityKey,
   type ArmorCategory,
   type ProficiencyLevel,
@@ -45,6 +46,7 @@ import type {
   SenseEntry,
   Skill,
   SpellEntry,
+  Spellcasting,
 } from './model';
 
 /** Fixed counts: 6 saving throws and 18 skills in 5e. */
@@ -455,6 +457,50 @@ function spellSaveDc(raw: RawCharacter, abilities: AbilityScore[], level: number
   return 8 + proficiencyBonus(level) + mod;
 }
 
+/** Full-caster and half-caster classes, for the effective caster-level sum. */
+const FULL_CASTERS = new Set(['bard', 'cleric', 'druid', 'sorcerer', 'wizard']);
+const HALF_CASTERS = new Set(['paladin', 'ranger']);
+
+/**
+ * Effective caster level for the multiclass spell-slot table: full casters add
+ * their level, half casters half (round down), an artificer half (round up).
+ * Warlock (pact magic) is intentionally excluded — its slots aren't on this
+ * table.
+ */
+function casterLevel(raw: RawCharacter): number {
+  let total = 0;
+  for (const cls of asArray(raw.classes)) {
+    const name = cls.definition?.name?.toLowerCase() ?? '';
+    if (FULL_CASTERS.has(name)) total += cls.level;
+    else if (HALF_CASTERS.has(name)) total += Math.floor(cls.level / 2);
+    else if (name === 'artificer') total += Math.ceil(cls.level / 2);
+  }
+  return total;
+}
+
+/** Spellcasting summary (ability, modifier, attack, save DC, slots), or nothing
+ * for a character with no spellcasting ability or slots. */
+function resolveSpellcasting(
+  raw: RawCharacter,
+  abilities: AbilityScore[],
+  level: number,
+): Spellcasting | undefined {
+  const key = abilityKeyById(spellcastingAbilityId(raw));
+  if (!key) return undefined;
+  const modifier = abilities.find((ability) => ability.key === key)?.modifier ?? 0;
+  const prof = proficiencyBonus(level);
+  // Trim trailing zero levels so the slots array ends at the highest usable level.
+  const slots = spellSlotsForCasterLevel(casterLevel(raw));
+  while (slots.length && slots[slots.length - 1] === 0) slots.pop();
+  return {
+    ability: key.toUpperCase(),
+    modifier,
+    attack: modifier + prof,
+    saveDc: 8 + prof + modifier,
+    slots,
+  };
+}
+
 /** Damage line for an action from its dice, ability modifier, and type. */
 function actionDamage(
   action: RawAction,
@@ -833,6 +879,9 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   if (background) character.background = background;
 
   if (avatarUrl) character.avatarUrl = avatarUrl;
+
+  const spellcasting = resolveSpellcasting(raw, abilities, level);
+  if (spellcasting) character.spellcasting = spellcasting;
 
   return character;
 }

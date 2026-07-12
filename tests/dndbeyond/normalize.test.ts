@@ -124,6 +124,19 @@ describe('normalizeCharacter', () => {
     }
   });
 
+  it('summarizes spellcasting: modifier, attack, save DC, and slots', () => {
+    const { spellcasting } = normalizeCharacter(raw);
+    // WIS 18 (+4), proficiency +2 at level 4.
+    expect(spellcasting).toEqual({
+      ability: 'WIS',
+      modifier: 4,
+      attack: 6,
+      saveDc: 14,
+      // A level-4 full caster has four 1st-level and three 2nd-level slots.
+      slots: [4, 3],
+    });
+  });
+
   it('lists inventory items and coins', () => {
     const character = normalizeCharacter(raw);
     expect(
