@@ -11,7 +11,7 @@ describe('AttacksCard', () => {
         toHit: 4,
         damage: { dice: '1d8', bonus: 2, type: 'Piercing' },
         range: '5 ft.',
-        notes: ['Sap'],
+        properties: [{ name: 'Sap', description: 'Disadvantage on its next attack.' }],
       },
     ];
     const wrapper = mount(AttacksCard, { props: { attacks } });
@@ -23,6 +23,8 @@ describe('AttacksCard', () => {
     expect(text).toContain('1d8+2 Piercing');
     expect(text).toContain('5 ft.');
     expect(text).toContain('Sap');
+    // The property is defined once in the legend beneath the table.
+    expect(text).toContain('Disadvantage on its next attack.');
   });
 
   it('shows a save prompt when an attack is save-based instead of a to-hit', () => {
@@ -41,5 +43,37 @@ describe('AttacksCard', () => {
     ];
     const wrapper = mount(AttacksCard, { props: { attacks } });
     expect(wrapper.text()).toContain('3 Bludgeoning');
+  });
+
+  it('lists only the properties that appear, once each, in the legend', () => {
+    const attacks: Attack[] = [
+      {
+        name: 'Dagger',
+        toHit: 5,
+        damage: { dice: '1d4', bonus: 3, type: 'Piercing' },
+        range: '20/60 ft.',
+        properties: [
+          { name: 'Finesse', description: 'Use Strength or Dexterity.' },
+          { name: 'Light', description: 'Allows two-weapon fighting.' },
+        ],
+      },
+      {
+        name: 'Shortsword',
+        toHit: 5,
+        damage: { dice: '1d6', bonus: 3, type: 'Piercing' },
+        range: '5 ft.',
+        // Finesse repeats (deduped); Thrown has no description (omitted).
+        properties: [
+          { name: 'Finesse', description: 'Use Strength or Dexterity.' },
+          { name: 'Thrown' },
+        ],
+      },
+    ];
+    const wrapper = mount(AttacksCard, { props: { attacks } });
+
+    const terms = wrapper.findAll('.attacks__legend dt').map((dt) => dt.text());
+    expect(terms).toEqual(['Finesse', 'Light']);
+    expect(wrapper.text()).toContain('Use Strength or Dexterity.');
+    expect(wrapper.text()).toContain('Allows two-weapon fighting.');
   });
 });

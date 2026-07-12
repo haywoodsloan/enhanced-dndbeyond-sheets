@@ -146,8 +146,15 @@ export interface Attack {
   damage?: DamageInfo;
   /** Range / reach shorthand, e.g. "5 ft." or "20/60 ft.". */
   range?: string;
-  /** Property tags, e.g. ["Finesse", "Light"]. */
-  notes?: string[];
+  /** Weapon properties (Finesse, Light, …), each with its rules text. */
+  properties?: WeaponProperty[];
+}
+
+/** A weapon property (Finesse, Light, …) with the rules text for the legend. */
+export interface WeaponProperty {
+  name: string;
+  /** Plain-text rules description, when the source provides one. */
+  description?: string;
 }
 
 /** A known or prepared spell. */

@@ -49,6 +49,7 @@ import type {
   Skill,
   SpellEntry,
   Spellcasting,
+  WeaponProperty,
 } from './model';
 
 /** Fixed counts: 6 saving throws and 18 skills in 5e. */
@@ -366,6 +367,25 @@ function isWeaponProficient(raw: RawCharacter, def: WeaponDef): boolean {
   return hasModifier(raw, 'proficiency', 'simple-weapons');
 }
 
+/**
+ * Plain text from a D&D Beyond rules string: strips HTML tags and the `[tag]…`
+ * markup D&D Beyond wraps around cross-references, decodes the common entities,
+ * and collapses whitespace.
+ */
+function plainText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\[\/?[^\]]+\]/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&rsquo;|&apos;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** One weapon's attack line: to-hit + damage + range + property notes. */
 function weaponAttack(
   raw: RawCharacter,
@@ -373,11 +393,14 @@ function weaponAttack(
   modOf: (key: AbilityKey) => number,
   prof: number,
 ): Attack {
-  const properties = asArray(def.properties)
-    .map((property) => property.name)
-    .filter((name): name is string => Boolean(name));
+  const properties: WeaponProperty[] = asArray(def.properties)
+    .map((property) => ({
+      name: property.name ?? '',
+      ...(property.description ? { description: plainText(property.description) } : {}),
+    }))
+    .filter((property) => property.name);
   const ranged = def.attackType === RANGED_WEAPON;
-  const finesse = properties.includes('Finesse');
+  const finesse = properties.some((property) => property.name === 'Finesse');
   // Ranged uses Dex; a Finesse weapon uses the better of Str/Dex; else Str.
   const abilityMod = ranged
     ? modOf('dex')
@@ -397,10 +420,10 @@ function weaponAttack(
     };
   }
   attack.range =
-    ranged || properties.includes('Thrown')
+    ranged || properties.some((property) => property.name === 'Thrown')
       ? `${def.range ?? 0}/${def.longRange ?? def.range ?? 0} ft.`
       : `${def.range ?? 5} ft.`;
-  if (properties.length) attack.notes = properties;
+  if (properties.length) attack.properties = properties;
   return attack;
 }
 

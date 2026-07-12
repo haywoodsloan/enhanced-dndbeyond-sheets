@@ -110,6 +110,8 @@ export interface RawDice {
 export interface RawWeaponProperty {
   id?: number;
   name?: string;
+  /** Rules text (HTML + D&D Beyond `[tag]` markup), used for the legend. */
+  description?: string | null;
 }
 
 /** Limited-use resource metadata attached to an action or feature. */
