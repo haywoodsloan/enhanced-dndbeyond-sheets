@@ -123,14 +123,26 @@ async function onNewProfile() {
   if (profile) await startRename(id, profile.name);
 }
 
-// Drag-to-reorder the profile list via each row's grip handle. The order updates
-// LIVE as the dragged row hovers another: native `dragover` fires ~once per row
-// crossing (the same-row no-op guard skips the rest), so it previews the new
-// order under the cursor without spamming storage writes.
+// Drag-to-reorder the profile list via each row's grip handle. The list geometry
+// (row 0's top + the row pitch) is captured ONCE at drag start, so the target
+// slot is computed from the pointer's Y against those FIXED positions — stable
+// even while rows are mid-FLIP-glide, and forgiving (a half-row threshold)
+// rather than needing a pixel-precise hover over a specific row.
+const profilesListRef = ref<HTMLElement | null>(null);
 const draggingProfileId = ref<string | null>(null);
+let profileDragGeom: { top: number; pitch: number; count: number } | null = null;
 
 function onProfileDragStart(id: string, event: DragEvent) {
   draggingProfileId.value = id;
+  const rows = profilesListRef.value
+    ? Array.from(profilesListRef.value.querySelectorAll<HTMLElement>('.profiles__item'))
+    : [];
+  if (rows.length) {
+    const top = rows[0].getBoundingClientRect().top;
+    const pitch =
+      rows.length > 1 ? rows[1].getBoundingClientRect().top - top : rows[0].offsetHeight;
+    profileDragGeom = { top, pitch: pitch || 1, count: rows.length };
+  }
   if (!event.dataTransfer) return;
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/plain', id);
@@ -138,16 +150,17 @@ function onProfileDragStart(id: string, event: DragEvent) {
   if (row) event.dataTransfer.setDragImage(row, 10, 10);
 }
 
-function onProfileDragOver(overId: string, event: DragEvent) {
+function onProfileDragOver(event: DragEvent) {
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
   const draggedId = draggingProfileId.value;
-  if (!draggedId || draggedId === overId) return;
-  const overIndex = profiles.value.findIndex((entry) => entry.id === overId);
-  if (overIndex >= 0) moveToProfile(draggedId, overIndex);
+  if (!draggedId || !profileDragGeom) return;
+  const slot = Math.round((event.clientY - profileDragGeom.top) / profileDragGeom.pitch);
+  moveToProfile(draggedId, Math.max(0, Math.min(slot, profileDragGeom.count - 1)));
 }
 
 function onProfileDragEnd() {
   draggingProfileId.value = null;
+  profileDragGeom = null;
 }
 
 const {
@@ -440,7 +453,6 @@ useGridFlip(sheetRef, () => [orderedSections.value, anchors.value], () => layout
 
 // Glide the profile rows to their new spots when the list order changes (drag
 // reorder, create, delete) — the same FLIP the cards use, keyed by profile id.
-const profilesListRef = ref<HTMLElement | null>(null);
 useGridFlip(profilesListRef, () => profiles.value.map((entry) => entry.id), undefined, {
   selector: '.profiles__item',
   key: (element) => element.dataset.profileId,
@@ -588,7 +600,12 @@ onUnmounted(() => {
 
       <aside class="profiles">
       <h2 class="settings__title">Profiles</h2>
-      <ul class="profiles__list" ref="profilesListRef">
+      <ul
+        class="profiles__list"
+        ref="profilesListRef"
+        @dragover.prevent="onProfileDragOver"
+        @drop.prevent
+      >
         <li
           v-for="profile in profiles"
           :key="profile.id"
@@ -598,8 +615,6 @@ onUnmounted(() => {
             'profiles__item--active': profile.id === activeProfileId,
             'profiles__item--dragging': draggingProfileId === profile.id,
           }"
-          @dragover.prevent="onProfileDragOver(profile.id, $event)"
-          @drop.prevent
         >
           <input
             v-if="editingProfileId === profile.id"
