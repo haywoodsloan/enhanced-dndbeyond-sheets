@@ -978,10 +978,12 @@ body {
   opacity: 0.5;
 }
 
-/* Inline delete confirmation bar (replaces the row while confirming). */
+/* Inline delete confirmation bar (replaces the row while confirming). Sized to
+   match a normal row: the text mirrors the switch's box so the row height is the
+   same, and the buttons stretch to fill it like the normal row actions. */
 .profiles__confirm {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
   width: 100%;
 }
@@ -992,7 +994,9 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  font: inherit;
   color: #1c1c1e;
 }
 
