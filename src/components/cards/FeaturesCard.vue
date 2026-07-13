@@ -32,6 +32,12 @@ defineProps<{ features: FeatureGroup[] }>();
   gap: 10px;
 }
 
+/* A divider line between feature categories (not before the first). */
+.features__group + .features__group {
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-top: 10px;
+}
+
 .features__label {
   display: block;
   margin-bottom: 4px;
