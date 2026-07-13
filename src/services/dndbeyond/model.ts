@@ -121,6 +121,8 @@ export interface CharacterAction {
   save?: string;
   /** Range / reach shorthand, e.g. "30 ft.". */
   range?: string;
+  /** A one-line blurb of what the action does. */
+  summary?: string;
 }
 
 /** Damage dice (and computed flat bonus) for an attack, action, or spell. */

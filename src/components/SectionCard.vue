@@ -92,7 +92,14 @@ const cardSubtitle = computed(() =>
 const bodyKey = computed(() => continuationBaseKey(props.section.key));
 const isContinuation = computed(() => isContinuationKey(props.section.key));
 const bodyStyle = computed(() =>
-  props.sliceOffset ? { transform: `translateY(-${props.sliceOffset}px)` } : {},
+  props.sliceOffset
+    ? {
+        transform: `translateY(-${props.sliceOffset}px)`,
+        // Clip the slice's top (the part translated up past the title) so a
+        // continuation's content can't overlap the card title / top margin.
+        clipPath: `inset(${props.sliceOffset}px 0 0 0)`,
+      }
+    : {},
 );
 
 // For a synthetic per-spell card, the SpellEntry it renders (matched by key).

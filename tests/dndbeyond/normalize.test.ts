@@ -110,7 +110,11 @@ describe('normalizeCharacter', () => {
 
   it('lists actions including Channel Divinity', () => {
     const { actions } = normalizeCharacter(raw);
-    expect(actions.some((action) => action.name === 'Channel Divinity')).toBe(true);
+    const channelDivinity = actions.find((action) => action.name === 'Channel Divinity');
+    expect(channelDivinity).toBeDefined();
+    // Actions get a plain one-line summary with placeholders stripped.
+    expect(channelDivinity?.summary).toContain('channel');
+    expect(channelDivinity?.summary).not.toContain('{{');
   });
 
   it('lists spells with levels, sorted ascending', () => {

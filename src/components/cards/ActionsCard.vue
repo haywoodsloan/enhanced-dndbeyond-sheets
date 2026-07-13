@@ -48,6 +48,7 @@ function metaOf(action: CharacterAction): string {
           <span class="actions__name">{{ action.name }}</span>
           <ResourceBoxes v-if="action.resource" :resource="action.resource" />
           <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
+          <span v-if="action.summary" class="actions__summary">{{ action.summary }}</span>
         </li>
       </ul>
     </div>
@@ -71,8 +72,8 @@ function metaOf(action: CharacterAction): string {
 
 .actions__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 2px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 20px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -84,12 +85,24 @@ function metaOf(action: CharacterAction): string {
   font-size: 14px;
 }
 
+.actions__name {
+  font-weight: 600;
+}
+
 /* The damage/save/range meta trails the name in a lighter, smaller style. */
 .actions__meta {
   margin-left: 6px;
   font-size: 12px;
   color: var(--p-text-muted-color, #888);
   white-space: nowrap;
+}
+
+/* One-line blurb of what the action does, beneath its name. */
+.actions__summary {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
 }
 
 /* A disc marker to match the bulleted lists on the other cards (the grid layout

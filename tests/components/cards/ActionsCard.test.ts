@@ -62,4 +62,25 @@ describe('ActionsCard', () => {
     expect(item.text()).toContain('DC 14 CON');
     expect(item.text()).toContain('30 ft.');
   });
+
+  it('renders an action summary blurb when present', () => {
+    const wrapper = mount(ActionsCard, {
+      props: {
+        actions: [
+          {
+            name: 'Channel Divinity',
+            category: 'action',
+            summary: 'Channel divine energy to fuel effects.',
+          },
+          { name: 'Dash', category: 'action' },
+        ],
+      },
+    });
+    const items = wrapper.findAll('[data-action]');
+    expect(items[0].find('.actions__summary').text()).toBe(
+      'Channel divine energy to fuel effects.',
+    );
+    // An action without a summary shows no blurb line.
+    expect(items[1].find('.actions__summary').exists()).toBe(false);
+  });
 });

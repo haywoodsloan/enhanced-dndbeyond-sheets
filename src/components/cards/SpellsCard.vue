@@ -135,6 +135,9 @@ function spellTags(spell: SpellEntry): string {
   margin: 0;
   padding: 0;
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .spells__spell {

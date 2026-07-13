@@ -208,6 +208,9 @@ export interface RawAction {
   name?: string;
   /** Id of the feature/feat/trait this action comes from (see resource pools). */
   componentId?: number | null;
+  /** Full rules text (HTML) and a short summary, for the action blurb. */
+  description?: string | null;
+  snippet?: string | null;
   displayAsAttack?: boolean | null;
   activation?: { activationType?: number | null } | null;
   /** Limited-use pool (checkbox resource) when the action is rationed. */

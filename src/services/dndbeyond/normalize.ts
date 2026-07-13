@@ -597,6 +597,8 @@ function resolveActions(
         }
         const range = action.range?.range;
         if (range) entry.range = `${range} ft.`;
+        const summary = summarize(action.snippet || action.description);
+        if (summary) entry.summary = summary;
         actions.push(entry);
       }
     }
