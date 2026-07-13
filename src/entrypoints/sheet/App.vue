@@ -651,7 +651,16 @@ function printSheet() {
  * sheet uses the fewest pages, keeping each card's current reading order. */
 function compactLayout() {
   const perPage = rowsPerPage.value;
-  const compacted = compactPlacements(packed.value.placements, gridColumns.value, perPage);
+  // Flag continuation cards so compact carries them with their base (the packer
+  // re-glues them there anyway) instead of back-filling one into a gap it then
+  // vacates — which would strand cards behind a long base+continuation.
+  const continuations = plannedCards.value.map((card) => isContinuationKey(card.key));
+  const compacted = compactPlacements(
+    packed.value.placements,
+    gridColumns.value,
+    perPage,
+    continuations,
+  );
   const cells: Record<string, { page: number; col: number; row: number }> = {};
   compacted.forEach((placement, index) => {
     const card = plannedCards.value[index];

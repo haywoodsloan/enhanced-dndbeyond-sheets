@@ -389,6 +389,27 @@ describe('compactPlacements', () => {
     expect(compacted[0]).toEqual({ col: 1, row: 0, cols: 2, rows: 1 });
   });
 
+  it('carries a continuation with its base instead of back-filling it above', () => {
+    // 1 col x 4 rows/page: P (row 0), a FULL-PAGE base A, its continuation A', and
+    // a trailing card B. A continuation must stay glued after its base (the packer
+    // re-glues it there), so B — not A' — is what floats up into the page-0 gap.
+    const compacted = compactPlacements(
+      [
+        { col: 0, row: 0, cols: 1, rows: 1 }, // P
+        { col: 0, row: 4, cols: 1, rows: 4 }, // A (full-page base)
+        { col: 0, row: 8, cols: 1, rows: 2 }, // A' (continuation)
+        { col: 0, row: 10, cols: 1, rows: 1 }, // B
+      ],
+      1,
+      4,
+      [false, false, true, false],
+    );
+    // The continuation stays right after its base (never back-filled above it)…
+    expect(compacted[2].row).toBe(compacted[1].row + compacted[1].rows);
+    // …and the trailing card floats up into the gap the base left instead.
+    expect(compacted[3].row).toBeLessThan(compacted[1].row);
+  });
+
   it('floats later cards up past others to save a page (back-fill)', () => {
     // A 2-row-per-page grid: a 1x1 top card, then a full-width card on row 1,
     // then two 1x1 cards stranded on page 1.

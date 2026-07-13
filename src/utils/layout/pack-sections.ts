@@ -374,31 +374,56 @@ export function packPositioned(
  * first-fit that rescans from (0,0) every time, NOT a forward-only cursor. So a
  * card floats UP past earlier ones into a gap a taller neighbour left whenever
  * that yields a denser layout, closing gaps a plain forward flow can't reach.
- * Returns new placements in the SAME index order as the input.
+ * A continuation (“… (cont.)”) card is NOT back-filled on its own — it is carried
+ * into the cells right after its base (matching packPositioned's follow pass), so
+ * the compacted base cells stay CONSISTENT with how the sheet re-packs them.
+ * Otherwise compact would back-fill a continuation into a gap the re-pack then
+ * vacates (re-gluing it to its base), stranding cards behind the long base+cont
+ * and leaving the gap open. Pass `continuations[i] = true` for each continuation
+ * card (parallel to `placements`); omit it (default all-false) to treat every card
+ * independently. Returns new placements in the SAME index order as the input.
  */
 export function compactPlacements(
   placements: CardPlacement[],
   columns: number,
   rowsPerPage: number,
+  continuations: boolean[] = [],
 ): CardPlacement[] {
   const perPage = Math.max(1, Math.floor(rowsPerPage));
   const grid = createOccupancy(columns);
-  // Visit the cards in the order they currently read on the page…
+  const result: CardPlacement[] = new Array(placements.length);
+
+  // A base carries its continuation run into the cells right after it (forward
+  // scan), so a base and its “(cont.)” cards stay together — matching the packer.
+  const placeContinuations = (baseIndex: number) => {
+    let after = result[baseIndex];
+    for (let j = baseIndex + 1; j < placements.length && continuations[j]; j += 1) {
+      const w = Math.min(Math.max(1, Math.floor(placements[j].cols)), grid.cols);
+      const h = Math.min(Math.max(1, Math.floor(placements[j].rows)), perPage);
+      const spot = firstFreeCell(grid, after.col, after.row, w, h, perPage);
+      grid.occupy(spot.row, spot.col, w, h);
+      result[j] = { col: spot.col, row: spot.row, cols: w, rows: h };
+      after = result[j];
+    }
+  };
+
+  // Visit the BASE cards in the order they currently read on the page…
   const order = placements
     .map((_, index) => index)
+    .filter((index) => !continuations[index])
     .sort(
       (a, b) => placements[a].row - placements[b].row || placements[a].col - placements[b].col,
     );
-  // …then seat each in the topmost free cell it fits. Rescanning from (0,0) every
-  // time lets a later card back-fill a gap ABOVE an already-placed one — that is
-  // what pulls cards up past others into the densest greedy pack.
-  const result: CardPlacement[] = new Array(placements.length);
+  // …then seat each in the topmost free cell it fits (rescanning from (0,0) every
+  // time back-fills a gap ABOVE an already-placed card), and carry its
+  // continuations into the cells right after it.
   for (const index of order) {
     const w = Math.min(Math.max(1, Math.floor(placements[index].cols)), grid.cols);
     const h = Math.min(Math.max(1, Math.floor(placements[index].rows)), perPage);
     const { col, row } = firstFreeCell(grid, 0, 0, w, h, perPage);
     grid.occupy(row, col, w, h);
     result[index] = { col, row, cols: w, rows: h };
+    placeContinuations(index);
   }
   return result;
 }
