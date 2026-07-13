@@ -177,9 +177,22 @@ function measure() {
   const bodyRect = body.getBoundingClientRect();
   const total = bodyRect.height;
   if (total <= 0) return;
-  const breaks = Array.from(body.querySelectorAll(BREAK_ITEMS))
-    .map((el) => el.getBoundingClientRect().bottom - bodyRect.top)
+  // Each break item's top/bottom edge, body-relative.
+  const rects = Array.from(body.querySelectorAll(BREAK_ITEMS)).map((el) => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top - bodyRect.top, bottom: r.bottom - bodyRect.top };
+  });
+  const EDGE = 0.5;
+  const breaks = rects
+    .map((r) => r.bottom)
     .filter((offset) => offset > 0)
+    // Keep only "safe" cut lines that don't pass THROUGH an item. In a masonry
+    // multi-column list the columns end at different heights, so one column's
+    // item-bottom would slice an item still running in another column; a line is
+    // only safe where every column has ended (e.g. a group boundary). The
+    // row-aligned grid cards share each row's bottom across both items, so every
+    // break is already safe there and this filter is a no-op.
+    .filter((offset) => !rects.some((r) => r.top < offset - EDGE && r.bottom > offset + EDGE))
     .sort((a, b) => a - b);
   // Store this card's OWN item edges for self-clipping. A continuation's body is
   // translated + clipped, but those are visual only — item boxes keep their

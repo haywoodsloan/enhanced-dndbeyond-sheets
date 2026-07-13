@@ -15,7 +15,7 @@ defineProps<{ features: FeatureGroup[] }>();
     >
       <span class="features__label">{{ group.label }}</span>
       <ul class="features__list">
-        <li v-for="(item, index) in group.items" :key="index" data-feature>
+        <li v-for="(item, index) in group.items" :key="index" class="features__item" data-feature>
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
           <span v-if="item.summary" class="features__summary">{{ item.summary }}</span>
@@ -40,13 +40,39 @@ defineProps<{ features: FeatureGroup[] }>();
   color: var(--p-text-muted-color, #888);
 }
 
+/* A masonry-style multi-column list: each item takes only its own height and the
+   columns pack independently, so a short item never leaves a gap before the next
+   one just because the item beside it is taller (a grid aligns rows and forces
+   that gap). As many >=240px columns as the card width allows. */
 .features__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 6px 20px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
+  column-width: 240px;
+  column-gap: 20px;
   font-size: 14px;
+}
+
+.features__item {
+  position: relative;
+  padding-left: 14px;
+  margin-bottom: 6px;
+  /* Keep a feature's name and its blurb together in one column. */
+  break-inside: avoid;
+}
+
+/* A disc marker to match the other bulleted list cards (a multi-column list can
+   clip native list markers at the column edge, so draw our own). */
+.features__item::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.7em;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .features__name {
