@@ -53,6 +53,11 @@ const props = withDefaults(
      * card), the body is clipped to exactly `[sliceOffset, sliceOffset+height]`
      * so no partial item peeks in from an adjacent slice. */
     sliceHeight?: number;
+    /** Item index range `[sliceStart, sliceEnd)` this card shows (set only when
+     * sliced) — the card clips to its OWN live item edges for these, so the cut
+     * always lands between whole items in the current layout. */
+    sliceStart?: number;
+    sliceEnd?: number;
   }>(),
   { canCycleLayout: true, sliceOffset: 0 },
 );
@@ -95,17 +100,38 @@ const cardSubtitle = computed(() =>
 // the overflow slice; `bodyKey` is the base key its content dispatches on.
 const bodyKey = computed(() => continuationBaseKey(props.section.key));
 const isContinuation = computed(() => isContinuationKey(props.section.key));
+
+// This card's own live item-bottom offsets (body-relative), measured from its
+// OWN DOM in `measure()`. Clipping to these — rather than to the sheet's
+// snapshot — guarantees a slice cut lands on a real item edge in the CURRENT
+// layout, so text is never split across cards even if the measurement the sheet
+// used to size footprints was momentarily stale.
+const itemBreaks = ref<number[]>([]);
+
 const bodyStyle = computed(() => {
-  // A sliced (overflowing) card shows only its slice: translate the body up to
-  // the slice offset and clip BOTH the part above (which would bleed over the
-  // title) and the part below the slice (so the next item — shown in full on the
-  // following card — can't peek through the card's row-rounded extra height).
-  if (props.sliceHeight == null) return {};
-  const offset = props.sliceOffset;
-  const bottom = `calc(100% - ${offset + props.sliceHeight}px)`;
+  // Not a sliced (overflowing) card → render the whole body, no clip/transform.
+  if (props.sliceEnd == null) return {};
+  const breaks = itemBreaks.value;
+  if (breaks.length === 0) {
+    // Before this card has measured its items (and in tests with no layout
+    // engine): fall back to the sheet's measured slice pixels.
+    const offset = props.sliceOffset;
+    const bottom = `calc(100% - ${offset + (props.sliceHeight ?? 0)}px)`;
+    return {
+      ...(offset ? { transform: `translateY(-${offset}px)` } : {}),
+      clipPath: `inset(${offset}px 0 ${bottom} 0)`,
+    };
+  }
+  // Clip to this card's item range using its own live boundaries: translate up to
+  // the first item's top (the previous item's bottom) and clip the bottom at the
+  // last item's bottom — no bottom clip for the final slice (runs to the end).
+  const start = props.sliceStart ?? 0;
+  const top = start > 0 ? (breaks[start - 1] ?? 0) : 0;
+  const bottomInset =
+    props.sliceEnd >= breaks.length ? '0' : `calc(100% - ${breaks[props.sliceEnd - 1]}px)`;
   return {
-    ...(offset ? { transform: `translateY(-${offset}px)` } : {}),
-    clipPath: `inset(${offset}px 0 ${bottom} 0)`,
+    ...(top ? { transform: `translateY(-${top}px)` } : {}),
+    clipPath: `inset(${top}px 0 ${bottomInset} 0)`,
   };
 });
 
@@ -144,19 +170,29 @@ const bodyRef = ref<HTMLElement | null>(null);
 const BREAK_ITEMS = '[data-spell],[data-action],[data-attack],[data-feature]';
 
 function measure() {
-  // Continuations mirror their base card's body, so only the base card measures.
-  if (props.hidden || isContinuation.value) return;
+  if (props.hidden) return;
   const body = bodyRef.value;
   const card = body?.closest('.card');
   if (!body || !card) return;
   const bodyRect = body.getBoundingClientRect();
   const total = bodyRect.height;
   if (total <= 0) return;
-  const chrome = bodyRect.top - card.getBoundingClientRect().top;
   const breaks = Array.from(body.querySelectorAll(BREAK_ITEMS))
     .map((el) => el.getBoundingClientRect().bottom - bodyRect.top)
     .filter((offset) => offset > 0)
     .sort((a, b) => a - b);
+  // Store this card's OWN item edges for self-clipping. A continuation's body is
+  // translated + clipped, but those are visual only — item boxes keep their
+  // layout positions, so the edges relative to the body top are the same. Skip
+  // the update when unchanged to avoid needless re-renders.
+  const changed =
+    breaks.length !== itemBreaks.value.length ||
+    breaks.some((value, i) => Math.abs(value - itemBreaks.value[i]) > 0.5);
+  if (changed) itemBreaks.value = breaks;
+  // Continuations self-clip but don't report to the sheet — the base card's
+  // measurement drives how the section is sliced into cards.
+  if (isContinuation.value) return;
+  const chrome = bodyRect.top - card.getBoundingClientRect().top;
   emit('measure', props.section.key, { chrome, total, breaks });
 }
 
@@ -165,10 +201,13 @@ onMounted(() => {
   void nextTick(measure);
   // Re-measure once webfonts settle (they change text heights).
   if (typeof document !== 'undefined') void document.fonts?.ready?.then(measure);
-  const card = bodyRef.value?.closest('.card');
-  if (typeof ResizeObserver !== 'undefined' && card) {
+  // Observe the BODY, not the card: its height tracks the CONTENT, so a summary
+  // wrapping, a webfont swap, or a width change all re-measure (a card-sized
+  // observer wouldn't fire once the footprint is fixed, leaving stale breaks).
+  const body = bodyRef.value;
+  if (typeof ResizeObserver !== 'undefined' && body) {
     resizeObserver = new ResizeObserver(() => measure());
-    resizeObserver.observe(card);
+    resizeObserver.observe(body);
   }
 });
 onBeforeUnmount(() => {

@@ -71,6 +71,9 @@ interface PageEntry {
   sliceOffset: number;
   /** Body-relative slice height, set only for a sliced (overflowing) card. */
   sliceHeight?: number;
+  /** Item index range `[start, end)` for a sliced card. */
+  sliceStart?: number;
+  sliceEnd?: number;
 }
 
 const props = defineProps<{ characterId: number | null }>();
@@ -318,6 +321,10 @@ interface PlannedCard {
   /** Body-relative px this card's slice is tall (set only for a SLICED section,
    * so the card clips to exactly its slice). */
   sliceHeight?: number;
+  /** Item index range `[start, end)` this card shows (set only when sliced), so
+   * the card can clip to its own live item boundaries. */
+  sliceStart?: number;
+  sliceEnd?: number;
   /** The base section's entry count (for layout viability). */
   count: number;
 }
@@ -365,6 +372,8 @@ const plannedCards = computed<PlannedCard[]>(() => {
         rows,
         sliceOffset: slice.offset,
         sliceHeight: sliced ? slice.height : undefined,
+        sliceStart: sliced ? slice.start : undefined,
+        sliceEnd: sliced ? slice.end : undefined,
         count: section.count,
       });
     });
@@ -449,6 +458,8 @@ const pages = computed<PageEntry[][]>(() => {
       place: placementStyle(placement, perPage),
       sliceOffset: card.sliceOffset,
       sliceHeight: card.sliceHeight,
+      sliceStart: card.sliceStart,
+      sliceEnd: card.sliceEnd,
     });
   });
   return grouped;
@@ -942,6 +953,8 @@ onUnmounted(() => {
                 :place="entry.place"
                 :slice-offset="entry.sliceOffset"
                 :slice-height="entry.sliceHeight"
+                :slice-start="entry.sliceStart"
+                :slice-end="entry.sliceEnd"
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
