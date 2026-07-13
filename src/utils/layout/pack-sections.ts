@@ -9,6 +9,7 @@
  * The result is pure geometry (no DOM), so it drives both rendering and — via
  * the drag hit-testing that reads the rendered rects — the drop targeting.
  */
+import { continuationBaseKey, isContinuationKey } from '@/utils/layout/card-continuation';
 
 /** A card's grid footprint: how many columns and row-units it spans. */
 export interface CardFootprint {
@@ -498,4 +499,36 @@ export function cellAtPoint(pointer: Point, geometry: GridGeometry): { col: numb
   const yInPage = relY - page * pageStride;
   const rowInPage = Math.min(rowsPerPage - 1, Math.max(0, Math.floor(yInPage / (rowUnit + gap))));
   return { col, row: page * rowsPerPage + rowInPage };
+}
+
+/**
+ * True when dropping a card (its top-left at absolute `target` row+col) would land
+ * in the reading-order gap between a base card and its continuation — those must
+ * stay adjacent, so wedging another card between them is disallowed. `keys` are the
+ * planned-card keys (index-aligned with `placements`); a continuation's base is the
+ * card right before it. The dragged card's OWN continuation chain is skipped (it
+ * moves as a unit). Dropping ON the base is allowed (base + continuation flow
+ * together); only the gap AFTER the base through the continuation's own cells is
+ * off-limits.
+ */
+export function dropSplitsContinuation(
+  keys: string[],
+  placements: CardPlacement[],
+  draggedKey: string,
+  target: { row: number; col: number },
+  columns: number,
+): boolean {
+  const cols = Math.max(1, Math.floor(columns));
+  const pos = (row: number, col: number) => row * cols + col;
+  const targetPos = pos(target.row, target.col);
+  for (let j = 1; j < keys.length; j += 1) {
+    if (!isContinuationKey(keys[j]) || continuationBaseKey(keys[j]) === draggedKey) continue;
+    const base = placements[j - 1];
+    const cont = placements[j];
+    if (!base || !cont) continue;
+    const baseEnd = pos(base.row + base.rows - 1, base.col + base.cols - 1);
+    const contEnd = pos(cont.row + cont.rows - 1, cont.col + cont.cols - 1);
+    if (targetPos > baseEnd && targetPos <= contEnd) return true;
+  }
+  return false;
 }

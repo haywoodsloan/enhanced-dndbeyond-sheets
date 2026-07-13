@@ -23,6 +23,7 @@ import {
 import {
   cellAtPoint,
   compactPlacements,
+  dropSplitsContinuation,
   packPositioned,
   packSections,
   placementPage,
@@ -512,8 +513,22 @@ const { dragging } = useCardDrag(sheetRef, {
     const col = Math.min(Math.max(0, cell.col), cols - w);
     const page = Math.min(Math.floor(cell.row / perPage), Math.max(0, pageCount.value - 1));
     const rowInPage = Math.min(Math.max(0, cell.row % perPage), perPage - h);
+    const absRow = page * perPage + rowInPage;
     const current = packed.value.placements[index];
-    if (current && current.col === col && current.row === page * perPage + rowInPage) {
+    if (current && current.col === col && current.row === absRow) {
+      return null;
+    }
+    // A drop that would wedge this card between a base card and its continuation
+    // (which must stay adjacent) is disallowed — keep the card where it is.
+    if (
+      dropSplitsContinuation(
+        plannedCards.value.map((planned) => planned.key),
+        packed.value.placements,
+        key,
+        { row: absRow, col },
+        cols,
+      )
+    ) {
       return null;
     }
     return { page, col, row: rowInPage };

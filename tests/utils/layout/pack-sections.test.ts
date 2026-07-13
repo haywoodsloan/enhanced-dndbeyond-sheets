@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cellAtPoint,
   compactPlacements,
+  dropSplitsContinuation,
   packPositioned,
   packSections,
   placementPage,
@@ -430,5 +431,40 @@ describe('compactPlacements', () => {
     expect(compacted[1]).toEqual({ col: 0, row: 1, cols: 3, rows: 1 });
     expect(compacted[2]).toEqual({ col: 1, row: 0, cols: 1, rows: 1 });
     expect(compacted[3]).toEqual({ col: 2, row: 0, cols: 1, rows: 1 });
+  });
+});
+
+describe('dropSplitsContinuation', () => {
+  const place = (row: number, col: number, cols = 3, rows = 1) => ({ row, col, cols, rows });
+
+  it('flags a drop that lands on the continuation of a base card', () => {
+    // spells (base, fills page 0 rows 0-3) + its continuation (page 1 row 4),
+    // then notes on page 2. keys are index-aligned with the placements.
+    const keys = ['spells', 'spells~cont~1', 'notes'];
+    const placements = [place(0, 0, 3, 4), place(4, 0, 3, 4), place(8, 0)];
+    // Dropping notes on the continuation's cell (page 1, row 4) splits them.
+    expect(dropSplitsContinuation(keys, placements, 'notes', { row: 4, col: 0 }, 3)).toBe(true);
+    // Anywhere within the continuation's span (its bottom-right cell) also splits.
+    expect(dropSplitsContinuation(keys, placements, 'notes', { row: 7, col: 2 }, 3)).toBe(true);
+    // Dropping ON the base is fine — the base + continuation flow together.
+    expect(dropSplitsContinuation(keys, placements, 'notes', { row: 0, col: 0 }, 3)).toBe(false);
+    // Dropping after the continuation is fine.
+    expect(dropSplitsContinuation(keys, placements, 'notes', { row: 8, col: 0 }, 3)).toBe(false);
+  });
+
+  it('flags the leftover cells after a base that does not fill its page', () => {
+    // Base spans page 0 rows 0-2 (leftover row 3); its continuation is on page 1.
+    const keys = ['features', 'features~cont~1'];
+    const placements = [place(0, 0, 3, 3), place(4, 0, 3, 2)];
+    // The empty row 3 after the base still sits between base and continuation.
+    expect(dropSplitsContinuation(keys, placements, 'notes', { row: 3, col: 0 }, 3)).toBe(true);
+  });
+
+  it("ignores the dragged card's own continuation chain", () => {
+    // Dragging the base itself past its own continuation is allowed (they move
+    // together as a unit).
+    const keys = ['spells', 'spells~cont~1'];
+    const placements = [place(0, 0, 3, 4), place(4, 0, 3, 4)];
+    expect(dropSplitsContinuation(keys, placements, 'spells', { row: 4, col: 0 }, 3)).toBe(false);
   });
 });
