@@ -37,7 +37,7 @@ defineProps<{ resource: ResourcePool }>();
 
 .resource__recharge {
   margin-left: 2px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--p-text-muted-color, #888);

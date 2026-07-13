@@ -115,7 +115,7 @@ const columnGroups = computed(() => {
 }
 
 .skill__ability {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--p-text-muted-color, #888);
 }
 

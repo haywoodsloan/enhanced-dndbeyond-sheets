@@ -55,7 +55,7 @@ const coins = computed(() => [
   height: 20px;
   border: 1.5px solid var(--p-primary-300, #d4d4d8);
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 

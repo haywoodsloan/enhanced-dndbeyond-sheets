@@ -159,7 +159,7 @@ function spellTags(spell: SpellEntry): string {
 .spells__spell-tags {
   margin-left: 4px;
   padding: 0 3px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
   color: var(--p-text-muted-color, #888);

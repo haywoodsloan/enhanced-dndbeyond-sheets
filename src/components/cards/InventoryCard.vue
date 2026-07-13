@@ -158,7 +158,7 @@ watch(
 
 .column__label {
   justify-self: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--p-text-muted-color, #888);
   white-space: nowrap;

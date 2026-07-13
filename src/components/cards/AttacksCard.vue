@@ -109,7 +109,7 @@ const legend = computed(() => {
 }
 
 .attacks__head {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -146,7 +146,7 @@ const legend = computed(() => {
   border-top: 1px solid var(--p-primary-200, #e4e4e7);
   display: grid;
   gap: 3px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
   color: var(--p-text-muted-color, #888);
 }
