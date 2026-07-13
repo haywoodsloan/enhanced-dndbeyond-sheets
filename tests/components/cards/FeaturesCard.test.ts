@@ -39,7 +39,7 @@ describe('FeaturesCard', () => {
     // The limited-use feature gets one empty box per use plus the recharge tag…
     const channelDivinity = items[0];
     expect(channelDivinity.findAll('.resource__box')).toHaveLength(2);
-    expect(channelDivinity.text()).toContain('LR');
+    expect(channelDivinity.text()).toContain('Long rest');
     // …a passive feature has none.
     expect(items[1].find('[data-resource]').exists()).toBe(false);
   });

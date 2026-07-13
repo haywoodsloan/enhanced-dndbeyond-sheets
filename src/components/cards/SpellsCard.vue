@@ -53,10 +53,10 @@ function spellTags(spell: SpellEntry): string {
 <template>
   <div class="spells">
     <div v-if="spellcasting" class="spells__casting" data-spellcasting>
-      <span class="spells__stat">Atk <b>{{ formatModifier(spellcasting.attack) }}</b></span>
+      <span class="spells__stat">Spell attack <b>{{ formatModifier(spellcasting.attack) }}</b></span>
       <span class="spells__stat">Save <b>DC {{ spellcasting.saveDc }}</b></span>
       <span class="spells__stat">
-        {{ spellcasting.ability }} <b>{{ formatModifier(spellcasting.modifier) }}</b>
+        Modifier ({{ spellcasting.ability }}) <b>{{ formatModifier(spellcasting.modifier) }}</b>
       </span>
     </div>
     <div

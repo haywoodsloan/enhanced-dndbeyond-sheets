@@ -77,18 +77,20 @@ function metaOf(action: CharacterAction): string {
 }
 
 .actions__list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 6px 20px;
   margin: 0;
   padding: 0;
   list-style: none;
+  column-width: 240px;
+  column-gap: 20px;
 }
 
 .actions__item {
   position: relative;
   padding-left: 14px;
+  margin-bottom: 6px;
   font-size: 14px;
+  /* Keep an action's name and its blurb together in one column. */
+  break-inside: avoid;
 }
 
 .actions__name {

@@ -2,6 +2,13 @@
 import type { ResourcePool } from '@/services/dndbeyond/model';
 
 defineProps<{ resource: ResourcePool }>();
+
+/** Spell out the recharge shorthand for the printed tag. */
+function rechargeLabel(recharge: string): string {
+  if (recharge === 'SR') return 'short rest';
+  if (recharge === 'LR') return 'Long rest';
+  return recharge;
+}
 </script>
 
 <template>
@@ -12,13 +19,15 @@ defineProps<{ resource: ResourcePool }>();
       class="resource__box"
       aria-hidden="true"
     ></span>
-    <span v-if="resource.recharge" class="resource__recharge">{{ resource.recharge }}</span>
+    <span v-if="resource.recharge" class="resource__recharge">{{
+      rechargeLabel(resource.recharge)
+    }}</span>
   </span>
 </template>
 
 <style scoped>
 /* A row of empty squares meant to be ticked by hand on the printed sheet, with
-   an optional recharge tag (SR/LR). */
+   an optional recharge tag ("short rest" / "Long rest"). */
 .resource {
   display: inline-flex;
   align-items: center;

@@ -403,19 +403,19 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
   const perPage = rowsPerPage.value;
   const cards = plannedCards.value;
   const count = cards.length;
-  // A continuation trails its base card: it borrows the base's resolved home and
-  // a priority just below it, so the packer seats it in the free cell right after
-  // the base — following it even when the base was dragged or compacted. A base
-  // left alone keeps its own default-flow home (reading-order correct), and its
-  // continuations then flow naturally at their own default cells.
-  let base = { anchored: false, home: { col: 0, row: 0 }, priority: 0, run: 0 };
   return cards.map((card, index) => {
+    // A continuation is seated by the packer's follow pass in the first free cell
+    // right after its base (or the previous continuation in the run), so a base
+    // and its “(cont.)” cards always stay together — even when the base is dragged.
+    // Its own home/priority are unused; the `continuation` flag defers it.
     if (isContinuationKey(card.key)) {
-      base.run += 1;
-      const fallback = defaultPlacements.value.placements[index];
-      const home = base.anchored ? { ...base.home } : { col: fallback.col, row: fallback.row };
-      const priority = base.anchored ? base.priority - base.run * 0.001 : index - count;
-      return { cols: card.cols, rows: card.rows, home, priority };
+      return {
+        cols: card.cols,
+        rows: card.rows,
+        home: { col: 0, row: 0 },
+        priority: index - count,
+        continuation: true,
+      };
     }
     const moved = anchors.value[card.key];
     const home = moved
@@ -426,7 +426,6 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
     // card always outranks the stationary ones — it takes its cell and they flow
     // aside.
     const priority = moved ? moved.seq : index - count;
-    base = { anchored: !!moved, home: { col: home.col, row: home.row }, priority, run: 0 };
     return {
       cols: card.cols,
       rows: card.rows,

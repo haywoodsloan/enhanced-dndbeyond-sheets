@@ -166,6 +166,39 @@ describe('packPositioned', () => {
     expect(placements[0]).toEqual({ col: 2, row: 1, cols: 1, rows: 1 });
   });
 
+  it('seats a continuation on the page immediately after its base', () => {
+    // Base (card 0) + its continuation (card 1) + a following card (card 2). The
+    // continuation follows the base onto the next page, ahead of card 2.
+    const { placements } = packPositioned(
+      [
+        { cols: 3, rows: 4, home: home(0, 0), priority: -3 },
+        { cols: 3, rows: 4, home: home(0, 0), priority: -2, continuation: true },
+        { cols: 3, rows: 1, home: home(0, 8), priority: -1 },
+      ],
+      3,
+      4,
+    );
+    expect(placements[0]).toEqual({ col: 0, row: 0, cols: 3, rows: 4 });
+    expect(placements[1]).toEqual({ col: 0, row: 4, cols: 3, rows: 4 });
+  });
+
+  it('keeps a continuation right after its base when another card is dragged in', () => {
+    // A dragged (high-priority) card holds page 0; the base + its continuation
+    // still land together, in reading order, right after it (pages 1 and 2).
+    const { placements } = packPositioned(
+      [
+        { cols: 3, rows: 4, home: home(0, 4), priority: -2 },
+        { cols: 3, rows: 4, home: home(0, 8), priority: -1, continuation: true },
+        { cols: 3, rows: 4, home: home(0, 0), priority: 9 },
+      ],
+      3,
+      4,
+    );
+    expect(placements[2]).toEqual({ col: 0, row: 0, cols: 3, rows: 4 });
+    expect(placements[0]).toEqual({ col: 0, row: 4, cols: 3, rows: 4 });
+    expect(placements[1]).toEqual({ col: 0, row: 8, cols: 3, rows: 4 });
+  });
+
   it('falls back to reading order for equal-priority cards', () => {
     const { placements } = packPositioned(
       [

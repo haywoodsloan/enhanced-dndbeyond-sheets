@@ -28,6 +28,9 @@ export interface PositionedFootprint {
    * card has one (there is no pinned/regular split); a never-moved card just
    * carries a low baseline so a freshly-dragged card outranks it. */
   priority: number;
+  /** A continuation (“… (cont.)”) card: seated by the follow pass immediately
+   * after the card it continues, so its own `home`/`priority` are ignored. */
+  continuation?: boolean;
 }
 
 /** Where a card sits on the grid. `row` is an absolute content-row index that
@@ -304,17 +307,34 @@ export function packPositioned(
   const placements: CardPlacement[] = new Array(cards.length);
 
   // Most recent (highest priority) first so a freshly-moved card wins its cell;
-  // ties fall back to reading order. Every card carries a priority, so there is
-  // no separate handling for "placed" vs "regular" cards.
+  // ties fall back to reading order. Continuation (“… (cont.)”) cards are held
+  // back from this pass — they are seated in a final follow pass right after their
+  // base so a base and its continuations always stay together in reading order.
   const order = cards
     .map((_, index) => index)
+    .filter((index) => !cards[index].continuation)
     .sort((a, b) => cards[b].priority - cards[a].priority || a - b);
 
-  // Phase 1 — every card claims its home cell if it is free. Priority order means
-  // a contested home goes to the higher-priority (more recently moved) card; the
-  // loser is deferred. Settling all uncontested homes FIRST is what keeps a drop
-  // local — a displaced card can then only land in a genuine gap, never on top of
-  // another card's home (which would cascade a reflow across the page).
+  // A base carries its continuation run into the cells right AFTER it, reserved at
+  // the moment the base is placed so nothing else can slot between them. Scanning
+  // forward from the previous card in the run keeps the whole run contiguous.
+  const placeContinuations = (baseIndex: number) => {
+    let after = placements[baseIndex];
+    for (let j = baseIndex + 1; j < cards.length && cards[j].continuation; j += 1) {
+      const w = Math.min(Math.max(1, Math.floor(cards[j].cols)), grid.cols);
+      const h = Math.min(Math.max(1, Math.floor(cards[j].rows)), perPage);
+      const spot = firstFreeCell(grid, after.col, after.row, w, h, perPage);
+      grid.occupy(spot.row, spot.col, w, h);
+      placements[j] = { col: spot.col, row: spot.row, cols: w, rows: h };
+      after = placements[j];
+    }
+  };
+
+  // Phase 1 — every base claims its home cell if it is free, then carries its
+  // continuations into the cells after it. Priority order means a contested home
+  // goes to the higher-priority (more recently moved) card; the loser is deferred.
+  // Settling all uncontested homes FIRST is what keeps a drop local — a displaced
+  // card can then only land in a genuine gap, never on top of another card's home.
   const deferred: { index: number; col: number; row: number; w: number; h: number }[] = [];
   for (const index of order) {
     const card = cards[index];
@@ -325,17 +345,20 @@ export function packPositioned(
     if (grid.isFree(row, col, w, h)) {
       grid.occupy(row, col, w, h);
       placements[index] = { col, row, cols: w, rows: h };
+      placeContinuations(index);
     } else {
       deferred.push({ index, col, row, w, h });
     }
   }
 
-  // Phase 2 — each displaced card flows out of the way to the nearest free slot,
-  // forward or backward, whichever is the shorter on-screen move.
+  // Phase 2 — each displaced base flows out of the way to the nearest free slot,
+  // forward or backward, whichever is the shorter on-screen move, then carries its
+  // continuations with it.
   for (const { index, col: homeCol, row: homeRow, w, h } of deferred) {
     const { col, row } = flowToNearestCell(grid, homeCol, homeRow, w, h, perPage, cell);
     grid.occupy(row, col, w, h);
     placements[index] = { col, row, cols: w, rows: h };
+    placeContinuations(index);
   }
 
   // Pull cards up over any fully-empty page so a move or layout change never
