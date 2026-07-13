@@ -62,6 +62,12 @@ function metaOf(action: CharacterAction): string {
   gap: 8px;
 }
 
+/* A divider line between action categories (not before the first). */
+.actions__group + .actions__group {
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-top: 8px;
+}
+
 .actions__label {
   display: block;
   margin-bottom: 2px;

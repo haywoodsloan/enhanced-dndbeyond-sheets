@@ -154,9 +154,10 @@ describe('normalizeCharacter', () => {
       concentration: true,
       duration: 'Conc, 1 minute',
     });
-    // A one-line summary = the first sentence of the description, nothing more.
+    // A blurb of several whole sentences — enough to play with, not just the
+    // first line.
     expect(dancingLights?.summary).toContain('You create up to four torch-size lights within range');
-    expect(dancingLights?.summary).not.toContain('Bonus Action');
+    expect(dancingLights?.summary).toContain('Dim Light');
   });
 
   it('lists inventory items and coins', () => {

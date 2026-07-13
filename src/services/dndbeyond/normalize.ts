@@ -389,18 +389,18 @@ function plainText(html: string): string {
 }
 
 /**
- * A one-line blurb from a rules string: prefers the whole text when it's already
- * short (a curated snippet), else the first sentence, else a word-boundary cut —
- * so spells/features get a little description without dumping the full rules.
+ * A short blurb from a rules string — enough to actually use the ability, not
+ * the full rules dump. Returns the whole text when it's already short (a curated
+ * snippet), else keeps as many WHOLE sentences as fit `maxLength` (preferring a
+ * real sentence end — a ./!/? before a capital or the end — so mid-sentence
+ * abbreviations like "ft." don't cut it short), else a word-boundary cut.
  */
-function summarize(text: string | null | undefined, maxLength = 200): string {
+function summarize(text: string | null | undefined, maxLength = 400): string {
   const plain = plainText(text ?? '');
   if (!plain || plain.length <= maxLength) return plain;
-  // The first sentence (a ./!/? before a capital or the end) reads cleanly and
-  // skips mid-sentence abbreviations like "ft."; fall back to a word cut.
-  const sentence = plain.match(/^.*?[.!?](?=\s+[A-Z(]|$)/)?.[0];
-  if (sentence && sentence.length <= maxLength) return sentence;
   const slice = plain.slice(0, maxLength);
+  const sentences = slice.match(/^[\s\S]*[.!?](?=\s+[A-Z(]|$)/)?.[0];
+  if (sentences && sentences.length >= maxLength * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : maxLength).trimEnd()}…`;
 }

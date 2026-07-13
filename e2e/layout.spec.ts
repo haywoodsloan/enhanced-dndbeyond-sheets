@@ -172,24 +172,25 @@ test.describe('sheet layout controls', () => {
     expect(await page.locator('.page [data-section-key^="spell:"]').count()).toBe(0);
   });
 
-  test('the spells card grows to fit its full list without clipping', async ({
+  test('the spells card grows to a page then continues so nothing is clipped', async ({
     context,
     extensionId,
   }) => {
     const page = await openSheet(context, extensionId);
     await settle(page);
 
-    // The reported bug: the spells card didn't grow to include the whole list and
-    // clipped the bottom. It should now be tall enough to show every spell.
+    // The reported bug was the spells card clipping its list at a small estimate.
+    // With the full per-spell blurbs the list is taller than a page, so the card
+    // grows to a full page and continues onto a follow-up card — every spell is
+    // shown, none clipped.
     const base = page.locator('.page [data-section-key="spells"]');
-    const cardBox = await base.boundingBox();
-    const bodyBox = await base.locator('.card__body').boundingBox();
-    // The card is at least as tall as its content — nothing is cut off.
-    expect(cardBox!.height).toBeGreaterThanOrEqual(bodyBox!.height);
-    // And the last spell row sits within the card's visible bounds.
-    const lastSpell = base.locator('[data-spell]').last();
-    const spellBox = await lastSpell.boundingBox();
-    expect(spellBox!.y + spellBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height + 2);
+    await expect(base).toBeVisible();
+    const gridBox = await page.locator('.page__grid').first().boundingBox();
+    const baseBox = await base.boundingBox();
+    // The card grew but is capped at one printable page (not unbounded).
+    expect(baseBox!.height).toBeLessThanOrEqual(gridBox!.height + 2);
+    // The remainder of the list continues on a "(cont.)" card.
+    await expect(page.locator('.page [data-section-key="spells~cont~1"]')).toBeVisible();
   });
 
   test('an over-tall card continues on a follow-up card', async ({ context, extensionId }) => {
