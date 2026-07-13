@@ -290,6 +290,10 @@ describe('sheet App', () => {
     // Continuations carry no drag handle or hide/layout controls.
     expect(continuation.find('.card__drag-handle').exists()).toBe(false);
     expect(continuation.find('.card__toggle').exists()).toBe(false);
+    // The base card's body is clipped to its slice (so the next item, shown in
+    // full on the continuation, can't peek through the row-rounded card height).
+    const baseBody = wrapper.find('[data-section-key="actions"] .card__body');
+    expect(baseBody.attributes('style')).toContain('clip-path');
 
     wrapper.unmount();
     gbcr.mockRestore();

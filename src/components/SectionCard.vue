@@ -49,6 +49,10 @@ const props = withDefaults(
     /** Body-relative px this card's body is translated up by when it's a
      * continuation slice of an overflowing card (0 for a normal/base card). */
     sliceOffset?: number;
+    /** Body-relative px this card's slice is tall. When set (an overflowing
+     * card), the body is clipped to exactly `[sliceOffset, sliceOffset+height]`
+     * so no partial item peeks in from an adjacent slice. */
+    sliceHeight?: number;
   }>(),
   { canCycleLayout: true, sliceOffset: 0 },
 );
@@ -91,16 +95,19 @@ const cardSubtitle = computed(() =>
 // the overflow slice; `bodyKey` is the base key its content dispatches on.
 const bodyKey = computed(() => continuationBaseKey(props.section.key));
 const isContinuation = computed(() => isContinuationKey(props.section.key));
-const bodyStyle = computed(() =>
-  props.sliceOffset
-    ? {
-        transform: `translateY(-${props.sliceOffset}px)`,
-        // Clip the slice's top (the part translated up past the title) so a
-        // continuation's content can't overlap the card title / top margin.
-        clipPath: `inset(${props.sliceOffset}px 0 0 0)`,
-      }
-    : {},
-);
+const bodyStyle = computed(() => {
+  // A sliced (overflowing) card shows only its slice: translate the body up to
+  // the slice offset and clip BOTH the part above (which would bleed over the
+  // title) and the part below the slice (so the next item — shown in full on the
+  // following card — can't peek through the card's row-rounded extra height).
+  if (props.sliceHeight == null) return {};
+  const offset = props.sliceOffset;
+  const bottom = `calc(100% - ${offset + props.sliceHeight}px)`;
+  return {
+    ...(offset ? { transform: `translateY(-${offset}px)` } : {}),
+    clipPath: `inset(${offset}px 0 ${bottom} 0)`,
+  };
+});
 
 // For a synthetic per-spell card, the SpellEntry it renders (matched by key).
 const spell = computed(() =>

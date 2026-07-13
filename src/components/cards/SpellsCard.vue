@@ -118,6 +118,12 @@ function spellTags(spell: SpellEntry): string {
   gap: 2px;
 }
 
+/* A divider line between spell levels (not before the first level). */
+.spells__group + .spells__group {
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-top: 6px;
+}
+
 /* Level heading with its slot checkboxes at the start of the level. */
 .spells__group-head {
   display: flex;

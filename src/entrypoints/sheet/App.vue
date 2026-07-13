@@ -69,6 +69,8 @@ interface PageEntry {
   /** Body-relative px to translate this card's slice up by (0 unless a
    * continuation of an overflowing content-fit card). */
   sliceOffset: number;
+  /** Body-relative slice height, set only for a sliced (overflowing) card. */
+  sliceHeight?: number;
 }
 
 const props = defineProps<{ characterId: number | null }>();
@@ -313,6 +315,9 @@ interface PlannedCard {
   rows: number;
   /** Body-relative px this card's slice is translated up by (0 for the first). */
   sliceOffset: number;
+  /** Body-relative px this card's slice is tall (set only for a SLICED section,
+   * so the card clips to exactly its slice). */
+  sliceHeight?: number;
   /** The base section's entry count (for layout viability). */
   count: number;
 }
@@ -348,6 +353,7 @@ const plannedCards = computed<PlannedCard[]>(() => {
     // boundaries when it's taller than a page.
     const { chrome, total, breaks } = measured;
     const slices = sliceContent(breaks, total, Math.max(1, pageBodyHeight(chrome)));
+    const sliced = slices.length > 1;
     slices.forEach((slice, sliceIndex) => {
       const rows = rowsForHeight(chrome + slice.height + CARD_CONTENT_PAD, ru, GRID_GAP, perPage);
       const key = sliceIndex === 0 ? section.key : continuationKey(section.key, sliceIndex);
@@ -358,6 +364,7 @@ const plannedCards = computed<PlannedCard[]>(() => {
         cols: estimate.cols,
         rows,
         sliceOffset: slice.offset,
+        sliceHeight: sliced ? slice.height : undefined,
         count: section.count,
       });
     });
@@ -441,6 +448,7 @@ const pages = computed<PageEntry[][]>(() => {
       span: footprints.value[index],
       place: placementStyle(placement, perPage),
       sliceOffset: card.sliceOffset,
+      sliceHeight: card.sliceHeight,
     });
   });
   return grouped;
@@ -933,6 +941,7 @@ onUnmounted(() => {
                 :span="entry.span"
                 :place="entry.place"
                 :slice-offset="entry.sliceOffset"
+                :slice-height="entry.sliceHeight"
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
