@@ -36,6 +36,7 @@ function metaOf(action: CharacterAction): string {
       :key="group.category"
       class="actions__group"
       :data-category="group.category"
+      data-card-group
     >
       <span class="actions__label">{{ group.label }}</span>
       <ul class="actions__list">
@@ -62,10 +63,12 @@ function metaOf(action: CharacterAction): string {
   gap: 8px;
 }
 
-/* A divider line between action categories (not before the first). */
-.actions__group + .actions__group {
-  border-top: 1px solid var(--p-primary-200, #e4e4e7);
-  padding-top: 8px;
+/* A divider line between action categories. Drawn on the BOTTOM of each group
+   (except the last) so a category continuing onto a “(cont.)” card leaves no stray
+   rule atop the continuation (the base card clips it off). */
+.actions__group:not(:last-child) {
+  border-bottom: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-bottom: 8px;
 }
 
 .actions__label {

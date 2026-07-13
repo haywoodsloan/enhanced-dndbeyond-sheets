@@ -12,6 +12,7 @@ defineProps<{ features: FeatureGroup[] }>();
       :key="group.label"
       class="features__group"
       :data-group="group.label"
+      data-card-group
     >
       <span class="features__label">{{ group.label }}</span>
       <ul class="features__list">
@@ -32,10 +33,12 @@ defineProps<{ features: FeatureGroup[] }>();
   gap: 10px;
 }
 
-/* A divider line between feature categories (not before the first). */
-.features__group + .features__group {
-  border-top: 1px solid var(--p-primary-200, #e4e4e7);
-  padding-top: 10px;
+/* A divider line between feature categories. Drawn on the BOTTOM of each group
+   (except the last) so when a category continues onto a “(cont.)” card the rule
+   sits at the base card's clipped-off edge — no stray line atop the continuation. */
+.features__group:not(:last-child) {
+  border-bottom: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-bottom: 10px;
 }
 
 .features__label {

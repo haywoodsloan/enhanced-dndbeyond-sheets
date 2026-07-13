@@ -107,6 +107,10 @@ const isContinuation = computed(() => isContinuationKey(props.section.key));
 // layout, so text is never split across cards even if the measurement the sheet
 // used to size footprints was momentarily stale.
 const itemBreaks = ref<number[]>([]);
+// For a continuation that starts at a group boundary, the group's OWN top to clip
+// to (parallel to `itemBreaks`), so the leading category/level divider doesn't
+// show at the top of the “(cont.)” card. Falls back to the item break otherwise.
+const groupClipTops = ref<number[]>([]);
 
 const bodyStyle = computed(() => {
   // Not a sliced (overflowing) card → render the whole body, no clip/transform.
@@ -126,7 +130,7 @@ const bodyStyle = computed(() => {
   // the first item's top (the previous item's bottom) and clip the bottom at the
   // last item's bottom — no bottom clip for the final slice (runs to the end).
   const start = props.sliceStart ?? 0;
-  const top = start > 0 ? (breaks[start - 1] ?? 0) : 0;
+  const top = start > 0 ? (groupClipTops.value[start - 1] ?? breaks[start - 1] ?? 0) : 0;
   const bottomInset =
     props.sliceEnd >= breaks.length ? '0' : `calc(100% - ${breaks[props.sliceEnd - 1]}px)`;
   return {
@@ -198,10 +202,28 @@ function measure() {
   // translated + clipped, but those are visual only — item boxes keep their
   // layout positions, so the edges relative to the body top are the same. Skip
   // the update when unchanged to avoid needless re-renders.
+  // Group (category/level) box tops, so a continuation that starts at a group
+  // boundary can clip to the group's OWN top — hiding the between-groups divider
+  // (and its gap) that would otherwise straddle the page break and show at the top
+  // of the “(cont.)” card. Non-grouped cards have none, so this stays a no-op.
+  const groupTops = Array.from(body.querySelectorAll('[data-card-group]'))
+    .map((el) => el.getBoundingClientRect().top - bodyRect.top)
+    .sort((a, b) => a - b);
+  // For each safe break, the clip-top a continuation starting right after it should
+  // use: the next group's top when a group begins in the gap after the break (so
+  // the leading divider is clipped), else the break itself.
+  const groupClips = breaks.map((value, i) => {
+    const next = breaks[i + 1] ?? Infinity;
+    return groupTops.find((t) => t > value + EDGE && t < next - EDGE) ?? value;
+  });
   const changed =
     breaks.length !== itemBreaks.value.length ||
     breaks.some((value, i) => Math.abs(value - itemBreaks.value[i]) > 0.5);
   if (changed) itemBreaks.value = breaks;
+  const clipsChanged =
+    groupClips.length !== groupClipTops.value.length ||
+    groupClips.some((value, i) => Math.abs(value - groupClipTops.value[i]) > 0.5);
+  if (clipsChanged) groupClipTops.value = groupClips;
   // Continuations self-clip but don't report to the sheet — the base card's
   // measurement drives how the section is sliced into cards.
   if (isContinuation.value) return;

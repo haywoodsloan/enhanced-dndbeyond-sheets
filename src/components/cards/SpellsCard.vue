@@ -64,6 +64,7 @@ function spellTags(spell: SpellEntry): string {
       :key="group.level"
       class="spells__group"
       :data-level="group.level"
+      data-card-group
     >
       <div class="spells__group-head">
         <span class="spells__label">{{ group.label }}</span>
@@ -118,10 +119,12 @@ function spellTags(spell: SpellEntry): string {
   gap: 2px;
 }
 
-/* A divider line between spell levels (not before the first level). */
-.spells__group + .spells__group {
-  border-top: 1px solid var(--p-primary-200, #e4e4e7);
-  padding-top: 6px;
+/* A divider line between spell levels. Drawn on the BOTTOM of each group (except
+   the last) so a level continuing onto a “(cont.)” card leaves no stray rule atop
+   the continuation (the base card clips it off). */
+.spells__group:not(:last-child) {
+  border-bottom: 1px solid var(--p-primary-200, #e4e4e7);
+  padding-bottom: 6px;
 }
 
 /* Level heading with its slot checkboxes at the start of the level. */
