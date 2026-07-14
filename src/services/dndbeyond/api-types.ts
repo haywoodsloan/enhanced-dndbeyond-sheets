@@ -45,6 +45,8 @@ export interface RawGrantedFeature {
     id?: number;
     name?: string;
     hideInSheet?: boolean;
+    /** Character level at which this feature is granted; gate display on it. */
+    requiredLevel?: number;
     snippet?: string | null;
     description?: string | null;
   };
@@ -190,12 +192,20 @@ export interface RawSpell {
   prepared?: boolean;
 }
 
+/** A tag on a feat's definition; `__DISGUISE_FEAT` marks a non-feat placeholder. */
+export interface RawFeatCategory {
+  tagName?: string;
+  entityTypeId?: number;
+}
+
 export interface RawFeat {
   definition?: {
     id?: number;
     name?: string;
     snippet?: string | null;
     description?: string | null;
+    /** Origin tags; a `__DISGUISE_FEAT` tag means this isn't a real feat. */
+    categories?: RawFeatCategory[] | null;
   };
 }
 
@@ -208,6 +218,8 @@ export interface RawAction {
   name?: string;
   /** Id of the feature/feat/trait this action comes from (see resource pools). */
   componentId?: number | null;
+  /** Entity type of the grantor (class-feature / feat / racial-trait / …). */
+  componentTypeId?: number | null;
   /** Full rules text (HTML) and a short summary, for the action blurb. */
   description?: string | null;
   snippet?: string | null;
@@ -237,6 +249,31 @@ export interface RawAction {
  * nothing.
  */
 export type RawSourceMap<T> = Record<string, T[] | null | undefined>;
+
+/**
+ * A single *selected* option for a "choose one" feature. `componentId` is the id
+ * of the feature that offered the choice; `definition` describes the picked
+ * option (e.g. the chosen Elven lineage).
+ */
+export interface RawSelectedOption {
+  componentId?: number | null;
+  componentTypeId?: number | null;
+  definition?: {
+    id?: number;
+    name?: string | null;
+    snippet?: string | null;
+    description?: string | null;
+  } | null;
+}
+
+/** The character's selected options, grouped by source. */
+export interface RawCharacterOptions {
+  race?: RawSelectedOption[] | null;
+  class?: RawSelectedOption[] | null;
+  feat?: RawSelectedOption[] | null;
+  background?: RawSelectedOption[] | null;
+  item?: RawSelectedOption[] | null;
+}
 
 /** Coin counts held by the character. */
 export interface RawCurrencies {
@@ -297,6 +334,8 @@ export interface RawCharacter {
   spells?: RawSourceMap<RawSpell> | null;
   actions?: RawSourceMap<RawAction> | null;
   feats?: RawFeat[];
+  /** Selected "choose one" options, keyed by the offering feature's id. */
+  options?: RawCharacterOptions | null;
   optionalClassFeatures?: unknown[];
   conditions?: RawCondition[] | null;
   currencies?: RawCurrencies | null;

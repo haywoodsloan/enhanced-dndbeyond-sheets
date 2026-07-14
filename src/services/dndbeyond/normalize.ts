@@ -18,6 +18,7 @@ import {
 import type {
   RawAction,
   RawCharacter,
+  RawFeat,
   RawInventoryItem,
   RawLimitedUse,
   RawModifier,
@@ -561,6 +562,34 @@ function actionDamage(
 }
 
 /**
+ * D&D Beyond `componentTypeId`s that identify a feature grantor: a class
+ * feature, a feat, or a racial trait. An action tagged with one of these but
+ * whose `componentId` isn't a feature the character actually has is an orphan
+ * (a leftover from an unselected option) and is dropped.
+ */
+const FEATURE_COMPONENT_TYPES = new Set([12168134, 1088085227, 1960452172]);
+
+/** Ids of every feature/feat/trait the character actually has, for grantor checks. */
+function grantedFeatureIds(raw: RawCharacter): Set<number> {
+  const ids = new Set<number>();
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.definition?.classFeatures)) {
+      if (feature.id != null) ids.add(feature.id);
+    }
+    for (const feature of asArray(cls.classFeatures)) {
+      if (feature.definition?.id != null) ids.add(feature.definition.id);
+    }
+  }
+  for (const trait of asArray(raw.race?.racialTraits)) {
+    if (trait.definition?.id != null) ids.add(trait.definition.id);
+  }
+  for (const feat of asArray(raw.feats)) {
+    if (feat.definition?.id != null) ids.add(feat.definition.id);
+  }
+  return ids;
+}
+
+/**
  * Real action-economy options (Action / Bonus Action / Reaction) from every
  * source, deduped, each enriched with its limited-use checkboxes, damage, save,
  * and range. Weapon attacks now live in the Attacks card, and passive / special
@@ -571,6 +600,7 @@ function resolveActions(
   raw: RawCharacter,
   abilities: AbilityScore[],
   level: number,
+  grantedIds: Set<number>,
 ): CharacterAction[] {
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
   const modByStatId = (id: number | null | undefined) =>
@@ -584,6 +614,16 @@ function resolveActions(
       for (const action of asArray<RawAction>(group)) {
         const category = actionCategory(action.activation?.activationType);
         if (!action.name || category === 'other' || seen.has(action.name)) continue;
+        // Skip actions granted by a feature the character doesn't have (an
+        // orphaned option, e.g. a subclass path that wasn't chosen).
+        if (
+          action.componentTypeId != null &&
+          FEATURE_COMPONENT_TYPES.has(action.componentTypeId) &&
+          action.componentId != null &&
+          !grantedIds.has(action.componentId)
+        ) {
+          continue;
+        }
         seen.add(action.name);
 
         const entry: CharacterAction = { name: action.name, category };
@@ -799,11 +839,48 @@ function resolveResourceMap(raw: RawCharacter, level: number): Map<number, Resou
  */
 const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$/;
 
+/** Category tag D&D Beyond puts on placeholder "feats" that aren't real feats. */
+const DISGUISE_FEAT_TAG = '__DISGUISE_FEAT';
+
+/** True when a feat is a data-origin placeholder rather than a chosen feat. */
+function isDisguiseFeat(feat: RawFeat): boolean {
+  return asArray(feat.definition?.categories).some(
+    (category) => category.tagName === DISGUISE_FEAT_TAG,
+  );
+}
+
+/**
+ * Map from a "choose one" feature's id to the option the character selected,
+ * built from `raw.options`. Only options that carry their own rules text (a
+ * non-empty snippet) are included: those are real benefits (e.g. an Elven
+ * lineage) that should replace the choice prompt on the sheet. Options with an
+ * empty snippet are minor parameters (a spellcasting ability, an ability-score
+ * bump) and are left attached to their base feature.
+ */
+function selectedOptionsByComponent(
+  raw: RawCharacter,
+): Map<number, { name: string; summary?: string }> {
+  const map = new Map<number, { name: string; summary?: string }>();
+  const options = raw.options;
+  if (!options) return map;
+  const groups = [options.race, options.class, options.feat, options.background, options.item];
+  for (const group of groups) {
+    for (const option of asArray(group)) {
+      const def = option.definition;
+      const id = option.componentId;
+      if (id == null || !def?.name || !def.snippet?.trim() || map.has(id)) continue;
+      map.set(id, { name: def.name, summary: summarize(def.snippet || def.description) });
+    }
+  }
+  return map;
+}
+
 /** Features and traits grouped by source, each with its limited-use resource. */
 function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
 ): FeatureGroup[] {
+  const optionByComponent = selectedOptionsByComponent(raw);
   const toItem = (name: string, id: number | undefined, summary?: string): FeatureItem => {
     const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
@@ -811,10 +888,26 @@ function resolveFeatures(
     if (summary) item.summary = summary;
     return item;
   };
+  // When a feature is a "choose one" prompt, surface the selected option in its
+  // place so the sheet shows the benefit (e.g. "Drow Lineage") rather than the
+  // choice ("Elven Lineage").
+  const withOption = (
+    id: number | undefined,
+    name: string | undefined,
+    summary: string | undefined,
+  ): { name: string | undefined; summary: string | undefined } => {
+    const chosen = id != null ? optionByComponent.get(id) : undefined;
+    return chosen ? { name: chosen.name, summary: chosen.summary } : { name, summary };
+  };
 
   const classItems: FeatureItem[] = [];
   const seen = new Set<string>();
-  const addClass = (name: string | undefined, id: number | undefined, summary?: string) => {
+  const addClass = (
+    id: number | undefined,
+    rawName: string | undefined,
+    rawSummary: string | undefined,
+  ) => {
+    const { name, summary } = withOption(id, rawName, rawSummary);
     if (!name || seen.has(name) || STRUCTURAL_FEATURE.test(name)) return;
     seen.add(name);
     classItems.push(toItem(name, id, summary));
@@ -822,44 +915,45 @@ function resolveFeatures(
   for (const cls of asArray(raw.classes)) {
     for (const feature of asArray(cls.definition?.classFeatures)) {
       if (feature.requiredLevel == null || feature.requiredLevel <= cls.level) {
-        addClass(feature.name, feature.id, summarize(feature.snippet || feature.description));
+        addClass(feature.id, feature.name, summarize(feature.snippet || feature.description));
       }
     }
     for (const feature of asArray(cls.classFeatures)) {
-      if (feature.definition?.hideInSheet !== true) {
-        addClass(
-          feature.definition?.name,
-          feature.definition?.id,
-          summarize(feature.definition?.snippet || feature.definition?.description),
-        );
-      }
+      const def = feature.definition;
+      if (def?.hideInSheet === true) continue;
+      // Granted features carry a `requiredLevel`; skip ones the character hasn't
+      // reached yet (e.g. Divine Intervention at level 10 on a level-4 cleric).
+      if (def?.requiredLevel != null && def.requiredLevel > cls.level) continue;
+      addClass(def?.id, def?.name, summarize(def?.snippet || def?.description));
     }
   }
 
   const racialTraits: FeatureItem[] = [];
   const seenTrait = new Set<string>();
   for (const trait of asArray(raw.race?.racialTraits)) {
-    const name = trait.definition?.name;
-    if (!name || trait.definition?.hideInSheet === true || seenTrait.has(name)) continue;
-    seenTrait.add(name);
-    racialTraits.push(
-      toItem(
-        name,
-        trait.definition?.id,
-        summarize(trait.definition?.snippet || trait.definition?.description),
-      ),
+    const def = trait.definition;
+    if (!def?.name || def.hideInSheet === true) continue;
+    const { name, summary } = withOption(
+      def.id,
+      def.name,
+      summarize(def.snippet || def.description),
     );
+    if (!name || seenTrait.has(name)) continue;
+    seenTrait.add(name);
+    racialTraits.push(toItem(name, def.id, summary));
   }
 
   const feats = asArray(raw.feats)
-    .filter((feat) => feat.definition?.name)
-    .map((feat) =>
-      toItem(
-        feat.definition!.name!,
-        feat.definition?.id,
-        summarize(feat.definition?.snippet || feat.definition?.description),
-      ),
-    );
+    .filter((feat) => feat.definition?.name && !isDisguiseFeat(feat))
+    .map((feat) => {
+      const def = feat.definition!;
+      const { name, summary } = withOption(
+        def.id,
+        def.name,
+        summarize(def.snippet || def.description),
+      );
+      return toItem(name!, def.id, summary);
+    });
 
   const groups: FeatureGroup[] = [];
   if (classItems.length) groups.push({ label: 'Class Features', items: classItems });
@@ -1001,7 +1095,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
-  const actions = resolveActions(raw, abilities, level);
+  const actions = resolveActions(raw, abilities, level, grantedFeatureIds(raw));
   const resources = resolveResourceMap(raw, level);
   const features = resolveFeatures(raw, resources);
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);

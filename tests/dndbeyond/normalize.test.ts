@@ -270,9 +270,12 @@ describe('normalizeCharacter', () => {
     expect(counts.savingThrows).toBe(6);
     expect(counts.spells).toBe(18);
     expect(counts.inventory).toBe(24);
-    // The count is the distinct features actually shown (deduped, minus hidden
-    // traits and structural placeholders like ASI / the subclass choice).
-    expect(counts.features).toBe(30);
+    // The count is the distinct features actually shown: deduped and minus
+    // hidden traits, structural placeholders (ASI / the subclass choice),
+    // above-level granted features (Divine Intervention), disguise-feat
+    // placeholders (Dark Bargain, Runestones), and choice prompts replaced by
+    // their selected option (Elven Lineage -> Drow Lineage).
+    expect(counts.features).toBe(20);
     expect(counts.basics).toBe(0); // Noct has no active conditions
     expect(counts.proficiencies).toBeGreaterThan(0);
     expect(counts.actions).toBeGreaterThan(0);
@@ -464,3 +467,92 @@ describe('normalizeCharacter', () => {
     expect(senses.some((sense) => sense.label === 'blindsight')).toBe(true);
   });
 });
+
+describe('normalizeCharacter — filtering spurious features and actions', () => {
+  const featureNames = (label: string): string[] => {
+    const group = normalizeCharacter(raw).features.find((g) => g.label === label);
+    return group?.items.map((item) => item.name) ?? [];
+  };
+
+  it('hides granted class features above the character level', () => {
+    // Divine Intervention is a level-10 cleric feature; Noct is level 4. It is
+    // granted (hideInSheet false) but gated by requiredLevel.
+    expect(featureNames('Class Features')).not.toContain('Divine Intervention');
+  });
+
+  it('drops actions granted by a feature the character does not have', () => {
+    const { actions } = normalizeCharacter(raw);
+    const names = actions.map((action) => action.name);
+    // "Initiate a Circle Spell" is granted by an unselected subclass component
+    // (componentId 12373777) that isn't any feature the character has.
+    expect(names).not.toContain('Initiate a Circle Spell');
+    // A real feat-granted action is kept (its grantor feat is present).
+    expect(names).toContain('Gathered Whispers: Unearthly Scream');
+    // A real class-feature action is kept.
+    expect(names).toContain('Channel Divinity: Turn Undead');
+  });
+
+  it('replaces a choice-base racial trait with the selected option', () => {
+    const names = featureNames('Racial Traits');
+    // "Elven Lineage" is just the choice prompt; the selected "Drow Lineage" is
+    // the real benefit and should take its place.
+    expect(names).not.toContain('Elven Lineage');
+    expect(names).toContain('Drow Lineage');
+    const racial = normalizeCharacter(raw).features.find((g) => g.label === 'Racial Traits');
+    const drow = racial?.items.find((item) => item.name === 'Drow Lineage');
+    expect(drow?.summary).toContain('Darkvision');
+  });
+
+  it('replaces a choice-base class feature with the selected option', () => {
+    const names = featureNames('Class Features');
+    // Same rule applied consistently to class features: "Divine Order" is a
+    // choose-one prompt whose selected role ("Protector") carries the benefit.
+    expect(names).not.toContain('Divine Order');
+    expect(names).toContain('Protector');
+  });
+
+  it('filters out __DISGUISE_FEAT placeholder feats', () => {
+    const names = featureNames('Feats');
+    expect(names).not.toContain('Dark Bargain');
+    expect(names).not.toContain('Runestones');
+    // A genuine feat is kept.
+    expect(names).toContain('Gathered Whispers');
+  });
+
+  it('leaves a choice-base feature untouched when its option carries no rules text', () => {
+    // A selected option with an empty snippet is a minor parameter (a
+    // spellcasting ability, an ability-score bump), not a benefit, so the base
+    // feature keeps its own name.
+    const character = {
+      ...raw,
+      classes: [
+        {
+          level: 4,
+          definition: {
+            name: 'Cleric',
+            classFeatures: [{ id: 5001, name: 'Weird Insight', requiredLevel: 1 }],
+          },
+        },
+      ],
+      race: null,
+      feats: [],
+      options: {
+        class: [
+          {
+            componentId: 5001,
+            componentTypeId: 12168134,
+            definition: { id: 99, name: 'Wisdom', snippet: '', description: '<p>Wisdom.</p>' },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const group = normalizeCharacter(character).features.find(
+      (g) => g.label === 'Class Features',
+    );
+    const names = group?.items.map((item) => item.name) ?? [];
+    expect(names).toContain('Weird Insight');
+    expect(names).not.toContain('Wisdom');
+  });
+});
+
