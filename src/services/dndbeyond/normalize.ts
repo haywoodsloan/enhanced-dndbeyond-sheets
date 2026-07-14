@@ -834,10 +834,11 @@ function resolveResourceMap(raw: RawCharacter, level: number): Map<number, Resou
 /**
  * Structural placeholder entries in a class's feature list that aren't real
  * features — a stat bump ("Ability Score Improvement"), the subclass CHOICE
- * ("Cleric Subclass"), or an epic boon slot — so they're dropped to match what
- * D&D Beyond actually lists.
+ * ("Cleric Subclass"), an epic boon slot, or the class's summary header
+ * ("Core Cleric Traits", which just points at the proficiencies table) — so
+ * they're dropped to match what D&D Beyond actually lists.
  */
-const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$/;
+const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$|^Core .+ Traits$/;
 
 /** Category tag D&D Beyond puts on placeholder "feats" that aren't real feats. */
 const DISGUISE_FEAT_TAG = '__DISGUISE_FEAT';

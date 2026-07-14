@@ -174,9 +174,11 @@ describe('normalizeCharacter', () => {
     const classFeatures = features.find((group) => group.label === 'Class Features');
     const names = classFeatures?.items.map((item) => item.name) ?? [];
     expect(names).toContain('Spellcasting');
-    // Structural placeholders (the ASI bump, the subclass choice) are dropped.
+    // Structural placeholders (the ASI bump, the subclass choice, and the
+    // "Core Cleric Traits" summary header) are dropped.
     expect(names).not.toContain('Ability Score Improvement');
     expect(names.some((name) => name.endsWith('Subclass'))).toBe(false);
+    expect(names).not.toContain('Core Cleric Traits');
   });
 
   it('gives features a plain-text summary with placeholders stripped', () => {
@@ -271,11 +273,11 @@ describe('normalizeCharacter', () => {
     expect(counts.spells).toBe(18);
     expect(counts.inventory).toBe(24);
     // The count is the distinct features actually shown: deduped and minus
-    // hidden traits, structural placeholders (ASI / the subclass choice),
-    // above-level granted features (Divine Intervention), disguise-feat
-    // placeholders (Dark Bargain, Runestones), and choice prompts replaced by
-    // their selected option (Elven Lineage -> Drow Lineage).
-    expect(counts.features).toBe(20);
+    // hidden traits, structural placeholders (ASI / the subclass choice /
+    // "Core Cleric Traits"), above-level granted features (Divine Intervention),
+    // disguise-feat placeholders (Dark Bargain, Runestones), and choice prompts
+    // replaced by their selected option (Elven Lineage -> Drow Lineage).
+    expect(counts.features).toBe(19);
     expect(counts.basics).toBe(0); // Noct has no active conditions
     expect(counts.proficiencies).toBeGreaterThan(0);
     expect(counts.actions).toBeGreaterThan(0);
