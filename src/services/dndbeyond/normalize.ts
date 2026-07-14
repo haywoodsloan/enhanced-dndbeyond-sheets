@@ -595,19 +595,24 @@ function grantedFeatureIds(raw: RawCharacter): Set<number> {
  * and range. Weapon attacks now live in the Attacks card, and passive / special
  * / no-action riders — which D&D Beyond doesn't list as actions — are dropped so
  * the card mirrors the site instead of every internal entry.
+ *
+ * `resourceComponentIds` collects the grantor id of every displayed action that
+ * shows its own checkboxes, so the caller can suppress the duplicate tracker on
+ * the granting feature (e.g. Channel Divinity's uses live on its action).
  */
 function resolveActions(
   raw: RawCharacter,
   abilities: AbilityScore[],
   level: number,
   grantedIds: Set<number>,
-): CharacterAction[] {
+): { actions: CharacterAction[]; resourceComponentIds: Set<number> } {
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
   const modByStatId = (id: number | null | undefined) =>
     modByKey.get(abilityKeyById(id) ?? ('' as AbilityKey)) ?? 0;
   const saveDc = spellSaveDc(raw, abilities, level);
 
   const actions: CharacterAction[] = [];
+  const resourceComponentIds = new Set<number>();
   const seen = new Set<string>();
   if (raw.actions) {
     for (const group of Object.values(raw.actions)) {
@@ -628,7 +633,10 @@ function resolveActions(
 
         const entry: CharacterAction = { name: action.name, category };
         const resource = limitedUseToPool(action.limitedUse, level);
-        if (resource) entry.resource = resource;
+        if (resource) {
+          entry.resource = resource;
+          if (action.componentId != null) resourceComponentIds.add(action.componentId);
+        }
         const damage = actionDamage(action, modByStatId);
         if (damage) entry.damage = damage;
         const saveKey = abilityKeyById(action.saveStatId);
@@ -643,7 +651,7 @@ function resolveActions(
       }
     }
   }
-  return actions;
+  return { actions, resourceComponentIds };
 }
 
 /** Casting-time shorthand from a spell's activation (A / BA / R / 1m / 1h). */
@@ -1096,8 +1104,16 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
-  const actions = resolveActions(raw, abilities, level, grantedFeatureIds(raw));
+  const { actions, resourceComponentIds } = resolveActions(
+    raw,
+    abilities,
+    level,
+    grantedFeatureIds(raw),
+  );
   const resources = resolveResourceMap(raw, level);
+  // A feature doesn't need its own checkboxes when the same limited-use pool is
+  // already shown on a corresponding action in the Actions card.
+  for (const id of resourceComponentIds) resources.delete(id);
   const features = resolveFeatures(raw, resources);
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);
 

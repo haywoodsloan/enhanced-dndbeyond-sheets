@@ -194,17 +194,61 @@ describe('normalizeCharacter', () => {
     expect(channelDivinity?.summary).toContain('channel divine energy');
   });
 
-  it('attaches limited-use checkboxes to a feature from its action', () => {
-    const { features } = normalizeCharacter(raw);
+  it('does not duplicate an action\'s limited-use checkboxes on its feature', () => {
+    const { features, actions } = normalizeCharacter(raw);
     const classFeatures = features.find((group) => group.label === 'Class Features');
     const channelDivinity = classFeatures?.items.find(
       (item) => item.name === 'Channel Divinity',
     );
-    // Channel Divinity is usable twice per long rest (from its action's limitedUse).
-    expect(channelDivinity?.resource).toEqual({ max: 2, recharge: 'LR' });
-    // A passive feature has no resource tracker.
+    // The Channel Divinity ACTION already shows the "2 / long rest" tracker, so
+    // the feature omits the duplicate checkboxes.
+    expect(channelDivinity?.resource).toBeUndefined();
+    expect(actions.find((action) => action.name === 'Channel Divinity')?.resource).toEqual(
+      { max: 2, recharge: 'LR' },
+    );
+    // A passive feature has no resource tracker either.
     const passive = classFeatures?.items.find((item) => item.name === 'Circle of Mortality');
     expect(passive?.resource).toBeUndefined();
+  });
+
+  it('keeps a feature\'s checkboxes when no displayed action shows them', () => {
+    // A feature whose only rationed action isn't an action-economy option
+    // (activationType 8 -> "other", dropped from the Actions card) still needs
+    // its own tracker, since nothing else surfaces the use count.
+    const character = {
+      ...raw,
+      classes: [
+        {
+          level: 4,
+          definition: {
+            name: 'Cleric',
+            classFeatures: [{ id: 7777, name: 'Hidden Reserve', requiredLevel: 1 }],
+          },
+        },
+      ],
+      race: null,
+      feats: [],
+      actions: {
+        class: [
+          {
+            name: 'Hidden Reserve',
+            componentId: 7777,
+            componentTypeId: 12168134,
+            activation: { activationType: 8 },
+            limitedUse: { maxUses: 3, resetType: 2 },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const { features, actions } = normalizeCharacter(character);
+    // The action was filtered out (category "other")...
+    expect(actions.some((action) => action.name === 'Hidden Reserve')).toBe(false);
+    // ...so the feature keeps its own checkboxes.
+    const item = features
+      .flatMap((group) => group.items)
+      .find((feature) => feature.name === 'Hidden Reserve');
+    expect(item?.resource).toEqual({ max: 3, recharge: 'LR' });
   });
 
   it('resolves the portrait section and an uncropped avatar url', () => {
