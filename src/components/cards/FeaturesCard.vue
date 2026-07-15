@@ -20,6 +20,15 @@ defineProps<{ features: FeatureGroup[] }>();
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
           <span v-if="item.summary" class="features__summary">{{ item.summary }}</span>
+          <p
+            v-for="(part, pIndex) in item.parts"
+            :key="pIndex"
+            class="features__part"
+            data-feature-part
+          >
+            <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
+            <span v-if="part.text">{{ part.text }}</span>
+          </p>
         </li>
       </ul>
     </div>
@@ -95,4 +104,21 @@ defineProps<{ features: FeatureGroup[] }>();
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);
 }
+
+/* A named sub-part of a feature (e.g. Circle of Mortality's "Pull of Death"),
+   rendered as a run-in bold heading followed by its text. An action sub-part
+   has no text (its detail lives on the Actions card); an un-named rider has no
+   heading. */
+.features__part {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.features__part-name {
+  margin-right: 5px;
+  color: #1c1c1e;
+}
+
 </style>

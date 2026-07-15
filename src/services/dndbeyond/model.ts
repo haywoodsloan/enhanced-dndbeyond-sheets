@@ -227,13 +227,23 @@ export interface ResourcePool {
   recharge?: string;
 }
 
+/** A named sub-section of a feature (e.g. Circle of Mortality's "Pull of Death"). */
+export interface FeaturePart {
+  /** The sub-part name; '' for an un-named trailing rider. */
+  label: string;
+  /** The sub-part text; '' when the detail lives on a matching action instead. */
+  text: string;
+}
+
 /** A single feature/trait, with an optional limited-use resource tracker. */
 export interface FeatureItem {
   name: string;
   /** Limited-use pool rendered as empty checkboxes, when the feature is rationed. */
   resource?: ResourcePool;
-  /** A one-line blurb of what the feature does. */
+  /** A one-line blurb of what the feature does (the intro for multi-part features). */
   summary?: string;
+  /** Named sub-parts, when the feature bundles several distinct benefits. */
+  parts?: FeaturePart[];
 }
 
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */

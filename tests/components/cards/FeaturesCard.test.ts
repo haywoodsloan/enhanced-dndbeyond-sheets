@@ -66,4 +66,42 @@ describe('FeaturesCard', () => {
     // A feature without a summary shows no blurb line.
     expect(items[1].find('.features__summary').exists()).toBe(false);
   });
+
+  it('renders named sub-parts, showing action sub-parts as a heading only', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Class Features',
+            items: [
+              {
+                name: 'Circle of Mortality',
+                summary: 'You gain the following benefits.',
+                parts: [
+                  { label: 'Pull of Death', text: '' },
+                  {
+                    label: 'Return to Life',
+                    text: 'You can cast Spare the Dying as a Bonus Action.',
+                  },
+                  { label: '', text: 'Use the highest number possible for each healing die.' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const parts = wrapper.findAll('[data-feature-part]');
+    expect(parts).toHaveLength(3);
+    // An action sub-part shows just its bold heading, no body text.
+    expect(parts[0].find('.features__part-name').text()).toBe('Pull of Death');
+    expect(parts[0].text().trim()).toBe('Pull of Death');
+    // A non-action sub-part shows heading + text.
+    expect(parts[1].text()).toContain('Return to Life');
+    expect(parts[1].text()).toContain('Spare the Dying');
+    // An un-named rider shows just its text.
+    expect(parts[2].find('.features__part-name').exists()).toBe(false);
+    expect(parts[2].text()).toContain('highest number possible');
+  });
 });

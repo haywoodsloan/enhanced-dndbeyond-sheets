@@ -189,9 +189,52 @@ describe('normalizeCharacter', () => {
     for (const item of items) {
       expect(item.summary ?? '').not.toContain('{{');
       expect(item.summary ?? '').not.toContain('<');
+      for (const part of item.parts ?? []) {
+        expect(part.text).not.toContain('{{');
+        expect(part.text).not.toContain('<');
+      }
     }
     const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
     expect(channelDivinity?.summary).toContain('channel divine energy');
+  });
+
+  it('breaks a feature into named sub-parts, noting action sub-parts briefly', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+
+    const circle = items.find((item) => item.name === 'Circle of Mortality');
+    const circleLabels = circle?.parts?.map((part) => part.label) ?? [];
+    expect(circleLabels).toContain('Pull of Death');
+    expect(circleLabels).toContain('Return to Life');
+    // Pull of Death is also an action, so the feature just notes its name.
+    expect(circle?.parts?.find((part) => part.label === 'Pull of Death')?.text).toBe('');
+    // Return to Life isn't an action, so it keeps its text.
+    expect(circle?.parts?.find((part) => part.label === 'Return to Life')?.text).toContain(
+      'Spare the Dying',
+    );
+    // The un-named healing rider (all the info) is kept as a label-less part.
+    expect(
+      circle?.parts?.some((part) => part.label === '' && part.text.includes('restore 8')),
+    ).toBe(true);
+
+    const whispers = items.find((item) => item.name === 'Gathered Whispers');
+    expect(whispers?.parts?.map((part) => part.label)).toEqual(
+      expect.arrayContaining(['Spirit Whispers', 'Unearthly Scream', 'Voices from Beyond']),
+    );
+    // Spirit Whispers isn't an action -> full text (mentions Augury)…
+    expect(whispers?.parts?.find((part) => part.label === 'Spirit Whispers')?.text).toContain(
+      'Augury',
+    );
+    // …Unearthly Scream / Voices from Beyond are actions -> brief.
+    expect(whispers?.parts?.find((part) => part.label === 'Unearthly Scream')?.text).toBe('');
+    expect(whispers?.parts?.find((part) => part.label === 'Voices from Beyond')?.text).toBe('');
+  });
+
+  it('leaves a feature without sub-parts as a plain summary', () => {
+    const feyAncestry = normalizeCharacter(raw)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Fey Ancestry');
+    expect(feyAncestry?.parts).toBeUndefined();
+    expect(feyAncestry?.summary?.length ?? 0).toBeGreaterThan(0);
   });
 
   it('does not duplicate an action\'s limited-use checkboxes on its feature', () => {

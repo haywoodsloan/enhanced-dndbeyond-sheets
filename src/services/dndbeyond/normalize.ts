@@ -41,6 +41,7 @@ import type {
   DamageInfo,
   FeatureGroup,
   FeatureItem,
+  FeaturePart,
   InventoryEntry,
   NoteEntry,
   ResourcePool,
@@ -599,13 +600,20 @@ function grantedFeatureIds(raw: RawCharacter): Set<number> {
  * `resourceComponentIds` collects the grantor id of every displayed action that
  * shows its own checkboxes, so the caller can suppress the duplicate tracker on
  * the granting feature (e.g. Channel Divinity's uses live on its action).
+ * `actionNamesByComponent` maps each grantor id to its action names, so a
+ * feature can show a brief note (instead of the full text) for a sub-part that
+ * is detailed as an action.
  */
 function resolveActions(
   raw: RawCharacter,
   abilities: AbilityScore[],
   level: number,
   grantedIds: Set<number>,
-): { actions: CharacterAction[]; resourceComponentIds: Set<number> } {
+): {
+  actions: CharacterAction[];
+  resourceComponentIds: Set<number>;
+  actionNamesByComponent: Map<number, string[]>;
+} {
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
   const modByStatId = (id: number | null | undefined) =>
     modByKey.get(abilityKeyById(id) ?? ('' as AbilityKey)) ?? 0;
@@ -613,6 +621,7 @@ function resolveActions(
 
   const actions: CharacterAction[] = [];
   const resourceComponentIds = new Set<number>();
+  const actionNamesByComponent = new Map<number, string[]>();
   const seen = new Set<string>();
   if (raw.actions) {
     for (const group of Object.values(raw.actions)) {
@@ -647,11 +656,16 @@ function resolveActions(
         if (range) entry.range = `${range} ft.`;
         const summary = summarize(action.snippet || action.description);
         if (summary) entry.summary = summary;
+        if (action.componentId != null) {
+          const names = actionNamesByComponent.get(action.componentId);
+          if (names) names.push(action.name);
+          else actionNamesByComponent.set(action.componentId, [action.name]);
+        }
         actions.push(entry);
       }
     }
   }
-  return { actions, resourceComponentIds };
+  return { actions, resourceComponentIds, actionNamesByComponent };
 }
 
 /** Casting-time shorthand from a spell's activation (A / BA / R / 1m / 1h). */
@@ -884,29 +898,108 @@ function selectedOptionsByComponent(
   return map;
 }
 
-/** Features and traits grouped by source, each with its limited-use resource. */
+/**
+ * Split a feature's description into its intro (leading prose) and named
+ * sub-parts. D&D Beyond marks each sub-part with a paragraph starting
+ * `<strong><em>Name.</em></strong>`; paragraphs before the first marker are the
+ * intro, and un-named paragraphs after the markers (e.g. Circle of Mortality's
+ * healing rider) become trailing parts with an empty label. Returns no parts
+ * when the feature has no sub-part markers.
+ */
+function parseFeatureParts(html: string | null | undefined): {
+  intro: string;
+  parts: FeaturePart[];
+} {
+  const source = html ?? '';
+  const paragraphs =
+    source.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ??
+    source.split(/\r?\n\s*\r?\n/).filter((chunk) => chunk.trim());
+  const parts: FeaturePart[] = [];
+  const introChunks: string[] = [];
+  let seenPart = false;
+  for (const paragraph of paragraphs) {
+    const inner = paragraph.replace(/^<p\b[^>]*>/i, '').replace(/<\/p>\s*$/i, '');
+    // A sub-part header is a bold+italic run at the paragraph start, in either
+    // nesting order (`<strong><em>…</em></strong>` or `<em><strong>…</strong></em>`).
+    const marker = inner.match(/^\s*<(strong|em)>\s*<(strong|em)>(.+?)<\/\2>\s*<\/\1>\s*/i);
+    if (marker) {
+      seenPart = true;
+      const label = plainText(marker[3]).replace(/[.:]\s*$/, '').trim();
+      if (label) parts.push({ label, text: plainText(inner.slice(marker[0].length)) });
+    } else {
+      const text = plainText(inner);
+      if (!text) continue;
+      if (seenPart) parts.push({ label: '', text });
+      else introChunks.push(text);
+    }
+  }
+  return { intro: introChunks.join(' '), parts };
+}
+
+/** Features and traits grouped by source, each with its resource + sub-parts. */
 function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
+  actionNamesByComponent: Map<number, string[]>,
 ): FeatureGroup[] {
   const optionByComponent = selectedOptionsByComponent(raw);
-  const toItem = (name: string, id: number | undefined, summary?: string): FeatureItem => {
+
+  // A sub-part is detailed on the Actions card when the feature's grantor id has
+  // an action named after it (e.g. Circle of Mortality -> "Pull of Death"); then
+  // the feature just notes the sub-part name instead of repeating its text.
+  const isActionPart = (id: number | undefined, label: string): boolean => {
+    if (id == null) return false;
+    return (
+      actionNamesByComponent
+        .get(id)
+        ?.some((name) => name === label || name.endsWith(`: ${label}`)) ?? false
+    );
+  };
+
+  // A feature's display content: a summary blurb plus optional named sub-parts.
+  const contentFor = (
+    id: number | undefined,
+    snippet: string | null | undefined,
+    description: string | null | undefined,
+  ): { summary?: string; parts?: FeaturePart[] } => {
+    const { intro, parts } = parseFeatureParts(description || snippet);
+    if (parts.length === 0) {
+      const summary = summarize(snippet || description);
+      return summary ? { summary } : {};
+    }
+    const shown = parts.map((part) =>
+      part.label && isActionPart(id, part.label) ? { label: part.label, text: '' } : part,
+    );
+    return intro ? { summary: intro, parts: shown } : { parts: shown };
+  };
+
+  const toItem = (
+    name: string,
+    id: number | undefined,
+    content: { summary?: string; parts?: FeaturePart[] },
+  ): FeatureItem => {
     const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
     if (resource) item.resource = resource;
-    if (summary) item.summary = summary;
+    if (content.summary) item.summary = content.summary;
+    if (content.parts?.length) item.parts = content.parts;
     return item;
   };
-  // When a feature is a "choose one" prompt, surface the selected option in its
-  // place so the sheet shows the benefit (e.g. "Drow Lineage") rather than the
-  // choice ("Elven Lineage").
-  const withOption = (
+
+  // Resolve a feature's displayed name + content, applying the choice-base
+  // option replacement (Elven Lineage -> Drow Lineage) — which supplies its own
+  // blurb and no sub-parts.
+  const resolve = (
     id: number | undefined,
-    name: string | undefined,
-    summary: string | undefined,
-  ): { name: string | undefined; summary: string | undefined } => {
+    rawName: string | undefined,
+    snippet: string | null | undefined,
+    description: string | null | undefined,
+  ): { name: string | undefined; content: { summary?: string; parts?: FeaturePart[] } } => {
     const chosen = id != null ? optionByComponent.get(id) : undefined;
-    return chosen ? { name: chosen.name, summary: chosen.summary } : { name, summary };
+    if (chosen) {
+      return { name: chosen.name, content: chosen.summary ? { summary: chosen.summary } : {} };
+    }
+    return { name: rawName, content: contentFor(id, snippet, description) };
   };
 
   const classItems: FeatureItem[] = [];
@@ -914,17 +1007,18 @@ function resolveFeatures(
   const addClass = (
     id: number | undefined,
     rawName: string | undefined,
-    rawSummary: string | undefined,
+    snippet: string | null | undefined,
+    description: string | null | undefined,
   ) => {
-    const { name, summary } = withOption(id, rawName, rawSummary);
+    const { name, content } = resolve(id, rawName, snippet, description);
     if (!name || seen.has(name) || STRUCTURAL_FEATURE.test(name)) return;
     seen.add(name);
-    classItems.push(toItem(name, id, summary));
+    classItems.push(toItem(name, id, content));
   };
   for (const cls of asArray(raw.classes)) {
     for (const feature of asArray(cls.definition?.classFeatures)) {
       if (feature.requiredLevel == null || feature.requiredLevel <= cls.level) {
-        addClass(feature.id, feature.name, summarize(feature.snippet || feature.description));
+        addClass(feature.id, feature.name, feature.snippet, feature.description);
       }
     }
     for (const feature of asArray(cls.classFeatures)) {
@@ -933,7 +1027,7 @@ function resolveFeatures(
       // Granted features carry a `requiredLevel`; skip ones the character hasn't
       // reached yet (e.g. Divine Intervention at level 10 on a level-4 cleric).
       if (def?.requiredLevel != null && def.requiredLevel > cls.level) continue;
-      addClass(def?.id, def?.name, summarize(def?.snippet || def?.description));
+      addClass(def?.id, def?.name, def?.snippet, def?.description);
     }
   }
 
@@ -942,26 +1036,18 @@ function resolveFeatures(
   for (const trait of asArray(raw.race?.racialTraits)) {
     const def = trait.definition;
     if (!def?.name || def.hideInSheet === true) continue;
-    const { name, summary } = withOption(
-      def.id,
-      def.name,
-      summarize(def.snippet || def.description),
-    );
+    const { name, content } = resolve(def.id, def.name, def.snippet, def.description);
     if (!name || seenTrait.has(name)) continue;
     seenTrait.add(name);
-    racialTraits.push(toItem(name, def.id, summary));
+    racialTraits.push(toItem(name, def.id, content));
   }
 
   const feats = asArray(raw.feats)
     .filter((feat) => feat.definition?.name && !isDisguiseFeat(feat))
     .map((feat) => {
       const def = feat.definition!;
-      const { name, summary } = withOption(
-        def.id,
-        def.name,
-        summarize(def.snippet || def.description),
-      );
-      return toItem(name!, def.id, summary);
+      const { name, content } = resolve(def.id, def.name, def.snippet, def.description);
+      return toItem(name!, def.id, content);
     });
 
   const groups: FeatureGroup[] = [];
@@ -1104,7 +1190,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
-  const { actions, resourceComponentIds } = resolveActions(
+  const { actions, resourceComponentIds, actionNamesByComponent } = resolveActions(
     raw,
     abilities,
     level,
@@ -1114,7 +1200,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
   for (const id of resourceComponentIds) resources.delete(id);
-  const features = resolveFeatures(raw, resources);
+  const features = resolveFeatures(raw, resources, actionNamesByComponent);
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);
 
   const sections: CharacterSection[] = [
