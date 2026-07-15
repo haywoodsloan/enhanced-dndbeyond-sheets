@@ -270,6 +270,35 @@ describe('normalizeCharacter', () => {
     expect(background?.parts).toBeUndefined();
   });
 
+  it('notes the ability bump on any other feature that also grants one', () => {
+    // A half-feat that grants a benefit AND a stat bump keeps its own text and
+    // also notes the bump (matched by the feat definition id).
+    const character = {
+      ...raw,
+      classes: [],
+      race: null,
+      feats: [
+        {
+          definition: {
+            id: 700,
+            name: 'Resilient',
+            snippet: 'You gain proficiency in one saving throw of your choice.',
+            description: '<p>You gain proficiency in one saving throw of your choice.</p>',
+          },
+        },
+      ],
+      modifiers: {
+        feat: [{ type: 'bonus', subType: 'constitution-score', value: 1, componentId: 700 }],
+      },
+    } as unknown as RawCharacter;
+
+    const resilient = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Resilient');
+    expect(resilient?.summary).toContain('saving throw');
+    expect(resilient?.parts).toContainEqual({ label: '', text: '+1 Constitution' });
+  });
+
   it('tracks the limited free-cast spells a feature grants', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
     // Gathered Whispers grants a free Augury once per long rest.

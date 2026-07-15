@@ -1087,24 +1087,37 @@ function resolveFeatures(
     snippet: string | null | undefined,
     description: string | null | undefined,
   ): { name: string | undefined; content: { summary?: string; parts?: FeaturePart[] } } => {
+    // A feature whose whole purpose is a stat bump (the Ability Score Improvement
+    // feat, a background's Ability Score Increase): show ONLY the bumps granted,
+    // not the generic "one score by 2 or two by 1" rules text.
+    if (rawName && ABILITY_SCORE_FEATURE.test(rawName)) {
+      const only = abilityScoreIncreases(raw, id);
+      return { name: rawName, content: only ? { summary: only } : {} };
+    }
+
+    let name = rawName;
+    let content: { summary?: string; parts?: FeaturePart[] };
     const chosen = id != null ? optionByComponent.get(id) : undefined;
     if (chosen) {
-      return { name: chosen.name, content: chosen.summary ? { summary: chosen.summary } : {} };
+      name = chosen.name;
+      content = chosen.summary ? { summary: chosen.summary } : {};
+    } else {
+      content = contentFor(id, snippet, description);
+      // Spellcasting/Pact Magic: drop the sub-parts (cantrips, spell slots,
+      // preparing spells, …) that just duplicate the Spells card, keeping the intro.
+      if (rawName && SPELLCASTING_FEATURE.test(rawName) && content.parts) {
+        content = content.summary ? { summary: content.summary } : {};
+      }
     }
-    // Ability Score Improvement / … Ability Score Increase: show just the ability
-    // bumps granted, not the generic "one score by 2 or two by 1" rules text.
-    if (rawName && ABILITY_SCORE_FEATURE.test(rawName)) {
-      const increases = abilityScoreIncreases(raw, id);
-      return { name: rawName, content: increases ? { summary: increases } : {} };
+
+    // Any OTHER feature that ALSO grants an ability-score bonus (a half-feat, an
+    // origin's fixed increase, …): note the bumps alongside its description.
+    const increases = abilityScoreIncreases(raw, id);
+    if (increases) {
+      content = { ...content, parts: [{ label: '', text: increases }, ...(content.parts ?? [])] };
     }
-    const content = contentFor(id, snippet, description);
-    // Spellcasting/Pact Magic: drop the sub-parts (cantrips, spell slots,
-    // preparing spells, …) that just duplicate the Spells card and keep only the
-    // intro blurb.
-    if (rawName && SPELLCASTING_FEATURE.test(rawName) && content.parts) {
-      return { name: rawName, content: content.summary ? { summary: content.summary } : {} };
-    }
-    return { name: rawName, content };
+
+    return { name, content };
   };
 
   const classItems: FeatureItem[] = [];
