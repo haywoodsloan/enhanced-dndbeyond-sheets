@@ -134,6 +134,12 @@ function spellTags(spell: SpellEntry): string {
   gap: 2px;
 }
 
+/* Slightly larger spell-slot checkboxes to match the bigger level headings. */
+.spells__group-head :deep(.resource__box) {
+  width: 13px;
+  height: 13px;
+}
+
 .spells__label {
   font-size: 14px;
   font-weight: 600;
