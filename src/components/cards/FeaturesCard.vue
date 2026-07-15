@@ -29,6 +29,15 @@ defineProps<{ features: FeatureGroup[] }>();
             <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
             <span v-if="part.text">{{ part.text }}</span>
           </p>
+          <span
+            v-for="spell in item.spellUses"
+            :key="spell.name"
+            class="features__spell"
+            data-feature-spell
+          >
+            <span class="features__spell-name">{{ spell.name }}</span
+            ><ResourceBoxes :resource="spell.pool" />
+          </span>
         </li>
       </ul>
     </div>
@@ -118,6 +127,19 @@ defineProps<{ features: FeatureGroup[] }>();
 
 .features__part-name {
   margin-right: 5px;
+  color: #1c1c1e;
+}
+
+/* A limited-use spell the feature grants free casts of: its name + checkboxes. */
+.features__spell {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.features__spell-name {
+  font-weight: 600;
   color: #1c1c1e;
 }
 

@@ -51,6 +51,7 @@ import type {
   Skill,
   SpellEntry,
   Spellcasting,
+  SpellUse,
   WeaponProperty,
 } from './model';
 
@@ -936,11 +937,57 @@ function parseFeatureParts(html: string | null | undefined): {
   return { intro: introChunks.join(' '), parts };
 }
 
+/**
+ * Map each granting feature id to the spells it grants a capped number of free
+ * casts of (e.g. Gathered Whispers -> Augury 1/LR). A spell's `componentId` can
+ * point at a sub-option (a lineage's spellcasting-ability choice), so resolve it
+ * through `raw.options` to the feature that actually offers it.
+ */
+function spellUsesByComponent(raw: RawCharacter, level: number): Map<number, SpellUse[]> {
+  const optionParent = new Map<number, number>();
+  const options = raw.options;
+  if (options) {
+    const groups = [options.race, options.class, options.feat, options.background, options.item];
+    for (const group of groups) {
+      for (const option of asArray(group)) {
+        if (option.definition?.id != null && option.componentId != null) {
+          optionParent.set(option.definition.id, option.componentId);
+        }
+      }
+    }
+  }
+  const resolveTarget = (id: number): number => {
+    let current = id;
+    for (let hop = 0; hop < 4 && optionParent.has(current); hop += 1) {
+      current = optionParent.get(current)!;
+    }
+    return current;
+  };
+
+  const map = new Map<number, SpellUse[]>();
+  for (const group of Object.values(raw.spells ?? {})) {
+    for (const spell of asArray<RawSpell>(group)) {
+      const pool = limitedUseToPool(spell.limitedUse, level);
+      const name = spell.definition?.name;
+      if (!pool || !name || spell.componentId == null) continue;
+      const target = resolveTarget(spell.componentId);
+      const list = map.get(target);
+      if (list) {
+        if (!list.some((use) => use.name === name)) list.push({ name, pool });
+      } else {
+        map.set(target, [{ name, pool }]);
+      }
+    }
+  }
+  return map;
+}
+
 /** Features and traits grouped by source, each with its resource + sub-parts. */
 function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
   actionNamesByComponent: Map<number, string[]>,
+  spellUses: Map<number, SpellUse[]>,
 ): FeatureGroup[] {
   const optionByComponent = selectedOptionsByComponent(raw);
 
@@ -983,6 +1030,8 @@ function resolveFeatures(
     if (resource) item.resource = resource;
     if (content.summary) item.summary = content.summary;
     if (content.parts?.length) item.parts = content.parts;
+    const uses = id != null ? spellUses.get(id) : undefined;
+    if (uses?.length) item.spellUses = uses;
     return item;
   };
 
@@ -1200,7 +1249,12 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
   for (const id of resourceComponentIds) resources.delete(id);
-  const features = resolveFeatures(raw, resources, actionNamesByComponent);
+  const features = resolveFeatures(
+    raw,
+    resources,
+    actionNamesByComponent,
+    spellUsesByComponent(raw, level),
+  );
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);
 
   const sections: CharacterSection[] = [

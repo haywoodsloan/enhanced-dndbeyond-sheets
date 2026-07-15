@@ -104,4 +104,31 @@ describe('FeaturesCard', () => {
     expect(parts[2].find('.features__part-name').exists()).toBe(false);
     expect(parts[2].text()).toContain('highest number possible');
   });
+
+  it('renders a limited-use spell tracker for a granting feature', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Feats',
+            items: [
+              {
+                name: 'Gathered Whispers',
+                spellUses: [{ name: 'Augury', pool: { max: 1, recharge: 'LR' } }],
+              },
+              { name: 'Skill Expert' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const items = wrapper.findAll('[data-feature]');
+    const spell = items[0].find('[data-feature-spell]');
+    expect(spell.text()).toContain('Augury');
+    expect(spell.findAll('.resource__box')).toHaveLength(1);
+    expect(spell.text()).toContain('Long rest');
+    // A feature without spell grants shows none.
+    expect(items[1].find('[data-feature-spell]').exists()).toBe(false);
+  });
 });

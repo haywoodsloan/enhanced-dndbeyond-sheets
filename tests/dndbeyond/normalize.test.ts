@@ -237,6 +237,25 @@ describe('normalizeCharacter', () => {
     expect(feyAncestry?.summary?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it('tracks the limited free-cast spells a feature grants', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    // Gathered Whispers grants a free Augury once per long rest.
+    const whispers = items.find((item) => item.name === 'Gathered Whispers');
+    expect(whispers?.spellUses).toContainEqual({
+      name: 'Augury',
+      pool: { max: 1, recharge: 'LR' },
+    });
+    // The Elven lineage grants a free Faerie Fire once per long rest — its spell
+    // is granted via a lineage sub-option, resolved back to the trait.
+    const lineageSpells = items.find((item) => item.name === 'Elven Lineage Spells');
+    expect(lineageSpells?.spellUses).toContainEqual({
+      name: 'Faerie Fire',
+      pool: { max: 1, recharge: 'LR' },
+    });
+    // A feature that grants no limited spells has none.
+    expect(items.find((item) => item.name === 'Fey Ancestry')?.spellUses).toBeUndefined();
+  });
+
   it('does not duplicate an action\'s limited-use checkboxes on its feature', () => {
     const { features, actions } = normalizeCharacter(raw);
     const classFeatures = features.find((group) => group.label === 'Class Features');

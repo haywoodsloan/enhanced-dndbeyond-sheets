@@ -190,6 +190,11 @@ export interface RawSpellDefinition {
 export interface RawSpell {
   definition?: RawSpellDefinition;
   prepared?: boolean;
+  /** Id of the feature/feat/trait (or its option) that granted this spell. */
+  componentId?: number | null;
+  componentTypeId?: number | null;
+  /** Free-cast pool when a feature grants a capped number of casts (e.g. 1/LR). */
+  limitedUse?: RawLimitedUse | null;
 }
 
 /** A tag on a feat's definition; `__DISGUISE_FEAT` marks a non-feat placeholder. */

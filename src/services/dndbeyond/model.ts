@@ -244,6 +244,14 @@ export interface FeatureItem {
   summary?: string;
   /** Named sub-parts, when the feature bundles several distinct benefits. */
   parts?: FeaturePart[];
+  /** Spells the feature grants a capped number of free casts of, with a tracker each. */
+  spellUses?: SpellUse[];
+}
+
+/** A spell a feature grants a limited number of free casts of (e.g. Augury 1/LR). */
+export interface SpellUse {
+  name: string;
+  pool: ResourcePool;
 }
 
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */
