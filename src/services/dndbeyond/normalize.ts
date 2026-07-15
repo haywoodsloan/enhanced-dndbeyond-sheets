@@ -863,6 +863,13 @@ function resolveResourceMap(raw: RawCharacter, level: number): Map<number, Resou
  */
 const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$|^Core .+ Traits$/;
 
+/**
+ * Spell-granting "summary" features whose sub-parts (cantrips, spell slots,
+ * preparing spells, spellcasting ability, …) merely restate the general casting
+ * rules already shown on the Spells card — so only their intro blurb is kept.
+ */
+const SPELLCASTING_FEATURE = /^Spellcasting$|^Pact Magic$/;
+
 /** Category tag D&D Beyond puts on placeholder "feats" that aren't real feats. */
 const DISGUISE_FEAT_TAG = '__DISGUISE_FEAT';
 
@@ -993,7 +1000,7 @@ function resolveFeatures(
 
   // A sub-part is detailed on the Actions card when the feature's grantor id has
   // an action named after it (e.g. Circle of Mortality -> "Pull of Death"); then
-  // the feature just notes the sub-part name instead of repeating its text.
+  // the feature just points to the Actions card instead of repeating its text.
   const isActionPart = (id: number | undefined, label: string): boolean => {
     if (id == null) return false;
     return (
@@ -1015,7 +1022,9 @@ function resolveFeatures(
       return summary ? { summary } : {};
     }
     const shown = parts.map((part) =>
-      part.label && isActionPart(id, part.label) ? { label: part.label, text: '' } : part,
+      part.label && isActionPart(id, part.label)
+        ? { label: part.label, text: '(see Actions)' }
+        : part,
     );
     return intro ? { summary: intro, parts: shown } : { parts: shown };
   };
@@ -1048,7 +1057,14 @@ function resolveFeatures(
     if (chosen) {
       return { name: chosen.name, content: chosen.summary ? { summary: chosen.summary } : {} };
     }
-    return { name: rawName, content: contentFor(id, snippet, description) };
+    const content = contentFor(id, snippet, description);
+    // Spellcasting/Pact Magic: drop the sub-parts (cantrips, spell slots,
+    // preparing spells, …) that just duplicate the Spells card and keep only the
+    // intro blurb.
+    if (rawName && SPELLCASTING_FEATURE.test(rawName) && content.parts) {
+      return { name: rawName, content: content.summary ? { summary: content.summary } : {} };
+    }
+    return { name: rawName, content };
   };
 
   const classItems: FeatureItem[] = [];

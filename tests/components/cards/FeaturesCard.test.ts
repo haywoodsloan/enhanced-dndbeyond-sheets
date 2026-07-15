@@ -67,7 +67,7 @@ describe('FeaturesCard', () => {
     expect(items[1].find('.features__summary').exists()).toBe(false);
   });
 
-  it('renders named sub-parts, showing action sub-parts as a heading only', () => {
+  it('renders named sub-parts, pointing action sub-parts to the Actions card', () => {
     const wrapper = mount(FeaturesCard, {
       props: {
         features: [
@@ -78,7 +78,7 @@ describe('FeaturesCard', () => {
                 name: 'Circle of Mortality',
                 summary: 'You gain the following benefits.',
                 parts: [
-                  { label: 'Pull of Death', text: '' },
+                  { label: 'Pull of Death', text: '(see Actions)' },
                   {
                     label: 'Return to Life',
                     text: 'You can cast Spare the Dying as a Bonus Action.',
@@ -94,9 +94,9 @@ describe('FeaturesCard', () => {
 
     const parts = wrapper.findAll('[data-feature-part]');
     expect(parts).toHaveLength(3);
-    // An action sub-part shows just its bold heading, no body text.
+    // An action sub-part shows its bold heading + a pointer to the Actions card.
     expect(parts[0].find('.features__part-name').text()).toBe('Pull of Death');
-    expect(parts[0].text().trim()).toBe('Pull of Death');
+    expect(parts[0].text()).toContain('(see Actions)');
     // A non-action sub-part shows heading + text.
     expect(parts[1].text()).toContain('Return to Life');
     expect(parts[1].text()).toContain('Spare the Dying');

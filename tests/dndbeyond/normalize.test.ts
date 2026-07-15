@@ -205,8 +205,10 @@ describe('normalizeCharacter', () => {
     const circleLabels = circle?.parts?.map((part) => part.label) ?? [];
     expect(circleLabels).toContain('Pull of Death');
     expect(circleLabels).toContain('Return to Life');
-    // Pull of Death is also an action, so the feature just notes its name.
-    expect(circle?.parts?.find((part) => part.label === 'Pull of Death')?.text).toBe('');
+    // Pull of Death is also an action, so the feature points to the Actions card.
+    expect(circle?.parts?.find((part) => part.label === 'Pull of Death')?.text).toBe(
+      '(see Actions)',
+    );
     // Return to Life isn't an action, so it keeps its text.
     expect(circle?.parts?.find((part) => part.label === 'Return to Life')?.text).toContain(
       'Spare the Dying',
@@ -224,9 +226,26 @@ describe('normalizeCharacter', () => {
     expect(whispers?.parts?.find((part) => part.label === 'Spirit Whispers')?.text).toContain(
       'Augury',
     );
-    // …Unearthly Scream / Voices from Beyond are actions -> brief.
-    expect(whispers?.parts?.find((part) => part.label === 'Unearthly Scream')?.text).toBe('');
-    expect(whispers?.parts?.find((part) => part.label === 'Voices from Beyond')?.text).toBe('');
+    // …Unearthly Scream / Voices from Beyond are actions -> point to the Actions card.
+    expect(whispers?.parts?.find((part) => part.label === 'Unearthly Scream')?.text).toBe(
+      '(see Actions)',
+    );
+    expect(whispers?.parts?.find((part) => part.label === 'Voices from Beyond')?.text).toBe(
+      '(see Actions)',
+    );
+  });
+
+  it('keeps only the intro blurb for the Spellcasting feature', () => {
+    const spellcasting = normalizeCharacter(raw)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Spellcasting');
+    // The generic casting mechanics (cantrips, slots, preparing spells, …) live
+    // on the Spells card, so only the basic intro is kept — no sub-parts.
+    expect(spellcasting?.parts).toBeUndefined();
+    expect(spellcasting?.summary).toBe(
+      'You have learned to cast spells through prayer and meditation. The information below ' +
+        'details how you use those rules with Cleric spells, which appear on the Cleric spell list.',
+    );
   });
 
   it('leaves a feature without sub-parts as a plain summary', () => {
