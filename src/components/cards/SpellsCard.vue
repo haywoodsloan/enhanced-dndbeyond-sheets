@@ -135,7 +135,7 @@ function spellTags(spell: SpellEntry): string {
 }
 
 .spells__label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--p-text-muted-color, #888);
 }
