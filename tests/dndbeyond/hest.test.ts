@@ -1,0 +1,94 @@
+import { readFileSync } from 'node:fs';
+import { describe, it, expect } from 'vitest';
+import type { RawCharacter } from '@/services/dndbeyond/api-types';
+import { normalizeCharacter } from '@/services/dndbeyond/normalize';
+
+// A second real D&D Beyond payload — Hest, a level 6 Tiefling Draconic Sorcerer
+// (https://www.dndbeyond.com/characters/164534479). It exercises a different
+// class, race, and background from the Noct cleric fixture: an arcane Charisma
+// caster, Tiefling legacy traits, and a Charlatan origin — a useful reference
+// and a regression guard for normalization beyond the primary fixture.
+const raw = JSON.parse(readFileSync('tests/fixtures/hest.json', 'utf-8')) as RawCharacter;
+
+describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
+  it('extracts core identity, class, race, and background', () => {
+    const character = normalizeCharacter(raw);
+    expect(character.id).toBe(164534479);
+    expect(character.name).toBe('Hest');
+    expect(character.race).toBe('Tiefling');
+    expect(character.background).toBe('Charlatan');
+    expect(character.level).toBe(6);
+    expect(character.classes).toEqual([
+      { name: 'Sorcerer', level: 6, subclass: 'Draconic Sorcery' },
+    ]);
+  });
+
+  it('produces all fourteen sections in the stable order', () => {
+    const character = normalizeCharacter(raw);
+    expect(character.sections.map((section) => section.key)).toEqual([
+      'portrait',
+      'basics',
+      'attributes',
+      'skills',
+      'savingThrows',
+      'senses',
+      'proficiencies',
+      'attacks',
+      'actions',
+      'spells',
+      'inventory',
+      'wealth',
+      'features',
+      'notes',
+    ]);
+  });
+
+  it('resolves the Charisma-focused ability spread', () => {
+    const { abilities } = normalizeCharacter(raw);
+    const scoreByKey = Object.fromEntries(abilities.map((ability) => [ability.key, ability.score]));
+    expect(scoreByKey).toEqual({ str: 9, dex: 14, con: 12, int: 14, wis: 10, cha: 18 });
+  });
+
+  it('summarizes Charisma-based spellcasting with level-6 slots', () => {
+    const { spellcasting } = normalizeCharacter(raw);
+    expect(spellcasting).toEqual({
+      ability: 'CHA',
+      modifier: 4,
+      attack: 7,
+      saveDc: 15,
+      slots: [4, 3, 3],
+    });
+  });
+
+  it('groups the sorcerer, tiefling, and feat features', () => {
+    const { features } = normalizeCharacter(raw);
+    const itemsOf = (label: string) =>
+      features.find((group) => group.label === label)?.items ?? [];
+    const namesOf = (label: string) => itemsOf(label).map((item) => item.name);
+
+    expect(namesOf('Class Features')).toEqual(
+      expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
+    );
+    expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
+
+    // The Ability Score Improvement feat shows just the bumps it granted…
+    const asi = itemsOf('Feats').find((item) => item.name === 'Ability Score Improvement');
+    expect(asi?.summary).toBe('+1 Dexterity, +1 Charisma');
+    // …and a half-feat-style origin increase keeps its text and also notes the bump.
+    const charlatan = itemsOf('Feats').find(
+      (item) => item.name === 'Charlatan Ability Score Improvements',
+    );
+    expect(charlatan?.parts).toContainEqual({ label: '', text: '+2 Charisma, +1 Dexterity' });
+  });
+
+  it('tracks a racial trait that grants limited-use spells', () => {
+    const { features } = normalizeCharacter(raw);
+    const legacy = features
+      .flatMap((group) => group.items)
+      .find((item) => item.name === 'Fiendish Legacy Spells');
+    // Tiefling's Fiendish Legacy grants Hellish Rebuke and Darkness once per long rest.
+    expect(legacy?.spellUses?.map((use) => use.name)).toEqual(
+      expect.arrayContaining(['Hellish Rebuke', 'Darkness']),
+    );
+  });
+});
