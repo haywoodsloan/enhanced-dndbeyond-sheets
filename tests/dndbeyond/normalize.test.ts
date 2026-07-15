@@ -256,6 +256,20 @@ describe('normalizeCharacter', () => {
     expect(feyAncestry?.summary?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it('summarizes ability-score features as just the bumps they grant', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    // The Ability Score Improvement feat took +1 Strength / +1 Wisdom — shown as
+    // the bumps, not the generic "one score by 2 or two by 1" text.
+    const asi = items.find((item) => item.name === 'Ability Score Improvement');
+    expect(asi?.summary).toBe('+1 Strength, +1 Wisdom');
+    expect(asi?.parts).toBeUndefined();
+    // The background's ability-score increase took +2 Wisdom / +1 Constitution
+    // (biggest bump first).
+    const background = items.find((item) => item.name === 'Spirit Medium Ability Score Increase');
+    expect(background?.summary).toBe('+2 Wisdom, +1 Constitution');
+    expect(background?.parts).toBeUndefined();
+  });
+
   it('tracks the limited free-cast spells a feature grants', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
     // Gathered Whispers grants a free Augury once per long rest.

@@ -12,6 +12,7 @@ import {
   proficiencyContribution,
   spellSlotsForCasterLevel,
   type AbilityKey,
+  type AbilityMeta,
   type ArmorCategory,
   type ProficiencyLevel,
 } from '@/utils/character/dnd5e';
@@ -870,6 +871,39 @@ const STRUCTURAL_FEATURE = /Ability Score Improvement| Subclass$|^Epic Boon$|^Co
  */
 const SPELLCASTING_FEATURE = /^Spellcasting$|^Pact Magic$/;
 
+/**
+ * Ability-score-boost features (the "Ability Score Improvement" feat, a
+ * background's "… Ability Score Increase", etc.) whose generic rules text ("one
+ * score by 2 or two by 1") is noise — we show just the bumps they granted. The
+ * suffix anchor excludes the generic "Ability Score Increases" rules placeholder.
+ */
+const ABILITY_SCORE_FEATURE = /Ability Score Improvement$|Ability Score Increase$/;
+
+/**
+ * The ability-score bonuses a feature granted, keyed by its component id, as a
+ * short "+2 Wisdom, +1 Constitution" summary (biggest bump first). Returns
+ * nothing when the feature granted no ability-score bonus.
+ */
+function abilityScoreIncreases(
+  raw: RawCharacter,
+  componentId: number | undefined,
+): string | undefined {
+  if (componentId == null || !raw.modifiers) return undefined;
+  const bumps: { meta: AbilityMeta; value: number }[] = [];
+  for (const mods of Object.values(raw.modifiers)) {
+    for (const mod of asArray<RawModifier>(mods)) {
+      if (mod.type !== 'bonus' || mod.componentId !== componentId) continue;
+      const ability = /^(.+)-score$/.exec(mod.subType ?? '')?.[1];
+      const meta = ability && ABILITIES.find((entry) => entry.name.toLowerCase() === ability);
+      const value = mod.value ?? mod.fixedValue ?? 0;
+      if (meta && value) bumps.push({ meta, value });
+    }
+  }
+  if (!bumps.length) return undefined;
+  bumps.sort((a, b) => b.value - a.value || a.meta.id - b.meta.id);
+  return bumps.map((bump) => `+${bump.value} ${bump.meta.name}`).join(', ');
+}
+
 /** Category tag D&D Beyond puts on placeholder "feats" that aren't real feats. */
 const DISGUISE_FEAT_TAG = '__DISGUISE_FEAT';
 
@@ -1056,6 +1090,12 @@ function resolveFeatures(
     const chosen = id != null ? optionByComponent.get(id) : undefined;
     if (chosen) {
       return { name: chosen.name, content: chosen.summary ? { summary: chosen.summary } : {} };
+    }
+    // Ability Score Improvement / … Ability Score Increase: show just the ability
+    // bumps granted, not the generic "one score by 2 or two by 1" rules text.
+    if (rawName && ABILITY_SCORE_FEATURE.test(rawName)) {
+      const increases = abilityScoreIncreases(raw, id);
+      return { name: rawName, content: increases ? { summary: increases } : {} };
     }
     const content = contentFor(id, snippet, description);
     // Spellcasting/Pact Magic: drop the sub-parts (cantrips, spell slots,

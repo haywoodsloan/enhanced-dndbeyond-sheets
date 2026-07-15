@@ -298,6 +298,8 @@ export interface RawModifier {
   friendlyTypeName?: string;
   friendlySubtypeName?: string;
   restriction?: string | null;
+  /** Id of the feature/feat/trait that granted this modifier. */
+  componentId?: number | null;
   /** Dice for a damage/healing modifier (e.g. a spell's damage). */
   die?: RawDice | null;
 }
