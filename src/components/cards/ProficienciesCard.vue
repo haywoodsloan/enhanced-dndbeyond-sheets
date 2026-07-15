@@ -101,7 +101,7 @@ const columnGroups = computed(() => {
 .profs__heading {
   display: block;
   margin-bottom: 2px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--p-text-muted-color, #888);
 }
