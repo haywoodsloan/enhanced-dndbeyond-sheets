@@ -590,11 +590,11 @@ function grantedFeatureIds(raw: RawCharacter): Set<number> {
 }
 
 /**
- * Real action-economy options (Action / Bonus Action / Reaction) from every
- * source, deduped, each enriched with its limited-use checkboxes, damage, save,
- * and range. Weapon attacks now live in the Attacks card, and passive / special
- * / no-action riders — which D&D Beyond doesn't list as actions — are dropped so
- * the card mirrors the site instead of every internal entry.
+ * Action-economy options from every source, deduped, each enriched with its
+ * limited-use checkboxes, damage, save, and range. Grouped downstream into
+ * Action / Bonus Action / Reaction / Other by activation type. Weapon attacks
+ * live in the Attacks card; only orphaned options (granted by a feature the
+ * character doesn't have) are dropped.
  *
  * `resourceComponentIds` collects the grantor id of every displayed action that
  * shows its own checkboxes, so the caller can suppress the duplicate tracker on
@@ -618,7 +618,7 @@ function resolveActions(
     for (const group of Object.values(raw.actions)) {
       for (const action of asArray<RawAction>(group)) {
         const category = actionCategory(action.activation?.activationType);
-        if (!action.name || category === 'other' || seen.has(action.name)) continue;
+        if (!action.name || seen.has(action.name)) continue;
         // Skip actions granted by a feature the character doesn't have (an
         // orphaned option, e.g. a subclass path that wasn't chosen).
         if (

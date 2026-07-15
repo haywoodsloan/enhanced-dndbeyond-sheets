@@ -211,46 +211,6 @@ describe('normalizeCharacter', () => {
     expect(passive?.resource).toBeUndefined();
   });
 
-  it('keeps a feature\'s checkboxes when no displayed action shows them', () => {
-    // A feature whose only rationed action isn't an action-economy option
-    // (activationType 8 -> "other", dropped from the Actions card) still needs
-    // its own tracker, since nothing else surfaces the use count.
-    const character = {
-      ...raw,
-      classes: [
-        {
-          level: 4,
-          definition: {
-            name: 'Cleric',
-            classFeatures: [{ id: 7777, name: 'Hidden Reserve', requiredLevel: 1 }],
-          },
-        },
-      ],
-      race: null,
-      feats: [],
-      actions: {
-        class: [
-          {
-            name: 'Hidden Reserve',
-            componentId: 7777,
-            componentTypeId: 12168134,
-            activation: { activationType: 8 },
-            limitedUse: { maxUses: 3, resetType: 2 },
-          },
-        ],
-      },
-    } as unknown as RawCharacter;
-
-    const { features, actions } = normalizeCharacter(character);
-    // The action was filtered out (category "other")...
-    expect(actions.some((action) => action.name === 'Hidden Reserve')).toBe(false);
-    // ...so the feature keeps its own checkboxes.
-    const item = features
-      .flatMap((group) => group.items)
-      .find((feature) => feature.name === 'Hidden Reserve');
-    expect(item?.resource).toEqual({ max: 3, recharge: 'LR' });
-  });
-
   it('resolves the portrait section and an uncropped avatar url', () => {
     const character = normalizeCharacter(raw);
     expect(character.avatarUrl).toBeDefined();
@@ -351,14 +311,21 @@ describe('normalizeCharacter', () => {
     expect(unarmed?.damage).toMatchObject({ dice: '', bonus: 3, type: 'Bludgeoning' });
   });
 
-  it('drops passive/special riders from the actions list', () => {
-    const names = normalizeCharacter(raw).actions.map((action) => action.name);
+  it('shows "other"-category abilities but drops orphaned options', () => {
+    const actions = normalizeCharacter(raw).actions;
+    const names = actions.map((action) => action.name);
     // Real action-economy options are kept…
     expect(names).toContain('Channel Divinity');
-    // …but no-action / special riders D&D Beyond doesn't list as actions are not.
+    // …no-action / passive riders now appear in the "Other" group…
+    expect(names).toContain('Pull of Death');
+    expect(names).toContain('Path to the Grave: End Curse');
+    expect(actions.find((a) => a.name === 'Pull of Death')?.category).toBe('other');
+    expect(actions.find((a) => a.name === 'Path to the Grave: End Curse')?.category).toBe(
+      'other',
+    );
+    // …but orphaned options (a subclass path the character didn't choose) are not.
     expect(names.some((name) => name.startsWith('Circle Spell:'))).toBe(false);
-    expect(names).not.toContain('Path to the Grave: End Curse');
-    expect(names).not.toContain('Pull of Death');
+    expect(names).not.toContain('Initiate a Circle Spell');
   });
 
   it('enriches actions with resources, damage, saves, and range', () => {
