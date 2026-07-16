@@ -4,6 +4,7 @@ import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
+import RichText from '@/components/RichText.vue';
 
 const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
 
@@ -80,7 +81,7 @@ function spellTags(spell: SpellEntry): string {
           <span class="spells__name">{{ spell.name }}</span>
           <span v-if="spellTags(spell)" class="spells__spell-tags">{{ spellTags(spell) }}</span>
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
-          <span v-if="spell.summary" class="spells__summary">{{ spell.summary }}</span>
+          <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
         </li>
       </ul>
     </div>

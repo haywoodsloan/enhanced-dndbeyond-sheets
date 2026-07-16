@@ -403,11 +403,29 @@ function plainText(html: string): string {
 }
 
 /**
+ * Like `plainText` but preserves bold HEADINGS as `**…**` markers so a list-
+ * formatted description keeps them (e.g. the Command spell's suggested commands
+ * “Approach.”, “Drop.”, …). D&D Beyond wraps a heading in `<strong>` or
+ * `<strong><em>…</em></strong>`; everything else is stripped like plainText.
+ */
+function richText(html: string): string {
+  return plainText(
+    html
+      .replace(/<(?:strong|b)>\s*<(?:em|i)>/gi, '**')
+      .replace(/<\/(?:em|i)>\s*<\/(?:strong|b)>/gi, '**')
+      .replace(/<\/?(?:strong|b)>/gi, '**'),
+  );
+}
+
+/**
  * A short blurb from a rules string — enough to actually use the ability, not
  * the full rules dump. Returns the whole text when it's already short (a curated
  * snippet), else keeps as many WHOLE sentences as fit `maxLength` (preferring a
  * real sentence end — a ./!/? before a capital or the end — so mid-sentence
  * abbreviations like "ft." don't cut it short), else a word-boundary cut.
+ * List-formatted rules (two or more bold `**headings**`, e.g. the Command
+ * spell's suggested commands) keep the whole list — truncating to the first
+ * item would drop the other options — up to a generous cap.
  */
 function summarize(
   text: string | null | undefined,
@@ -415,13 +433,15 @@ function summarize(
   resolvePlaceholders?: (text: string) => string,
 ): string {
   const source = text ?? '';
-  const plain = plainText(resolvePlaceholders ? resolvePlaceholders(source) : source);
-  if (!plain || plain.length <= maxLength) return plain;
-  const slice = plain.slice(0, maxLength);
-  const sentences = slice.match(/^[\s\S]*[.!?](?=\s+[A-Z(]|$)/)?.[0];
-  if (sentences && sentences.length >= maxLength * 0.5) return sentences.trimEnd();
+  const plain = richText(resolvePlaceholders ? resolvePlaceholders(source) : source);
+  const isList = (plain.match(/\*\*[^*]+\*\*/g) ?? []).length >= 2;
+  const cap = isList ? Math.max(maxLength, 1200) : maxLength;
+  if (!plain || plain.length <= cap) return plain;
+  const slice = plain.slice(0, cap);
+  const sentences = slice.match(/^[\s\S]*[.!?](?=\s+\**[A-Z(]|$)/)?.[0];
+  if (sentences && sentences.length >= cap * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
-  return `${slice.slice(0, lastSpace > 0 ? lastSpace : maxLength).trimEnd()}…`;
+  return `${slice.slice(0, lastSpace > 0 ? lastSpace : cap).trimEnd()}…`;
 }
 
 /**

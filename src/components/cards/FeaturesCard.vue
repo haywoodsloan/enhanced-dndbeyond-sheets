@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { FeatureGroup } from '@/services/dndbeyond/model';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
+import RichText from '@/components/RichText.vue';
 
 defineProps<{ features: FeatureGroup[] }>();
 </script>
@@ -19,7 +20,7 @@ defineProps<{ features: FeatureGroup[] }>();
         <li v-for="(item, index) in group.items" :key="index" class="features__item" data-feature>
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
-          <span v-if="item.summary" class="features__summary">{{ item.summary }}</span>
+          <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
           <p
             v-for="(part, pIndex) in item.parts"
             :key="pIndex"

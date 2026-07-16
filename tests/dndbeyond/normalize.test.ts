@@ -160,6 +160,18 @@ describe('normalizeCharacter', () => {
     expect(dancingLights?.summary).toContain('Dim Light');
   });
 
+  it('keeps a spell list-formatted description whole, with bold headings', () => {
+    const command = normalizeCharacter(raw).spells.find((spell) => spell.name === 'Command');
+    const summary = command?.summary ?? '';
+    // Every suggested command survives (not truncated to the first) …
+    for (const heading of ['Approach.', 'Drop.', 'Flee.', 'Grovel.', 'Halt.']) {
+      expect(summary).toContain(`**${heading}**`);
+    }
+    // … including the upcast note, and no raw HTML leaks through.
+    expect(summary).toContain('**Using a Higher-Level Spell Slot.**');
+    expect(summary).not.toContain('<');
+  });
+
   it('lists inventory items and coins', () => {
     const character = normalizeCharacter(raw);
     expect(

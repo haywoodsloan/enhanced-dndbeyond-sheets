@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model';
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
+import RichText from '@/components/RichText.vue';
 
 const props = defineProps<{ actions: CharacterAction[] }>();
 
@@ -49,7 +50,7 @@ function metaOf(action: CharacterAction): string {
           <span class="actions__name">{{ action.name }}</span>
           <ResourceBoxes v-if="action.resource" :resource="action.resource" />
           <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
-          <span v-if="action.summary" class="actions__summary">{{ action.summary }}</span>
+          <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />
         </li>
       </ul>
     </div>
