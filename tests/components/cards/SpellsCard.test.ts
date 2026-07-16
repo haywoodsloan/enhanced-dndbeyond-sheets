@@ -81,6 +81,17 @@ describe('SpellsCard', () => {
     expect(spells[1].text()).toContain('C');
   });
 
+  it('shows concentration and ritual as separate boxes', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [{ name: 'Detect Magic', level: 1, concentration: true, ritual: true }],
+      },
+    });
+
+    const tags = wrapper.findAll('[data-spell] .spells__spell-tag');
+    expect(tags.map((tag) => tag.text())).toEqual(['C', 'R']);
+  });
+
   it('renders a spell summary blurb when present', () => {
     const wrapper = mount(SpellsCard, {
       props: {

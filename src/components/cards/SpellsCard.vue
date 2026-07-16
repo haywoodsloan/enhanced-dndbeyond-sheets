@@ -45,9 +45,12 @@ function spellMeta(spell: SpellEntry): string {
     .join(' · ');
 }
 
-/** Concentration / ritual tags for a spell. */
-function spellTags(spell: SpellEntry): string {
-  return `${spell.concentration ? 'C' : ''}${spell.ritual ? 'R' : ''}`;
+/** Concentration / ritual markers, each shown in its own box. */
+function spellTags(spell: SpellEntry): { key: string; label: string; title: string }[] {
+  const tags: { key: string; label: string; title: string }[] = [];
+  if (spell.concentration) tags.push({ key: 'C', label: 'C', title: 'Concentration' });
+  if (spell.ritual) tags.push({ key: 'R', label: 'R', title: 'Ritual' });
+  return tags;
 }
 </script>
 
@@ -79,7 +82,13 @@ function spellTags(spell: SpellEntry): string {
           data-spell
         >
           <span class="spells__name">{{ spell.name }}</span>
-          <span v-if="spellTags(spell)" class="spells__spell-tags">{{ spellTags(spell) }}</span>
+          <span
+            v-for="tag in spellTags(spell)"
+            :key="tag.key"
+            class="spells__spell-tag"
+            :title="tag.title"
+            >{{ tag.label }}</span
+          >
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
         </li>
@@ -165,8 +174,8 @@ function spellTags(spell: SpellEntry): string {
   font-weight: 600;
 }
 
-/* Concentration/ritual tag pill after the spell name. */
-.spells__spell-tags {
+/* Concentration/ritual marker box after the spell name. */
+.spells__spell-tag {
   margin-left: 4px;
   padding: 0 3px;
   font-size: 12px;
