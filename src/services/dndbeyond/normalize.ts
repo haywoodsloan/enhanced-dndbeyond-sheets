@@ -1002,6 +1002,24 @@ function abilityScoreIncreases(
   return bumps.map((bump) => `+${bump.value} ${bump.meta.name}`).join(', ');
 }
 
+/**
+ * The proficiencies a FEAT granted, keyed by its id in the `feat` modifier
+ * group, as a short "Stealth, Perception, Insight" list — the actual skills or
+ * tools chosen for a "choose N proficiencies" feat like Skilled, shown in place
+ * of its generic "any combination of your choice" rules text. Scoped to the
+ * `feat` group so a class/background proficiency grant is never swept in.
+ */
+function featProficiencies(raw: RawCharacter, componentId: number | undefined): string | undefined {
+  if (componentId == null) return undefined;
+  const names: string[] = [];
+  for (const mod of asArray<RawModifier>(raw.modifiers?.feat)) {
+    if (mod.type !== 'proficiency' || mod.componentId !== componentId) continue;
+    const name = mod.friendlySubtypeName?.trim();
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names.length ? names.join(', ') : undefined;
+}
+
 /** Category tag D&D Beyond puts on placeholder "feats" that aren't real feats. */
 const DISGUISE_FEAT_TAG = '__DISGUISE_FEAT';
 
@@ -1269,6 +1287,11 @@ function resolveFeatures(
         content = content.summary ? { summary: content.summary } : {};
       }
     }
+
+    // A feat that grants proficiencies (Skilled and the like) shows the actual
+    // skills/tools chosen, not the generic "any combination of your choice" text.
+    const proficiencies = featProficiencies(raw, id);
+    if (proficiencies) content = { ...content, summary: proficiencies };
 
     // Any OTHER feature that ALSO grants an ability-score bonus (a half-feat, an
     // origin's fixed increase, …): note the bumps alongside its description.

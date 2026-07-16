@@ -110,6 +110,19 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     );
   });
 
+  it('shows a skill feat\'s selected proficiencies instead of the generic text', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    const skilled = items.find((item) => item.name === 'Skilled');
+    // The generic "any combination of your choice" blurb is replaced by the picks.
+    expect(skilled?.summary).toBe('Stealth, Perception, Insight');
+    expect(skilled?.summary).not.toMatch(/of your choice/i);
+    // The repeatable note (a real sub-part) is still shown.
+    expect(skilled?.parts?.some((part) => part.label === 'Repeatable')).toBe(true);
+    // A pure ASI feat is unaffected — it still shows its bumps.
+    const asi = items.find((item) => item.name === 'Ability Score Improvement');
+    expect(asi?.summary).toBe('+1 Dexterity, +1 Charisma');
+  });
+
   it('points Font of Magic option sub-parts to the Actions card', () => {
     const fom = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
