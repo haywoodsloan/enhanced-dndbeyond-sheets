@@ -210,6 +210,23 @@ describe('normalizeCharacter', () => {
     expect(channelDivinity?.summary).toContain('channel divine energy');
   });
 
+  it('drops sentences that reference a rules table (absent from the sheet)', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    // No blurb or sub-part still points at a table the printed sheet lacks …
+    for (const item of items) {
+      expect(item.summary ?? '').not.toMatch(/\btables?\b/i);
+      for (const part of item.parts ?? []) expect(part.text).not.toMatch(/\btables?\b/i);
+    }
+    // … Channel Divinity keeps its useful text, only losing the table sentence.
+    const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
+    expect(channelDivinity?.summary).toContain('channel divine energy');
+    expect(channelDivinity?.summary).not.toContain('as shown in');
+    // A feature whose whole blurb was a table reference keeps just its name.
+    const domainSpells = items.find((item) => item.name === 'Grave Domain Spells');
+    expect(domainSpells).toBeDefined();
+    expect(domainSpells?.summary).toBeUndefined();
+  });
+
   it('breaks a feature into named sub-parts, noting action sub-parts briefly', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
 
@@ -630,7 +647,11 @@ describe('normalizeCharacter — filtering spurious features and actions', () =>
     expect(names).toContain('Drow Lineage');
     const racial = normalizeCharacter(raw).features.find((g) => g.label === 'Racial Traits');
     const drow = racial?.items.find((item) => item.name === 'Drow Lineage');
-    expect(drow?.summary).toContain('Darkvision');
+    // Drow Lineage's only blurb ("…Darkvision increases to 120 ft. and you gain
+    // the spells outlined in the Elven Lineages table") references a table, so it
+    // is dropped — the Darkvision itself still shows on the Senses card.
+    expect(drow).toBeDefined();
+    expect(drow?.summary).toBeUndefined();
   });
 
   it('replaces a choice-base class feature with the selected option', () => {
@@ -639,6 +660,10 @@ describe('normalizeCharacter — filtering spurious features and actions', () =>
     // choose-one prompt whose selected role ("Protector") carries the benefit.
     expect(names).not.toContain('Divine Order');
     expect(names).toContain('Protector');
+    const protector = normalizeCharacter(raw)
+      .features.find((g) => g.label === 'Class Features')
+      ?.items.find((item) => item.name === 'Protector');
+    expect(protector?.summary).toContain('proficiency');
   });
 
   it('filters out __DISGUISE_FEAT placeholder feats', () => {

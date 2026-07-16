@@ -1085,6 +1085,23 @@ function parseFeatureParts(
 }
 
 /**
+ * Drop whole sentences that reference a rules TABLE (e.g. "as shown in the
+ * Cleric Features table", "the spells outlined in the Elven Lineages table") —
+ * the printed sheet doesn't include those tables, so the reference is dead
+ * weight. Matches the WORD "table"/"tables" (so "Repeatable" is safe) and splits
+ * on the same sentence boundary the summarizer respects (a ./!/? before a
+ * capital or paren, so "120 ft." isn't treated as a break).
+ */
+function stripTableSentences(text: string): string {
+  return text
+    .replace(/([.!?])\s+(?=[A-Z(])/g, '$1\u0000')
+    .split('\u0000')
+    .filter((sentence) => !/\btables?\b/i.test(sentence))
+    .join(' ')
+    .trim();
+}
+
+/**
  * Map each granting feature id to the spells it grants a capped number of free
  * casts of (e.g. Gathered Whispers -> Augury 1/LR). A spell's `componentId` can
  * point at a sub-option (a lineage's spellcasting-ability choice), so resolve it
@@ -1203,8 +1220,15 @@ function resolveFeatures(
     const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
     if (resource) item.resource = resource;
-    if (content.summary) item.summary = content.summary;
-    if (content.parts?.length) item.parts = content.parts;
+    // Drop table references — the printed sheet has no rules tables to look at.
+    const summary = content.summary ? stripTableSentences(content.summary) : '';
+    if (summary) item.summary = summary;
+    if (content.parts?.length) {
+      const parts = content.parts
+        .map((part) => ({ label: part.label, text: stripTableSentences(part.text) }))
+        .filter((part) => part.label || part.text);
+      if (parts.length) item.parts = parts;
+    }
     const uses = id != null ? spellUses.get(id) : undefined;
     if (uses?.length) item.spellUses = uses;
     return item;

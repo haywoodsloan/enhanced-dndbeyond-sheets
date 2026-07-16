@@ -96,6 +96,20 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
 
+  it('strips table references but keeps words like "Repeatable"', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    const find = (name: string) => items.find((item) => item.name === name);
+    // Font of Magic loses its "Sorcerer Features table" sentences, keeps the rest.
+    const fom = find('Font of Magic');
+    expect(fom?.summary).not.toMatch(/\btable\b/i);
+    expect(fom?.summary).toContain('Sorcery Points');
+    // "Repeatable" contains "table" as a substring but is NOT a table reference.
+    const skilled = find('Skilled');
+    expect(skilled?.parts?.find((part) => part.label === 'Repeatable')?.text).toContain(
+      'more than once',
+    );
+  });
+
   it('points Font of Magic option sub-parts to the Actions card', () => {
     const fom = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
