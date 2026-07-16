@@ -30,7 +30,6 @@ export function makeCharacter(overrides: Partial<Character> = {}): Character {
     features: [],
     defences: [],
     senses: [],
-    notes: [],
     sections: [],
     ...overrides,
   };

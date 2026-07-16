@@ -260,12 +260,6 @@ export interface FeatureGroup {
   items: FeatureItem[];
 }
 
-/** A labeled free-text note (backstory, allies, possessions, etc.). */
-export interface NoteEntry {
-  label: string;
-  text: string;
-}
-
 /** A passive score or special sense, split into a label and its value. */
 export interface SenseEntry {
   label: string;
@@ -311,7 +305,5 @@ export interface Character {
   wealth: Coins;
   /** Features and traits, grouped by source. */
   features: FeatureGroup[];
-  /** Free-text notes (backstory, allies, possessions, etc.). */
-  notes: NoteEntry[];
   sections: CharacterSection[];
 }

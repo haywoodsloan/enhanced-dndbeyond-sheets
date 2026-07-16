@@ -44,7 +44,6 @@ import type {
   FeatureItem,
   FeaturePart,
   InventoryEntry,
-  NoteEntry,
   ResourcePool,
   SavingThrow,
   SectionKey,
@@ -1342,27 +1341,6 @@ function resolveDefences(raw: RawCharacter): string[] {
   return [...labels];
 }
 
-/** Free-text notes from the character's D&D Beyond notes fields. */
-function resolveNotes(raw: RawCharacter): NoteEntry[] {
-  const n = raw.notes;
-  if (!n) return [];
-  const fields: [string | null | undefined, string][] = [
-    [n.backstory, 'Backstory'],
-    [n.allies, 'Allies'],
-    [n.organizations, 'Organizations'],
-    [n.enemies, 'Enemies'],
-    [n.otherHoldings, 'Other Holdings'],
-    [n.otherNotes, 'Other Notes'],
-  ];
-  const entries: NoteEntry[] = [];
-  for (const [text, label] of fields) {
-    if (typeof text === 'string' && text.trim()) {
-      entries.push({ label, text: text.trim() });
-    }
-  }
-  return entries;
-}
-
 /** Passive skills shown on the Senses card, by skill key and label. */
 const PASSIVE_SENSES: [string, string][] = [
   ['perception', 'Passive Perception'],
@@ -1454,7 +1432,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     toSection('inventory', 'Inventory', asArray(raw.inventory).length),
     toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
     toSection('features', 'Features & Traits', featureCount),
-    toSection('notes', 'Notes', resolveNotes(raw).length, { alwaysPresent: true }),
+    toSection('notes', 'Notes', 0, { alwaysPresent: true }),
   ];
 
   const character: Character = {
@@ -1475,7 +1453,6 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),
     features,
-    notes: resolveNotes(raw),
     sections,
   };
 

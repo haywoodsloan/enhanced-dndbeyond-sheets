@@ -417,10 +417,7 @@ watch(
           v-else-if="bodyKey === 'features' && character"
           :features="character.features"
         />
-        <NotesCard
-          v-else-if="bodyKey === 'notes' && character"
-          :notes="character.notes"
-        />
+        <NotesCard v-else-if="bodyKey === 'notes'" />
         <SpellCard v-else-if="spell" :spell="spell" />
         <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
         <p v-else class="card__note">Details coming soon.</p>
@@ -593,7 +590,8 @@ watch(
 .card[data-section-key='proficiencies'] :deep(.p-card-body),
 .card[data-section-key='attributes'] :deep(.p-card-body),
 .card[data-section-key='inventory'] :deep(.p-card-body),
-.card[data-section-key='wealth'] :deep(.p-card-body) {
+.card[data-section-key='wealth'] :deep(.p-card-body),
+.card[data-section-key='notes'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -605,7 +603,8 @@ watch(
 .card[data-section-key='proficiencies'] :deep(.p-card-content),
 .card[data-section-key='attributes'] :deep(.p-card-content),
 .card[data-section-key='inventory'] :deep(.p-card-content),
-.card[data-section-key='wealth'] :deep(.p-card-content) {
+.card[data-section-key='wealth'] :deep(.p-card-content),
+.card[data-section-key='notes'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
 }
@@ -617,7 +616,8 @@ watch(
 .card[data-section-key='proficiencies'] .card__body,
 .card[data-section-key='attributes'] .card__body,
 .card[data-section-key='inventory'] .card__body,
-.card[data-section-key='wealth'] .card__body {
+.card[data-section-key='wealth'] .card__body,
+.card[data-section-key='notes'] .card__body {
   height: 100%;
   min-height: 0;
   display: flex;
