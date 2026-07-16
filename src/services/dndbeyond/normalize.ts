@@ -950,6 +950,14 @@ const SPELLCASTING_FEATURE = /^Spellcasting$|^Pact Magic$/;
 const ABILITY_SCORE_FEATURE = /Ability Score (?:Improvement|Increase)s?$/;
 
 /**
+ * A selected option whose name is a bare damage type (e.g. Draconic Sorcery's
+ * Elemental Affinity, chosen as "Fire Damage"). Such a choice reads better under
+ * its feature's own name — "Elemental Affinity (Fire)" — than the raw label.
+ */
+const DAMAGE_TYPE_CHOICE =
+  /^(Acid|Bludgeoning|Cold|Fire|Force|Lightning|Necrotic|Piercing|Poison|Psychic|Radiant|Slashing|Thunder) Damage$/i;
+
+/**
  * The ability-score bonuses a feature granted, keyed by its component id, as a
  * short "+2 Wisdom, +1 Constitution" summary (biggest bump first). Returns
  * nothing when the feature granted no ability-score bonus.
@@ -1204,7 +1212,10 @@ function resolveFeatures(
     let content: { summary?: string; parts?: FeaturePart[] };
     const chosen = id != null ? optionByComponent.get(id) : undefined;
     if (chosen) {
-      name = chosen.name;
+      // A bare damage-type choice (Elemental Affinity -> "Fire Damage") reads
+      // better under its feature's own name, e.g. "Elemental Affinity (Fire)".
+      const damageType = DAMAGE_TYPE_CHOICE.exec(chosen.name)?.[1];
+      name = damageType && rawName ? `${rawName} (${damageType})` : chosen.name;
       content = chosen.summary ? { summary: chosen.summary } : {};
     } else {
       content = contentFor(id, snippet, description);

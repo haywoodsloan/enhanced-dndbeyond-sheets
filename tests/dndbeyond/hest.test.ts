@@ -90,7 +90,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const summaryOf = (name: string) => items.find((item) => item.name === name)?.summary ?? '';
     // {{classlevel}} -> 6, {{modifier:cha}} -> +4, {{modifier:cha@min:1#unsigned}} -> 4.
     expect(summaryOf('Draconic Resilience')).toContain('increases by 6');
-    expect(summaryOf('Fire Damage')).toContain('add +4 to one damage roll');
+    expect(summaryOf('Elemental Affinity (Fire)')).toContain('add +4 to one damage roll');
     expect(summaryOf('Empowered Spell')).toContain('reroll up to 4 damage dice');
     // No unresolved placeholder braces remain in any feature text.
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
