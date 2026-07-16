@@ -374,8 +374,8 @@ function isWeaponProficient(raw: RawCharacter, def: WeaponDef): boolean {
 /**
  * Plain text from a D&D Beyond rules string: strips HTML tags, the `[tag]…`
  * markup D&D Beyond wraps around cross-references, and its `{{…}}` dynamic-value
- * placeholders (which we can't resolve here), decodes the common entities, and
- * collapses whitespace.
+ * placeholders (which we can't resolve here), decodes HTML entities (named smart
+ * quotes/dashes plus any numeric `&#…;`), and collapses whitespace.
  */
 function plainText(html: string): string {
   return html
@@ -386,8 +386,19 @@ function plainText(html: string): string {
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&rsquo;|&apos;/g, "'")
+    .replace(/&(?:quot|ldquo|rdquo);/g, '"')
+    .replace(/&(?:#39|apos|lsquo|rsquo);/g, "'")
+    .replace(/&mdash;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&hellip;/g, '…')
+    .replace(/&#(\d+);/g, (match, code: string) => {
+      const point = Number(code);
+      return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : match;
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, hex: string) => {
+      const point = parseInt(hex, 16);
+      return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : match;
+    })
     .replace(/\s+/g, ' ')
     .trim();
 }

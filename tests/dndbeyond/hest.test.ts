@@ -91,4 +91,14 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Hellish Rebuke', 'Darkness']),
     );
   });
+
+  it('decodes HTML entities in feature text', () => {
+    const metamagic = normalizeCharacter(raw)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Metamagic');
+    // The Metamagic description references &ldquo;Metamagic Options&rdquo; — the
+    // curly-quote entities should be decoded, not rendered raw.
+    expect(metamagic?.summary).toContain('"Metamagic Options"');
+    expect(metamagic?.summary).not.toMatch(/&(?:ldquo|rdquo|amp|#\d+);/);
+  });
 });
