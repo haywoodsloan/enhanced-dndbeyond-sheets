@@ -410,14 +410,68 @@ function plainText(html: string): string {
  * real sentence end — a ./!/? before a capital or the end — so mid-sentence
  * abbreviations like "ft." don't cut it short), else a word-boundary cut.
  */
-function summarize(text: string | null | undefined, maxLength = 400): string {
-  const plain = plainText(text ?? '');
+function summarize(
+  text: string | null | undefined,
+  maxLength = 400,
+  resolvePlaceholders?: (text: string) => string,
+): string {
+  const source = text ?? '';
+  const plain = plainText(resolvePlaceholders ? resolvePlaceholders(source) : source);
   if (!plain || plain.length <= maxLength) return plain;
   const slice = plain.slice(0, maxLength);
   const sentences = slice.match(/^[\s\S]*[.!?](?=\s+[A-Z(]|$)/)?.[0];
   if (sentences && sentences.length >= maxLength * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : maxLength).trimEnd()}…`;
+}
+
+/**
+ * A resolver for D&D Beyond's `{{…}}` dynamic-value placeholders, bound to this
+ * character's level and ability modifiers. Handles the common forms —
+ * `{{classlevel}}`, `{{modifier:cha}}` (with optional `@min:N` / `#unsigned`
+ * flags), and simple `{{(classlevel/2)@rounddown}}` arithmetic — and drops any
+ * placeholder it can't resolve (e.g. `{{scalevalue}}`). Modifiers render signed
+ * unless `#unsigned`; levels and arithmetic render as plain numbers.
+ */
+function makePlaceholderResolver(
+  abilities: AbilityScore[],
+  level: number,
+): (text: string) => string {
+  const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
+  return (text) =>
+    text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_whole, expr: string) => {
+      const [beforeHash, format = ''] = expr.split('#');
+      const [core, ...flags] = beforeHash.split('@').map((part) => part.trim());
+      const modMatch = /^modifier:([a-z]+)/i.exec(core);
+      let value: number | undefined;
+      if (/^classlevel$/i.test(core)) {
+        value = level;
+      } else if (modMatch) {
+        value = modByKey.get(modMatch[1].slice(0, 3).toLowerCase() as AbilityKey);
+      } else {
+        // Simple binary arithmetic on the class level, e.g. (classlevel/2).
+        const arith = core.replace(/classlevel/gi, String(level));
+        const parts = /^\(?\s*(-?\d+)\s*([+\-*/])\s*(-?\d+)\s*\)?$/.exec(arith);
+        if (parts) {
+          const a = Number(parts[1]);
+          const b = Number(parts[3]);
+          const op = parts[2];
+          value = op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : a / b;
+        }
+      }
+      if (value == null || Number.isNaN(value)) return ''; // unresolved -> drop
+      for (const flag of flags) {
+        const min = /^min:(-?\d+)/.exec(flag);
+        const max = /^max:(-?\d+)/.exec(flag);
+        if (min) value = Math.max(value, Number(min[1]));
+        else if (max) value = Math.min(value, Number(max[1]));
+        else if (/rounddown/i.test(flag)) value = Math.floor(value);
+        else if (/roundup/i.test(flag)) value = Math.ceil(value);
+      }
+      value = Math.round(value);
+      if (modMatch && !/unsigned/i.test(format)) return value >= 0 ? `+${value}` : String(value);
+      return String(value);
+    });
 }
 
 /** One weapon's attack line: to-hit + damage + range + property notes. */
@@ -622,6 +676,7 @@ function resolveActions(
   abilities: AbilityScore[],
   level: number,
   grantedIds: Set<number>,
+  resolvePlaceholders: (text: string) => string,
 ): {
   actions: CharacterAction[];
   resourceComponentIds: Set<number>;
@@ -667,7 +722,7 @@ function resolveActions(
         }
         const range = action.range?.range;
         if (range) entry.range = `${range} ft.`;
-        const summary = summarize(action.snippet || action.description);
+        const summary = summarize(action.snippet || action.description, 400, resolvePlaceholders);
         if (summary) entry.summary = summary;
         if (action.componentId != null) {
           const names = actionNamesByComponent.get(action.componentId);
@@ -768,7 +823,11 @@ function spellDamage(def: RawSpellDefinition, characterLevel: number): DamageInf
 }
 
 /** Known/prepared spells from class spells and other sources, deduped and sorted. */
-function resolveSpells(raw: RawCharacter, level: number): SpellEntry[] {
+function resolveSpells(
+  raw: RawCharacter,
+  level: number,
+  resolvePlaceholders: (text: string) => string,
+): SpellEntry[] {
   const entries: SpellEntry[] = [];
   const add = (spell: RawSpell) => {
     const def = spell.definition;
@@ -793,7 +852,7 @@ function resolveSpells(raw: RawCharacter, level: number): SpellEntry[] {
     const damage = spellDamage(def, level);
     if (damage) entry.damage = damage;
     if (spell.prepared) entry.prepared = true;
-    const summary = summarize(def.snippet || def.description);
+    const summary = summarize(def.snippet || def.description, 400, resolvePlaceholders);
     if (summary) entry.summary = summary;
     entries.push(entry);
   };
@@ -884,11 +943,12 @@ const SPELLCASTING_FEATURE = /^Spellcasting$|^Pact Magic$/;
 
 /**
  * Ability-score-boost features (the "Ability Score Improvement" feat, a
- * background's "… Ability Score Increase", etc.) whose generic rules text ("one
- * score by 2 or two by 1") is noise — we show just the bumps they granted. The
- * suffix anchor excludes the generic "Ability Score Increases" rules placeholder.
+ * background's "… Ability Score Increase(s)", etc.). When such a feature granted
+ * ability bonuses we show just those bumps instead of the generic rules text; one
+ * that granted none (the generic "Ability Score Increases" rules placeholder)
+ * falls through and keeps its own description.
  */
-const ABILITY_SCORE_FEATURE = /Ability Score Improvement$|Ability Score Increase$/;
+const ABILITY_SCORE_FEATURE = /Ability Score (?:Improvement|Increase)s?$/;
 
 /**
  * The ability-score bonuses a feature granted, keyed by its component id, as a
@@ -935,6 +995,7 @@ function isDisguiseFeat(feat: RawFeat): boolean {
  */
 function selectedOptionsByComponent(
   raw: RawCharacter,
+  resolvePlaceholders: (text: string) => string,
 ): Map<number, { name: string; summary?: string }> {
   const map = new Map<number, { name: string; summary?: string }>();
   const options = raw.options;
@@ -945,7 +1006,10 @@ function selectedOptionsByComponent(
       const def = option.definition;
       const id = option.componentId;
       if (id == null || !def?.name || !def.snippet?.trim() || map.has(id)) continue;
-      map.set(id, { name: def.name, summary: summarize(def.snippet || def.description) });
+      map.set(id, {
+        name: def.name,
+        summary: summarize(def.snippet || def.description, 400, resolvePlaceholders),
+      });
     }
   }
   return map;
@@ -959,11 +1023,15 @@ function selectedOptionsByComponent(
  * healing rider) become trailing parts with an empty label. Returns no parts
  * when the feature has no sub-part markers.
  */
-function parseFeatureParts(html: string | null | undefined): {
+function parseFeatureParts(
+  html: string | null | undefined,
+  resolvePlaceholders?: (text: string) => string,
+): {
   intro: string;
   parts: FeaturePart[];
 } {
-  const source = html ?? '';
+  const raw = html ?? '';
+  const source = resolvePlaceholders ? resolvePlaceholders(raw) : raw;
   const paragraphs =
     source.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ??
     source.split(/\r?\n\s*\r?\n/).filter((chunk) => chunk.trim());
@@ -1040,8 +1108,9 @@ function resolveFeatures(
   resources: Map<number, ResourcePool>,
   actionNamesByComponent: Map<number, string[]>,
   spellUses: Map<number, SpellUse[]>,
+  resolvePlaceholders: (text: string) => string,
 ): FeatureGroup[] {
-  const optionByComponent = selectedOptionsByComponent(raw);
+  const optionByComponent = selectedOptionsByComponent(raw, resolvePlaceholders);
 
   // A sub-part is detailed on the Actions card when the feature's grantor id has
   // an action named after it (e.g. Circle of Mortality -> "Pull of Death"); then
@@ -1061,9 +1130,9 @@ function resolveFeatures(
     snippet: string | null | undefined,
     description: string | null | undefined,
   ): { summary?: string; parts?: FeaturePart[] } => {
-    const { intro, parts } = parseFeatureParts(description || snippet);
+    const { intro, parts } = parseFeatureParts(description || snippet, resolvePlaceholders);
     if (parts.length === 0) {
-      const summary = summarize(snippet || description);
+      const summary = summarize(snippet || description, 400, resolvePlaceholders);
       return summary ? { summary } : {};
     }
     const shown = parts.map((part) =>
@@ -1099,11 +1168,12 @@ function resolveFeatures(
     description: string | null | undefined,
   ): { name: string | undefined; content: { summary?: string; parts?: FeaturePart[] } } => {
     // A feature whose whole purpose is a stat bump (the Ability Score Improvement
-    // feat, a background's Ability Score Increase): show ONLY the bumps granted,
-    // not the generic "one score by 2 or two by 1" rules text.
+    // feat, a background's Ability Score Increase(s)): show ONLY the bumps granted,
+    // not the generic "one score by 2 or two by 1" rules text. A name-only rules
+    // placeholder that granted no bumps falls through and keeps its description.
     if (rawName && ABILITY_SCORE_FEATURE.test(rawName)) {
       const only = abilityScoreIncreases(raw, id);
-      return { name: rawName, content: only ? { summary: only } : {} };
+      if (only) return { name: rawName, content: { summary: only } };
     }
 
     let name = rawName;
@@ -1139,8 +1209,13 @@ function resolveFeatures(
     snippet: string | null | undefined,
     description: string | null | undefined,
   ) => {
+    // Skip a feature whose original name is already shown, so an option-renamed
+    // grant (e.g. "Innate Sorcery" -> its "Activate Innate Sorcery" option) isn't
+    // listed alongside the plain feature from the class template.
+    if (rawName && seen.has(rawName)) return;
     const { name, content } = resolve(id, rawName, snippet, description);
     if (!name || seen.has(name) || STRUCTURAL_FEATURE.test(name)) return;
+    if (rawName) seen.add(rawName);
     seen.add(name);
     classItems.push(toItem(name, id, content));
   };
@@ -1316,6 +1391,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const level = classes.reduce((total, cls) => total + cls.level, 0);
   const avatarUrl = resolveAvatarUrl(raw);
   const abilities = resolveAbilities(raw);
+  const resolvePlaceholders = makePlaceholderResolver(abilities, level);
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
@@ -1324,6 +1400,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     abilities,
     level,
     grantedFeatureIds(raw),
+    resolvePlaceholders,
   );
   const resources = resolveResourceMap(raw, level);
   // A feature doesn't need its own checkboxes when the same limited-use pool is
@@ -1334,6 +1411,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     resources,
     actionNamesByComponent,
     spellUsesByComponent(raw, level),
+    resolvePlaceholders,
   );
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);
 
@@ -1368,7 +1446,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     proficiencies: resolveProficiencies(raw),
     attacks,
     actions,
-    spells: resolveSpells(raw, level),
+    spells: resolveSpells(raw, level, resolvePlaceholders),
     inventory: resolveInventory(raw),
     wealth: resolveWealth(raw),
     features,

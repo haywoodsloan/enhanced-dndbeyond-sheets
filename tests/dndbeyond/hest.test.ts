@@ -70,15 +70,30 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
+    // The base feature is shown; its option-form duplicate is not listed too.
+    expect(namesOf('Class Features')).toContain('Innate Sorcery');
+    expect(namesOf('Class Features')).not.toContain('Activate Innate Sorcery');
 
     // The Ability Score Improvement feat shows just the bumps it granted…
     const asi = itemsOf('Feats').find((item) => item.name === 'Ability Score Improvement');
     expect(asi?.summary).toBe('+1 Dexterity, +1 Charisma');
-    // …and a half-feat-style origin increase keeps its text and also notes the bump.
+    // …as does a plural "… Ability Score Improvements" origin increase.
     const charlatan = itemsOf('Feats').find(
       (item) => item.name === 'Charlatan Ability Score Improvements',
     );
-    expect(charlatan?.parts).toContainEqual({ label: '', text: '+2 Charisma, +1 Dexterity' });
+    expect(charlatan?.summary).toBe('+2 Charisma, +1 Dexterity');
+    expect(charlatan?.parts).toBeUndefined();
+  });
+
+  it('resolves dynamic-value placeholders in feature text', () => {
+    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    const summaryOf = (name: string) => items.find((item) => item.name === name)?.summary ?? '';
+    // {{classlevel}} -> 6, {{modifier:cha}} -> +4, {{modifier:cha@min:1#unsigned}} -> 4.
+    expect(summaryOf('Draconic Resilience')).toContain('increases by 6');
+    expect(summaryOf('Fire Damage')).toContain('add +4 to one damage roll');
+    expect(summaryOf('Empowered Spell')).toContain('reroll up to 4 damage dice');
+    // No unresolved placeholder braces remain in any feature text.
+    expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
 
   it('tracks a racial trait that grants limited-use spells', () => {
