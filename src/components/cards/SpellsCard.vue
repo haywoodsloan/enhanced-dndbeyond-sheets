@@ -39,7 +39,7 @@ const groups = computed(() => {
 
 /** Compact per-spell shorthand: "A · 60 ft. · V,S · 1d8 Radiant · DEX save". */
 function spellMeta(spell: SpellEntry): string {
-  const hit = spell.save ? `${spell.save} save` : spell.attack ? 'Spell atk' : '';
+  const hit = spell.save ? `${spell.save} save` : spell.attack ? 'Spell attack' : '';
   return [spell.castingTime, spell.range, spell.components, formatDamage(spell.damage), hit]
     .filter(Boolean)
     .join(' · ');

@@ -76,7 +76,7 @@ describe('SpellsCard', () => {
     expect(spells).toHaveLength(2);
     expect(spells[0].text()).toContain('Fire Bolt');
     expect(spells[0].text()).toContain('1d10 Fire');
-    expect(spells[0].text()).toContain('Spell atk');
+    expect(spells[0].text()).toContain('Spell attack');
     // The concentration spell shows a "C" tag.
     expect(spells[1].text()).toContain('C');
   });
