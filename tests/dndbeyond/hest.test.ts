@@ -96,6 +96,20 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
 
+  it('points Font of Magic option sub-parts to the Actions card', () => {
+    const fom = normalizeCharacter(raw)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Font of Magic');
+    const partText = (label: string) => fom?.parts?.find((part) => part.label === label)?.text;
+    // These options are fully defined as actions ("Convert Spell Slots" / "Create
+    // Spell Slot Level N"), so the feature just points there despite the wording
+    // difference ("Creating Spell Slots" vs "Create Spell Slot Level 1").
+    expect(partText('Converting Spell Slots to Sorcery Points')).toBe('(see Actions)');
+    expect(partText('Creating Spell Slots')).toBe('(see Actions)');
+    // The trailing rules rider (not an action) keeps its text.
+    expect(fom?.parts?.find((part) => part.label === '')?.text).toContain('vanishes');
+  });
+
   it('tracks a racial trait that grants limited-use spells', () => {
     const { features } = normalizeCharacter(raw);
     const legacy = features

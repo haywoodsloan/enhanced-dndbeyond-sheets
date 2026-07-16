@@ -1113,14 +1113,39 @@ function resolveFeatures(
   const optionByComponent = selectedOptionsByComponent(raw, resolvePlaceholders);
 
   // A sub-part is detailed on the Actions card when the feature's grantor id has
-  // an action named after it (e.g. Circle of Mortality -> "Pull of Death"); then
-  // the feature just points to the Actions card instead of repeating its text.
+  // an action that corresponds to it (e.g. Circle of Mortality -> "Pull of Death",
+  // or Font of Magic -> its "Create Spell Slot Level 1" action); then the feature
+  // just points to the Actions card instead of repeating its text. The match is
+  // loose — significant, crudely-stemmed words (dropping any "Feature: " prefix
+  // and stopwords), so gerund/qualifier wording still lines up ("Creating Spell
+  // Slots" <-> "Create Spell Slot Level 1"). A sub-part matches an action when
+  // they share their leading word and one name's words are a subset of the other's.
+  const matchStopwords = new Set([
+    'a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on',
+    'or', 'the', 'this', 'to', 'with', 'your',
+  ]);
+  const significantWords = (text: string): string[] => {
+    const body = text.includes(': ') ? text.slice(text.indexOf(': ') + 2) : text;
+    return body
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word && !matchStopwords.has(word) && !/^\d+$/.test(word))
+      .map((word) => word.replace(/ing$/, '').replace(/es$/, '').replace(/s$/, '').replace(/e$/, ''));
+  };
   const isActionPart = (id: number | undefined, label: string): boolean => {
     if (id == null) return false;
+    const labelWords = significantWords(label);
+    if (labelWords.length < 2) return false;
+    const labelSet = new Set(labelWords);
     return (
-      actionNamesByComponent
-        .get(id)
-        ?.some((name) => name === label || name.endsWith(`: ${label}`)) ?? false
+      actionNamesByComponent.get(id)?.some((name) => {
+        const actionWords = significantWords(name);
+        if (actionWords.length < 2 || actionWords[0] !== labelWords[0]) return false;
+        const actionSet = new Set(actionWords);
+        const [small, large] =
+          labelSet.size <= actionSet.size ? [labelSet, actionSet] : [actionSet, labelSet];
+        return [...small].every((word) => large.has(word));
+      }) ?? false
     );
   };
 
