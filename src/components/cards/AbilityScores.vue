@@ -107,7 +107,7 @@ const isList = computed(() => grid.value.tileCols === 1);
   display: inline;
   font-size: 20px;
   font-weight: 300;
-  color: var(--p-primary-300, #cbd5e1);
+  color: var(--p-primary-300, #d4d4d8);
 }
 
 .ability__name {

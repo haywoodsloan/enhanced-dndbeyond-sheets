@@ -66,6 +66,14 @@ export interface HitPoints {
   temp: number;
 }
 
+/** Hit dice available for short-rest recovery, grouped by die size. */
+export interface HitDie {
+  /** Die size (e.g. 8 means a d8). */
+  die: number;
+  /** Number of dice of this size (character levels in classes using it). */
+  count: number;
+}
+
 /** At-a-glance combat and vital stats shown in the Basics section. */
 export interface CharacterBasics {
   armorClass: number;
@@ -75,6 +83,10 @@ export interface CharacterBasics {
   speed: number;
   proficiencyBonus: number;
   hitPoints: HitPoints;
+  /** Hit dice grouped by die size (highest die first); empty when none. */
+  hitDice: HitDie[];
+  /** Heroic Inspiration flag. */
+  inspiration: boolean;
   /** Active condition names; empty when none. */
   conditions: string[];
 }

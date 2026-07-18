@@ -20,21 +20,22 @@ withDefaults(defineProps<{ senses?: SenseEntry[] }>(), {
 .senses {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  height: 100%;
   margin: 0;
 }
 
+/* Equal-height bands spread the senses down the full card height (matching the
+   Abilities / Wealth fill), so a taller footprint doesn't leave a gap below. */
 .senses__item {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 6px;
 }
 
 .senses__item + .senses__item {
-  border-top: 1px solid var(--p-primary-200);
-  padding-top: 6px;
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
 }
 
 .senses__label {
@@ -49,7 +50,7 @@ withDefaults(defineProps<{ senses?: SenseEntry[] }>(), {
   margin: 0;
   min-width: 34px;
   padding: 2px 10px;
-  border: 1px solid var(--p-primary-200);
+  border: 1px solid var(--p-primary-200, #e4e4e7);
   border-radius: 999px;
   font-size: 15px;
   font-weight: 700;

@@ -35,24 +35,33 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 .saves-card {
   display: grid;
   grid-template-columns: auto 1fr;
+  grid-template-rows: 1fr;
   gap: 16px;
   align-items: stretch;
+  height: 100%;
 }
 
 .saves {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Equal-height bands distribute the saves down the full card height, matching
+   the Skills card (its twin prof-dot + name + modifier list). */
 .save {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+
+/* Subtle horizontal rule between save rows (they carry no bullet marker). */
+.save + .save {
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
 }
 
 .save__prof {
@@ -80,7 +89,10 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 .defences {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  /* Spread the entries down the column so the list reaches the card bottom in
+     step with the saves, keeping the two sides balanced. */
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
   border-left: 1px solid var(--p-primary-300, #d4d4d8);
   padding-left: 16px;

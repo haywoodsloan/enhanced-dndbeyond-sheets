@@ -9,6 +9,8 @@ const basics: CharacterBasics = {
   speed: 30,
   proficiencyBonus: 2,
   hitPoints: { current: 4, max: 31, temp: 0 },
+  hitDice: [{ die: 8, count: 4 }],
+  inspiration: false,
   conditions: [],
 };
 
@@ -45,8 +47,11 @@ describe('BasicsCard', () => {
       },
     });
 
-    expect(wrapper.find('[data-stat="hp"]').text()).toContain('temp');
-    expect(wrapper.find('[data-stat="hp"]').text()).toContain('5');
+    // Temp HP is a hand write-in line labelled "TEMP".
+    expect(wrapper.find('[data-stat="hp"]').text()).toContain('TEMP');
+    expect(
+      wrapper.find('[data-stat="hp"] .basics__temp-blank').exists(),
+    ).toBe(true);
     const rows = wrapper.findAll('[data-stat="conditions"] .conditions__box');
     const poisoned = rows.find((row) => row.text().includes('Poisoned'));
     const blinded = rows.find((row) => row.text().includes('Blinded'));
@@ -73,5 +78,33 @@ describe('BasicsCard', () => {
     expect(
       boxes.every((box) => !(box.element as HTMLInputElement).checked),
     ).toBe(true);
+  });
+
+  it('renders hit dice and an inspiration toggle', () => {
+    const wrapper = mount(BasicsCard, {
+      props: {
+        basics: {
+          ...basics,
+          hitDice: [
+            { die: 10, count: 2 },
+            { die: 8, count: 3 },
+          ],
+          inspiration: true,
+        },
+      },
+    });
+
+    const dice = wrapper.find('[data-stat="hit-dice"]');
+    expect(dice.text()).toContain('d10');
+    expect(dice.text()).toContain('d8');
+    // A remaining/total write-in per die size (no per-level boxes).
+    expect(dice.findAll('.hitdice__blank')).toHaveLength(2);
+    expect(dice.text()).toContain('/2');
+    expect(dice.text()).toContain('/3');
+
+    const inspiration = wrapper.find(
+      '[data-stat="inspiration"] input[type="checkbox"]',
+    );
+    expect((inspiration.element as HTMLInputElement).checked).toBe(true);
   });
 });

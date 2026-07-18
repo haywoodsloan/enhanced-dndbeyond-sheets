@@ -153,7 +153,7 @@ watch(
 
 /* A thin divider between columns so the three lists are easy to scan. */
 .column + .column {
-  border-left: 1px solid var(--p-primary-200, #d4d4d8);
+  border-left: 1px solid var(--p-primary-200, #e4e4e7);
 }
 
 .column__label {
@@ -187,7 +187,7 @@ watch(
 .item__divider {
   grid-column: 1 / -1;
   height: 1px;
-  background: var(--p-primary-200, #e5e7eb);
+  background: var(--p-primary-200, #e4e4e7);
 }
 
 .item__qty {

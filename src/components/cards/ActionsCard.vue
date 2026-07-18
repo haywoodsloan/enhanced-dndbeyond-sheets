@@ -47,9 +47,11 @@ function metaOf(action: CharacterAction): string {
           class="actions__item"
           data-action
         >
-          <span class="actions__name">{{ action.name }}</span>
-          <ResourceBoxes v-if="action.resource" :resource="action.resource" />
-          <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
+          <span class="actions__head">
+            <span class="actions__name">{{ action.name }}</span>
+            <ResourceBoxes v-if="action.resource" :resource="action.resource" />
+            <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
+          </span>
           <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />
         </li>
       </ul>
@@ -101,9 +103,24 @@ function metaOf(action: CharacterAction): string {
   font-weight: 600;
 }
 
+/* Name, use-boxes, and meta share one wrapping row so they flow together and the
+   use-boxes never orphan onto a lonely line when the name is long. */
+.actions__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+
+/* Neutralise the resource component's own left margin inside the flex row (the
+   row's column-gap already spaces it). */
+.actions__head :deep(.resource) {
+  margin-left: 0;
+}
+
 /* The damage/save/range meta trails the name in a lighter, smaller style. */
 .actions__meta {
-  margin-left: 6px;
   font-size: 12px;
   color: var(--p-text-muted-color, #888);
   white-space: nowrap;

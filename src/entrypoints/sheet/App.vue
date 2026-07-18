@@ -1347,6 +1347,12 @@ body {
   width: var(--page-width);
   font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: #1c1c1e;
+  /* Print the theme colours exactly — the proficiency/save dots, expertise
+     rings, coin tokens, and pre-checked boxes are colour fills that browsers
+     drop by default, which would leave those indicators blank on paper. This is
+     an inherited property, so it covers every card. */
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
   /* Tie borders and secondary text to the theme (lighter/darker shades). */
   --p-content-border-color: var(--p-primary-200, #e5e5e5);
   --p-text-muted-color: var(--p-primary-700, #6b7280);

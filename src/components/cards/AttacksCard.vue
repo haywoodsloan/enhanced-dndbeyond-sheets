@@ -6,6 +6,21 @@ import { formatDamage } from '@/utils/character/format';
 
 const props = defineProps<{ attacks: Attack[] }>();
 
+// Weapon mastery properties (2024). Unlike ordinary properties (Finesse, Light,
+// …), these can be used only with a feature such as Weapon Mastery, so they're
+// flagged with a "*" wherever they appear and explained in a footnote below.
+const MASTERY_PROPERTIES = new Set([
+  'Cleave',
+  'Graze',
+  'Nick',
+  'Push',
+  'Sap',
+  'Slow',
+  'Topple',
+  'Vex',
+]);
+const isMastery = (name: string) => MASTERY_PROPERTIES.has(name);
+
 interface AttackRow {
   name: string;
   /** To-hit (e.g. "+4") or a save prompt (e.g. "DC 14 DEX"). */
@@ -22,7 +37,9 @@ const rows = computed<AttackRow[]>(() =>
     hit: attack.toHit != null ? formatModifier(attack.toHit) : (attack.save ?? ''),
     damage: formatDamage(attack.damage),
     range: attack.range ?? '',
-    notes: (attack.properties ?? []).map((property) => property.name).join(', '),
+    notes: (attack.properties ?? [])
+      .map((property) => (isMastery(property.name) ? `${property.name}*` : property.name))
+      .join(', '),
   })),
 );
 
@@ -41,8 +58,16 @@ const legend = computed(() => {
       }
     }
   }
-  return [...seen].map(([name, description]) => ({ name, description }));
+  return [...seen].map(([name, description]) => ({
+    name,
+    description,
+    mastery: isMastery(name),
+  }));
 });
+
+// A mastery-property footnote is shown whenever any mastery property appears in
+// the legend, explaining the "*" that marks them.
+const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
 </script>
 
 <template>
@@ -65,10 +90,14 @@ const legend = computed(() => {
     </div>
     <dl v-if="legend.length" class="attacks__legend">
       <div v-for="entry in legend" :key="entry.name" class="attacks__legend-item">
-        <dt>{{ entry.name }}</dt>
+        <dt>{{ entry.name }}{{ entry.mastery ? '*' : '' }}</dt>
         <dd>{{ entry.description }}</dd>
       </div>
     </dl>
+    <p v-if="hasMastery" class="attacks__mastery-note" data-mastery-note>
+      * To use a weapon's mastery property, you must have a feature, such as
+      Weapon Mastery, that lets you use it.
+    </p>
   </div>
 </template>
 
@@ -145,7 +174,7 @@ const legend = computed(() => {
   padding-top: 6px;
   border-top: 1px solid var(--p-primary-200, #e4e4e7);
   display: grid;
-  gap: 3px;
+  gap: 6px;
   font-size: 12px;
   line-height: 1.35;
   color: var(--p-text-muted-color, #888);
@@ -154,7 +183,7 @@ const legend = computed(() => {
 .attacks__legend dt {
   display: inline;
   font-weight: 600;
-  color: var(--p-text-color, #3f3f46);
+  color: #1c1c1e;
 }
 
 .attacks__legend dt::after {
@@ -164,5 +193,16 @@ const legend = computed(() => {
 .attacks__legend dd {
   display: inline;
   margin: 0 0 0 4px;
+}
+
+/* A note that the mastery properties above (Sap, Vex, …) can't be used without a
+   Weapon Mastery feature. */
+.attacks__mastery-note {
+  margin: 0;
+  padding-top: 6px;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--p-text-muted-color, #888);
 }
 </style>

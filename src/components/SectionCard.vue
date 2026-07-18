@@ -359,8 +359,8 @@ watch(
       </button>
       <div ref="bodyRef" class="card__body" :style="bodyStyle">
         <PortraitCard
-          v-if="bodyKey === 'portrait' && character?.avatarUrl"
-          :avatar-url="character.avatarUrl"
+          v-if="bodyKey === 'portrait' && character"
+          :avatar-url="character.avatarUrl ?? ''"
         />
         <AbilityScores
           v-else-if="bodyKey === 'attributes' && character"
@@ -591,6 +591,8 @@ watch(
 .card[data-section-key='attributes'] :deep(.p-card-body),
 .card[data-section-key='inventory'] :deep(.p-card-body),
 .card[data-section-key='wealth'] :deep(.p-card-body),
+.card[data-section-key='savingThrows'] :deep(.p-card-body),
+.card[data-section-key='senses'] :deep(.p-card-body),
 .card[data-section-key='notes'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
@@ -604,6 +606,8 @@ watch(
 .card[data-section-key='attributes'] :deep(.p-card-content),
 .card[data-section-key='inventory'] :deep(.p-card-content),
 .card[data-section-key='wealth'] :deep(.p-card-content),
+.card[data-section-key='savingThrows'] :deep(.p-card-content),
+.card[data-section-key='senses'] :deep(.p-card-content),
 .card[data-section-key='notes'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
@@ -617,6 +621,8 @@ watch(
 .card[data-section-key='attributes'] .card__body,
 .card[data-section-key='inventory'] .card__body,
 .card[data-section-key='wealth'] .card__body,
+.card[data-section-key='savingThrows'] .card__body,
+.card[data-section-key='senses'] .card__body,
 .card[data-section-key='notes'] .card__body {
   height: 100%;
   min-height: 0;

@@ -58,6 +58,9 @@ describe('normalizeCharacter', () => {
     expect(basics.initiative).toBe(0);
     expect(basics.speed).toBe(30);
     expect(basics.proficiencyBonus).toBe(2);
+    // Cleric 4 -> four d8 hit dice; no inspiration flag set.
+    expect(basics.hitDice).toEqual([{ die: 8, count: 4 }]);
+    expect(basics.inspiration).toBe(false);
     expect(basics.conditions).toEqual([]);
   });
 
@@ -117,6 +120,25 @@ describe('normalizeCharacter', () => {
     expect(channelDivinity?.summary).not.toContain('{{');
   });
 
+  it('resolves save-DC and proficiency placeholders in summaries', () => {
+    const { actions } = normalizeCharacter(raw);
+    // {{savedc:wis}} -> 8 + proficiency(2) + WIS(+4) = 14.
+    const divineSpark = actions.find(
+      (action) => action.name === 'Channel Divinity: Divine Spark',
+    );
+    expect(divineSpark?.summary).toContain('DC 14');
+    expect(divineSpark?.summary).not.toMatch(/DC\s+Con/);
+    // {{13+proficiency}} -> 13 + 2 = 15, so no empty "(DC )".
+    const voices = actions.find(
+      (action) => action.name === 'Gathered Whispers: Voices from Beyond',
+    );
+    expect(voices?.summary).toContain('DC 15');
+    expect(voices?.summary).not.toContain('(DC )');
+    for (const action of actions) {
+      expect(action.summary ?? '').not.toContain('{{');
+    }
+  });
+
   it('lists spells with levels, sorted ascending', () => {
     const { spells } = normalizeCharacter(raw);
     expect(spells.length).toBeGreaterThan(0);
@@ -172,6 +194,16 @@ describe('normalizeCharacter', () => {
     expect(summary).not.toContain('<');
   });
 
+  it('drops an embedded rules table from a spell summary instead of flattening it', () => {
+    const augury = normalizeCharacter(raw).spells.find((spell) => spell.name === 'Augury');
+    const summary = augury?.summary ?? '';
+    expect(summary).toContain('You receive an omen');
+    // The Omens table's cells ("Weal | Good", "Woe | Bad", …) must not leak in as
+    // run-on text.
+    expect(summary).not.toContain('Weal');
+    expect(summary).not.toContain('Neither good nor bad');
+  });
+
   it('lists inventory items and coins', () => {
     const character = normalizeCharacter(raw);
     expect(
@@ -221,10 +253,11 @@ describe('normalizeCharacter', () => {
     const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
     expect(channelDivinity?.summary).toContain('channel divine energy');
     expect(channelDivinity?.summary).not.toContain('as shown in');
-    // A feature whose whole blurb was a table reference keeps just its name.
+    // A feature whose lone sentence pointed at a table keeps the sentence with
+    // just the table pointer trimmed off, rather than losing all of its info.
     const domainSpells = items.find((item) => item.name === 'Grave Domain Spells');
-    expect(domainSpells).toBeDefined();
-    expect(domainSpells?.summary).toBeUndefined();
+    expect(domainSpells?.summary).toContain('always have the listed spells prepared');
+    expect(domainSpells?.summary).not.toMatch(/\btable\b/i);
   });
 
   it('breaks a feature into named sub-parts, noting action sub-parts briefly', () => {
@@ -555,6 +588,37 @@ describe('normalizeCharacter', () => {
     expect(actions.map((action) => action.name)).toEqual(['Rage']);
   });
 
+  it('de-duplicates identical attack rows for repeated weapons', () => {
+    const scimitar = {
+      equipped: true,
+      definition: {
+        name: 'Scimitar',
+        filterType: 'Weapon',
+        damage: { diceString: '1d6' },
+        damageType: 'Slashing',
+      },
+    };
+    const twinBlades = {
+      id: 3,
+      name: 'Twin',
+      stats: [
+        { id: 1, name: null, value: 16 },
+        { id: 2, name: null, value: 14 },
+        { id: 3, name: null, value: 14 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 11 },
+        { id: 6, name: null, value: 8 },
+      ],
+      classes: [{ level: 5, definition: { name: 'Fighter' } }],
+      // Two equipped copies of the same weapon.
+      inventory: [scimitar, structuredClone(scimitar)],
+    } as unknown as RawCharacter;
+
+    const { attacks } = normalizeCharacter(twinBlades);
+    // The identical Scimitars collapse to one row (plus the always-on Unarmed Strike).
+    expect(attacks.map((attack) => attack.name)).toEqual(['Scimitar', 'Unarmed Strike']);
+  });
+
   it('merges spells from non-class sources and de-duplicates by name', () => {
     const mystic = {
       id: 3,
@@ -647,11 +711,11 @@ describe('normalizeCharacter — filtering spurious features and actions', () =>
     expect(names).toContain('Drow Lineage');
     const racial = normalizeCharacter(raw).features.find((g) => g.label === 'Racial Traits');
     const drow = racial?.items.find((item) => item.name === 'Drow Lineage');
-    // Drow Lineage's only blurb ("…Darkvision increases to 120 ft. and you gain
-    // the spells outlined in the Elven Lineages table") references a table, so it
-    // is dropped — the Darkvision itself still shows on the Senses card.
+    // Drow Lineage's only blurb points at the "Elven Lineages table"; the pointer
+    // is trimmed off but the useful text ("Darkvision increases to 120 ft. …") stays.
     expect(drow).toBeDefined();
-    expect(drow?.summary).toBeUndefined();
+    expect(drow?.summary).toContain('Darkvision increases to 120 ft.');
+    expect(drow?.summary).not.toMatch(/\btable\b/i);
   });
 
   it('replaces a choice-base class feature with the selected option', () => {

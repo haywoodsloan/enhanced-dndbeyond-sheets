@@ -70,6 +70,13 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
+    // Infernal Legacy keeps its info even though its lone sentence pointed at a
+    // "Fiendish Legacies table" — the pointer is trimmed, not the whole sentence.
+    const infernal = itemsOf('Racial Traits').find(
+      (item) => item.name === 'Infernal Legacy',
+    );
+    expect(infernal?.summary).toContain('resistance to Fire');
+    expect(infernal?.summary).not.toMatch(/\btable\b/i);
     // The base feature is shown; its option-form duplicate is not listed too.
     expect(namesOf('Class Features')).toContain('Innate Sorcery');
     expect(namesOf('Class Features')).not.toContain('Activate Innate Sorcery');
@@ -96,18 +103,21 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
 
-  it('strips table references but keeps words like "Repeatable"', () => {
+  it('strips table references and the repeatable-feat boilerplate', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
     const find = (name: string) => items.find((item) => item.name === name);
     // Font of Magic loses its "Sorcerer Features table" sentences, keeps the rest.
     const fom = find('Font of Magic');
     expect(fom?.summary).not.toMatch(/\btable\b/i);
     expect(fom?.summary).toContain('Sorcery Points');
-    // "Repeatable" contains "table" as a substring but is NOT a table reference.
+    // The "Repeatable — you can take this feat more than once" note is dropped
+    // (and the table stripper's \btable\b boundary never touched "Repeatable").
     const skilled = find('Skilled');
-    expect(skilled?.parts?.find((part) => part.label === 'Repeatable')?.text).toContain(
-      'more than once',
-    );
+    expect(
+      (skilled?.parts ?? []).some((part) =>
+        /repeatable|more than once/i.test(`${part.label ?? ''} ${part.text}`),
+      ),
+    ).toBe(false);
   });
 
   it('shows a skill feat\'s selected proficiencies instead of the generic text', () => {
@@ -116,8 +126,10 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The generic "any combination of your choice" blurb is replaced by the picks.
     expect(skilled?.summary).toBe('Stealth, Perception, Insight');
     expect(skilled?.summary).not.toMatch(/of your choice/i);
-    // The repeatable note (a real sub-part) is still shown.
-    expect(skilled?.parts?.some((part) => part.label === 'Repeatable')).toBe(true);
+    // The repeatable-feat boilerplate note is dropped.
+    expect((skilled?.parts ?? []).some((part) => part.label === 'Repeatable')).toBe(
+      false,
+    );
     // A pure ASI feat is unaffected — it still shows its bumps.
     const asi = items.find((item) => item.name === 'Ability Score Improvement');
     expect(asi?.summary).toBe('+1 Dexterity, +1 Charisma');
@@ -135,6 +147,37 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(partText('Creating Spell Slots')).toBe('(see Actions)');
     // The trailing rules rider (not an action) keeps its text.
     expect(fom?.parts?.find((part) => part.label === '')?.text).toContain('vanishes');
+  });
+
+  it('points the Innate Sorcery feature to its Bonus Action, which shows the full effect', () => {
+    const character = normalizeCharacter(raw);
+    const featureNamed = (name: string) =>
+      character.features.flatMap((group) => group.items).find((item) => item.name === name);
+
+    // The feature IS a Bonus Action detailed on the Actions card, so it just
+    // references it rather than repeating the text.
+    const feature = featureNamed('Innate Sorcery');
+    expect(feature?.summary).toBe('(see Actions)');
+    expect(feature?.parts).toBeUndefined();
+
+    // The Bonus Action carries the full effect — the benefits the snippet dropped —
+    // trimmed of its lead-in flavor and the recharge line (shown as use checkboxes).
+    const action = character.actions.find(
+      (entry) => entry.name === 'Innate Sorcery' && entry.category === 'bonus',
+    );
+    expect(action?.summary).toBe(
+      'As a Bonus Action, you can unleash that magic for 1 minute, during which you gain ' +
+        'the following benefits: The spell save DC of your Sorcerer spells increases by 1. ' +
+        'You have Advantage on the attack rolls of Sorcerer spells you cast.',
+    );
+    expect(action?.summary).not.toMatch(/an event in your past|regain all expended uses/i);
+
+    // A passive "other" option that merely shares a name with an action is NOT
+    // collapsed — it keeps its own description in the feature list.
+    expect(featureNamed('Sorcerous Restoration')?.summary).toContain(
+      'regain expended Sorcery Points',
+    );
+    expect(featureNamed('Empowered Spell')?.summary).toContain('reroll up to 4 damage dice');
   });
 
   it('tracks a racial trait that grants limited-use spells', () => {

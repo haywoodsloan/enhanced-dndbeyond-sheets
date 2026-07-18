@@ -104,6 +104,8 @@ describe('SectionCard', () => {
             speed: 30,
             proficiencyBonus: 2,
             hitPoints: { current: 4, max: 31, temp: 0 },
+            hitDice: [],
+            inspiration: false,
             conditions: [],
           },
         }),

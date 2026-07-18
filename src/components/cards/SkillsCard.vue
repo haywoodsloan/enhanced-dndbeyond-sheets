@@ -79,7 +79,7 @@ const columnGroups = computed(() => {
 
 /* Subtle horizontal rule between skill rows (they carry no bullet marker). */
 .skill + .skill {
-  border-top: 1px solid var(--p-primary-200, #e5e7eb);
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
 }
 
 .skill__prof {

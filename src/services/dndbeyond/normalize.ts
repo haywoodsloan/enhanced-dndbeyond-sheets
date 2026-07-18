@@ -218,6 +218,16 @@ function resolveBasics(
     bonus: raw.bonusHitPoints ?? 0,
     override: raw.overrideHitPoints,
   });
+  // Group each class's levels by its hit-die size so a multiclass character shows
+  // e.g. "2d8 + 3d10"; highest die first.
+  const hitDiceByDie = new Map<number, number>();
+  for (const cls of asArray(raw.classes)) {
+    const die = cls.definition?.hitDice ?? 0;
+    if (die > 0) hitDiceByDie.set(die, (hitDiceByDie.get(die) ?? 0) + (cls.level ?? 0));
+  }
+  const hitDice = [...hitDiceByDie]
+    .map(([die, count]) => ({ die, count }))
+    .sort((a, b) => b.die - a.die);
   return {
     armorClass: resolveArmorClass(raw, dexModifier),
     initiative: dexModifier + sumBonusModifiers(raw, 'initiative'),
@@ -228,6 +238,8 @@ function resolveBasics(
       max,
       temp: raw.temporaryHitPoints ?? 0,
     },
+    hitDice,
+    inspiration: raw.inspiration ?? false,
     conditions: resolveConditions(raw),
   };
 }
@@ -374,10 +386,13 @@ function isWeaponProficient(raw: RawCharacter, def: WeaponDef): boolean {
  * Plain text from a D&D Beyond rules string: strips HTML tags, the `[tag]…`
  * markup D&D Beyond wraps around cross-references, and its `{{…}}` dynamic-value
  * placeholders (which we can't resolve here), decodes HTML entities (named smart
- * quotes/dashes plus any numeric `&#…;`), and collapses whitespace.
+ * quotes/dashes plus any numeric `&#…;`), and collapses whitespace. Whole HTML
+ * tables are dropped first: the printed sheet has no room for them and their
+ * cells would otherwise flatten into unreadable run-on text.
  */
 function plainText(html: string): string {
   return html
+    .replace(/<table[\s\S]*?<\/table>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\[\/?[^\]]+\]/g, '')
     .replace(/\{\{[^}]*\}\}/g, '')
@@ -447,10 +462,11 @@ function summarize(
 /**
  * A resolver for D&D Beyond's `{{…}}` dynamic-value placeholders, bound to this
  * character's level and ability modifiers. Handles the common forms —
- * `{{classlevel}}`, `{{modifier:cha}}` (with optional `@min:N` / `#unsigned`
- * flags), and simple `{{(classlevel/2)@rounddown}}` arithmetic — and drops any
- * placeholder it can't resolve (e.g. `{{scalevalue}}`). Modifiers render signed
- * unless `#unsigned`; levels and arithmetic render as plain numbers.
+ * `{{classlevel}}`, `{{proficiency}}`, `{{modifier:cha}}` (with optional
+ * `@min:N` / `#unsigned` flags), `{{savedc:wis}}` (a spell/feature save DC), and
+ * simple `{{(classlevel/2)@rounddown}}` / `{{13+proficiency}}` arithmetic — and
+ * drops any placeholder it can't resolve (e.g. `{{scalevalue}}`). Modifiers
+ * render signed unless `#unsigned`; levels, DCs, and arithmetic render plain.
  */
 function makePlaceholderResolver(
   abilities: AbilityScore[],
@@ -462,14 +478,24 @@ function makePlaceholderResolver(
       const [beforeHash, format = ''] = expr.split('#');
       const [core, ...flags] = beforeHash.split('@').map((part) => part.trim());
       const modMatch = /^modifier:([a-z]+)/i.exec(core);
+      const saveDcMatch = /^savedc:([a-z]+)/i.exec(core);
       let value: number | undefined;
       if (/^classlevel$/i.test(core)) {
         value = level;
+      } else if (/^proficiency(?:bonus)?$/i.test(core)) {
+        value = proficiencyBonus(level);
+      } else if (saveDcMatch) {
+        // Save DC = 8 + proficiency + the relevant ability's modifier.
+        const mod = modByKey.get(saveDcMatch[1].slice(0, 3).toLowerCase() as AbilityKey);
+        if (mod != null) value = 8 + proficiencyBonus(level) + mod;
       } else if (modMatch) {
         value = modByKey.get(modMatch[1].slice(0, 3).toLowerCase() as AbilityKey);
       } else {
-        // Simple binary arithmetic on the class level, e.g. (classlevel/2).
-        const arith = core.replace(/classlevel/gi, String(level));
+        // Simple binary arithmetic on the class level or proficiency bonus, e.g.
+        // (classlevel/2) or 13+proficiency.
+        const arith = core
+          .replace(/classlevel/gi, String(level))
+          .replace(/proficiency(?:bonus)?/gi, String(proficiencyBonus(level)));
         const parts = /^\(?\s*(-?\d+)\s*([+\-*/])\s*(-?\d+)\s*\)?$/.exec(arith);
         if (parts) {
           const a = Number(parts[1]);
@@ -550,6 +576,18 @@ function resolveAttacks(
   const modOf = (key: AbilityKey) => modByKey.get(key) ?? 0;
 
   const attacks: Attack[] = [];
+  // Skip a weapon whose attack line is identical to one already added — two
+  // equipped copies of the same weapon would otherwise repeat the row.
+  const seen = new Set<string>();
+  const signatureOf = (attack: Attack): string =>
+    JSON.stringify({
+      name: attack.name,
+      toHit: attack.toHit ?? null,
+      save: attack.save ?? null,
+      damage: attack.damage ?? null,
+      range: attack.range ?? null,
+      properties: (attack.properties ?? []).map((property) => property.name),
+    });
   for (const item of asArray(raw.inventory)) {
     const def = item.definition;
     if (!def?.name) continue;
@@ -560,7 +598,11 @@ function resolveAttacks(
     // the Inventory, matching what the site surfaces as attacks.
     if (!isWeapon && !flagged) continue;
     if (isWeapon && item.equipped !== true && !flagged) continue;
-    attacks.push(weaponAttack(raw, def, modOf, prof));
+    const attack = weaponAttack(raw, def, modOf, prof);
+    const signature = signatureOf(attack);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    attacks.push(attack);
   }
   // Every creature can make an Unarmed Strike (2024 rules: 1 + Str bludgeoning),
   // so keep it as an always-available fallback at the end of the list.
@@ -676,6 +718,54 @@ function grantedFeatureIds(raw: RawCharacter): Set<number> {
   return ids;
 }
 
+/** True when a description carries D&D Beyond's "benefits you gain" bullet list. */
+function hasEffectList(description: string | null | undefined): boolean {
+  return /class="[^"]*\beffect-info\b/i.test(description ?? '');
+}
+
+/**
+ * Drop a narrative lead-in that precedes an action's activation, so its blurb
+ * starts at the mechanics ("As a Bonus Action, you can…") instead of backstory
+ * ("An event in your past left an indelible mark on you…").
+ */
+function dropLeadInFlavor(text: string): string {
+  const trigger = /\bAs an? (?:Bonus Action|Reaction|Free Action|Magic Action|Action)\b/i.exec(text);
+  return trigger && trigger.index > 0 ? text.slice(trigger.index) : text;
+}
+
+/**
+ * Drop a trailing limited-use / recharge sentence ("You can use this feature
+ * twice, … when you finish a Long Rest.") — the action already shows its uses as
+ * checkboxes, so repeating it in the blurb is redundant.
+ */
+function dropUsesSentence(text: string): string {
+  return text
+    .replace(
+      /\s*(?:You can use (?:this|it)\b[^.!?]*|Once used,[^.!?]*)\b(?:Short Rest|Long Rest|Short or Long Rest)\.?\s*$/i,
+      '',
+    )
+    .trim();
+}
+
+/**
+ * A concise blurb of what an action does. D&D Beyond's hand-written snippet is
+ * normally the cleanest source, but when it paraphrases away the action's actual
+ * effects — which D&D Beyond spells out in a benefit list (e.g. Innate Sorcery's
+ * "+1 spell save DC / Advantage on spell attacks") — use the description instead,
+ * trimmed of its lead-in flavor and the recharge line shown as use checkboxes.
+ */
+function actionDetail(
+  snippet: string | null | undefined,
+  description: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): string {
+  if (!hasEffectList(description)) {
+    return summarize(snippet || description, 400, resolvePlaceholders);
+  }
+  const full = summarize(description, 1200, resolvePlaceholders);
+  return summarize(dropUsesSentence(dropLeadInFlavor(full)), 400);
+}
+
 /**
  * Action-economy options from every source, deduped, each enriched with its
  * limited-use checkboxes, damage, save, and range. Grouped downstream into
@@ -700,6 +790,7 @@ function resolveActions(
   actions: CharacterAction[];
   resourceComponentIds: Set<number>;
   actionNamesByComponent: Map<number, string[]>;
+  detailedActionNames: Set<string>;
 } {
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
   const modByStatId = (id: number | null | undefined) =>
@@ -709,6 +800,7 @@ function resolveActions(
   const actions: CharacterAction[] = [];
   const resourceComponentIds = new Set<number>();
   const actionNamesByComponent = new Map<number, string[]>();
+  const detailedActionNames = new Set<string>();
   const seen = new Set<string>();
   if (raw.actions) {
     for (const group of Object.values(raw.actions)) {
@@ -741,8 +833,14 @@ function resolveActions(
         }
         const range = action.range?.range;
         if (range) entry.range = `${range} ft.`;
-        const summary = summarize(action.snippet || action.description, 400, resolvePlaceholders);
+        const summary = actionDetail(action.snippet, action.description, resolvePlaceholders);
         if (summary) entry.summary = summary;
+        // Note real activations (Action / Bonus Action / Reaction) whose blurb
+        // spells out their full effect, so a whole feature that IS one can point
+        // to the Actions card instead of repeating its (now complete) text.
+        if (category !== 'other' && hasEffectList(action.description)) {
+          detailedActionNames.add(action.name);
+        }
         if (action.componentId != null) {
           const names = actionNamesByComponent.get(action.componentId);
           if (names) names.push(action.name);
@@ -752,7 +850,7 @@ function resolveActions(
       }
     }
   }
-  return { actions, resourceComponentIds, actionNamesByComponent };
+  return { actions, resourceComponentIds, actionNamesByComponent, detailedActionNames };
 }
 
 /** Casting-time shorthand from a spell's activation (A / BA / R / 1m / 1h). */
@@ -1120,6 +1218,39 @@ function stripTableSentences(text: string): string {
 }
 
 /**
+ * Remove just a "… in the <Name> table" REFERENCE CLAUSE from a sentence, keeping
+ * the rest of it — unlike {@link stripTableSentences}, which drops the whole
+ * sentence. Used as a fallback so a lone sentence that carries real info next to
+ * a table pointer (e.g. "You gain the spells outlined in the Fiendish Legacies
+ * table.") isn't lost entirely.
+ */
+function stripTableClause(text: string): string {
+  return text
+    .replace(
+      /,?\s*(?:as\s+)?(?:shown|outlined|listed|described|detailed|found|noted|specified|presented|provided)\s+(?:in|on)\s+the\b[^.!?]*?\btables?\b/gi,
+      '',
+    )
+    .replace(/\s+([.!?,;])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Drop the boilerplate repeatability note D&D Beyond appends to repeatable feats
+ * ("Repeatable. You can take this feat more than once.") — it's noise on a
+ * filled sheet where the feat has already been taken.
+ */
+function stripRepeatableNote(text: string): string {
+  return text
+    .replace(
+      /\*\*\s*repeatable\.?\s*\*\*\s*you can take this feat more than once\.?/gi,
+      '',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Map each granting feature id to the spells it grants a capped number of free
  * casts of (e.g. Gathered Whispers -> Augury 1/LR). A spell's `componentId` can
  * point at a sub-option (a lineage's spellcasting-ability choice), so resolve it
@@ -1169,6 +1300,7 @@ function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
   actionNamesByComponent: Map<number, string[]>,
+  detailedActionNames: Set<string>,
   spellUses: Map<number, SpellUse[]>,
   resolvePlaceholders: (text: string) => string,
 ): FeatureGroup[] {
@@ -1194,22 +1326,33 @@ function resolveFeatures(
       .filter((word) => word && !matchStopwords.has(word) && !/^\d+$/.test(word))
       .map((word) => word.replace(/ing$/, '').replace(/es$/, '').replace(/s$/, '').replace(/e$/, ''));
   };
+  // Two names "match" when they share their leading significant word and one's
+  // words are a subset of the other's (so "Creating Spell Slots" lines up with
+  // "Create Spell Slot Level 1", and the "Innate Sorcery" feature with its action).
+  const wordsSubsetMatch = (a: string[], b: string[]): boolean => {
+    if (a.length < 2 || b.length < 2 || a[0] !== b[0]) return false;
+    const aSet = new Set(a);
+    const bSet = new Set(b);
+    const [small, large] = aSet.size <= bSet.size ? [aSet, bSet] : [bSet, aSet];
+    return [...small].every((word) => large.has(word));
+  };
   const isActionPart = (id: number | undefined, label: string): boolean => {
     if (id == null) return false;
     const labelWords = significantWords(label);
-    if (labelWords.length < 2) return false;
-    const labelSet = new Set(labelWords);
     return (
-      actionNamesByComponent.get(id)?.some((name) => {
-        const actionWords = significantWords(name);
-        if (actionWords.length < 2 || actionWords[0] !== labelWords[0]) return false;
-        const actionSet = new Set(actionWords);
-        const [small, large] =
-          labelSet.size <= actionSet.size ? [labelSet, actionSet] : [actionSet, labelSet];
-        return [...small].every((word) => large.has(word));
-      }) ?? false
+      actionNamesByComponent
+        .get(id)
+        ?.some((name) => wordsSubsetMatch(labelWords, significantWords(name))) ?? false
     );
   };
+  // A whole feature that IS a real activation whose full effect is spelled out on
+  // the Actions card just points there instead of repeating it (e.g. Innate
+  // Sorcery -> its Bonus Action). Umbrella/resource features (Channel Divinity)
+  // and passive "other" options (Sorcerous Restoration, a Metamagic option) don't
+  // qualify, so they keep their own text in the feature list.
+  const detailedNameWords = [...detailedActionNames].map(significantWords);
+  const isDetailedActionFeature = (name: string): boolean =>
+    detailedNameWords.some((words) => wordsSubsetMatch(significantWords(name), words));
 
   // A feature's display content: a summary blurb plus optional named sub-parts.
   const contentFor = (
@@ -1238,13 +1381,27 @@ function resolveFeatures(
     const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
     if (resource) item.resource = resource;
-    // Drop table references — the printed sheet has no rules tables to look at.
-    const summary = content.summary ? stripTableSentences(content.summary) : '';
+    // Drop table references (the printed sheet has no rules tables) and the
+    // "Repeatable — you can take this feat more than once" boilerplate.
+    let summary = content.summary
+      ? stripRepeatableNote(stripTableSentences(content.summary))
+      : '';
+    // If dropping table-reference sentences removed EVERYTHING, the lone sentence
+    // carried real info beside a table pointer — trim just the pointer instead of
+    // showing nothing.
+    if (!summary && content.summary) {
+      summary = stripRepeatableNote(stripTableClause(content.summary));
+    }
     if (summary) item.summary = summary;
     if (content.parts?.length) {
       const parts = content.parts
         .map((part) => ({ label: part.label, text: stripTableSentences(part.text) }))
-        .filter((part) => part.label || part.text);
+        .filter((part) => part.label || part.text)
+        .filter(
+          (part) =>
+            !/^\s*repeatable\b/i.test(part.label ?? '') &&
+            !/take this feat more than once/i.test(part.text ?? ''),
+        );
       if (parts.length) item.parts = parts;
     }
     const uses = id != null ? spellUses.get(id) : undefined;
@@ -1298,6 +1455,12 @@ function resolveFeatures(
     const increases = abilityScoreIncreases(raw, id);
     if (increases) {
       content = { ...content, parts: [{ label: '', text: increases }, ...(content.parts ?? [])] };
+    }
+
+    // A whole feature that is itself an Actions-card activation just points there
+    // — its full text (benefits and all) lives on the action.
+    if (name && isDetailedActionFeature(name)) {
+      return { name, content: { summary: '(see Actions)' } };
     }
 
     return { name, content };
@@ -1476,13 +1639,14 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const attacks = resolveAttacks(raw, abilities, level);
-  const { actions, resourceComponentIds, actionNamesByComponent } = resolveActions(
-    raw,
-    abilities,
-    level,
-    grantedFeatureIds(raw),
-    resolvePlaceholders,
-  );
+  const { actions, resourceComponentIds, actionNamesByComponent, detailedActionNames } =
+    resolveActions(
+      raw,
+      abilities,
+      level,
+      grantedFeatureIds(raw),
+      resolvePlaceholders,
+    );
   const resources = resolveResourceMap(raw, level);
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
@@ -1491,6 +1655,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     raw,
     resources,
     actionNamesByComponent,
+    detailedActionNames,
     spellUsesByComponent(raw, level),
     resolvePlaceholders,
   );

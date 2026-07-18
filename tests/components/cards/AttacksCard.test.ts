@@ -76,4 +76,35 @@ describe('AttacksCard', () => {
     expect(wrapper.text()).toContain('Use Strength or Dexterity.');
     expect(wrapper.text()).toContain('Allows two-weapon fighting.');
   });
+
+  it('marks mastery properties with a "*" to set them apart from ordinary ones', () => {
+    const attacks: Attack[] = [
+      {
+        name: 'Scimitar',
+        toHit: 5,
+        damage: { dice: '1d6', bonus: 3, type: 'Slashing' },
+        range: '5 ft.',
+        properties: [
+          { name: 'Finesse', description: 'Use Strength or Dexterity.' },
+          { name: 'Nick', description: 'Make the extra Light attack as part of the Attack action.' },
+        ],
+      },
+    ];
+    const wrapper = mount(AttacksCard, { props: { attacks } });
+
+    // The per-row property list stars only the mastery property.
+    const notes = wrapper.find('.attacks__notes').text();
+    expect(notes).toContain('Nick*');
+    expect(notes).toContain('Finesse');
+    expect(notes).not.toContain('Finesse*');
+
+    // The legend term is starred for the mastery property, plain for the ordinary one.
+    const terms = wrapper.findAll('.attacks__legend dt').map((dt) => dt.text());
+    expect(terms).toContain('Nick*');
+    expect(terms).toContain('Finesse');
+    expect(terms).not.toContain('Finesse*');
+
+    // The footnote is keyed to the "*".
+    expect(wrapper.find('[data-mastery-note]').text().startsWith('*')).toBe(true);
+  });
 });

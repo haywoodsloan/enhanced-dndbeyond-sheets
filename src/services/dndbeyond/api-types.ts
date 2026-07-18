@@ -25,6 +25,8 @@ export interface RawClassDefinition {
   canCastSpells?: boolean;
   /** Ability id used for this class's spellcasting (see ABILITIES). */
   spellCastingAbilityId?: number | null;
+  /** Hit die size for this class (e.g. 8 means a d8). */
+  hitDice?: number | null;
   classFeatures?: RawClassFeature[];
 }
 
@@ -330,6 +332,8 @@ export interface RawCharacter {
   overrideHitPoints?: number | null;
   removedHitPoints?: number | null;
   temporaryHitPoints?: number | null;
+  /** Heroic Inspiration flag. */
+  inspiration?: boolean | null;
   stats: RawStat[];
   bonusStats?: RawStat[];
   overrideStats?: RawStat[];

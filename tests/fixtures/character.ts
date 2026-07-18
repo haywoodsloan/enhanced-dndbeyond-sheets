@@ -17,6 +17,8 @@ export function makeCharacter(overrides: Partial<Character> = {}): Character {
       speed: 30,
       proficiencyBonus: 2,
       hitPoints: { current: 10, max: 10, temp: 0 },
+      hitDice: [],
+      inspiration: false,
       conditions: [],
     },
     savingThrows: [],
