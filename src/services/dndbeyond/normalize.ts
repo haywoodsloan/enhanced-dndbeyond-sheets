@@ -40,6 +40,7 @@ import type {
   CharacterSection,
   Coins,
   DamageInfo,
+  DefenceEntry,
   FeatureGroup,
   FeatureItem,
   FeaturePart,
@@ -51,7 +52,6 @@ import type {
   Skill,
   SpellEntry,
   Spellcasting,
-  SpellUse,
   WeaponProperty,
 } from './model';
 
@@ -822,6 +822,15 @@ function resolveActions(
         const entry: CharacterAction = { name: action.name, category };
         const resource = limitedUseToPool(action.limitedUse, level);
         if (resource) {
+          // A pool that resets on a long rest but also regains one use on a
+          // short rest (Channel Divinity): the reset type only records the long
+          // rest, so read the short-rest recovery from the blurb and show both.
+          if (
+            resource.recharge === 'LR' &&
+            regainsOneOnShortRest(action.snippet, action.description)
+          ) {
+            resource.recharge = 'SR1_LR';
+          }
           entry.resource = resource;
           if (action.componentId != null) resourceComponentIds.add(action.componentId);
         }
@@ -835,10 +844,11 @@ function resolveActions(
         if (range) entry.range = `${range} ft.`;
         const summary = actionDetail(action.snippet, action.description, resolvePlaceholders);
         if (summary) entry.summary = summary;
-        // Note real activations (Action / Bonus Action / Reaction) whose blurb
-        // spells out their full effect, so a whole feature that IS one can point
-        // to the Actions card instead of repeating its (now complete) text.
-        if (category !== 'other' && hasEffectList(action.description)) {
+        // Note real activations (Action / Bonus Action / Reaction) by name, so a
+        // whole feature that IS one (Innate Sorcery, or Channel Divinity — whose
+        // Divine Spark / Turn Undead effects are themselves actions) can point to
+        // the Actions card instead of repeating its text.
+        if (category !== 'other') {
           detailedActionNames.add(action.name);
         }
         if (action.componentId != null) {
@@ -945,10 +955,18 @@ function resolveSpells(
   level: number,
   resolvePlaceholders: (text: string) => string,
 ): SpellEntry[] {
-  const entries: SpellEntry[] = [];
+  const byName = new Map<string, SpellEntry>();
   const add = (spell: RawSpell) => {
     const def = spell.definition;
     if (def?.name == null) return;
+    const uses = limitedUseToPool(spell.limitedUse, level);
+    const existing = byName.get(def.name);
+    if (existing) {
+      // A spell can be both a prepared class spell and a feature-granted free
+      // cast; keep the first entry but pick up the limited-use tracker.
+      if (uses && !existing.uses) existing.uses = uses;
+      return;
+    }
     const entry: SpellEntry = { name: def.name, level: def.level ?? 0 };
     if (def.school) entry.school = def.school;
     const castingTime = spellCastingTime(def.activation);
@@ -971,16 +989,14 @@ function resolveSpells(
     if (spell.prepared) entry.prepared = true;
     const summary = summarize(def.snippet || def.description, 400, resolvePlaceholders);
     if (summary) entry.summary = summary;
-    entries.push(entry);
+    if (uses) entry.uses = uses;
+    byName.set(def.name, entry);
   };
   for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(add);
   if (raw.spells) {
     for (const group of Object.values(raw.spells)) asArray<RawSpell>(group).forEach(add);
   }
-  const seen = new Set<string>();
-  return entries
-    .filter((entry) => (seen.has(entry.name) ? false : seen.add(entry.name)))
-    .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  return [...byName.values()].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
 }
 
 /** Carried items with quantity and equipped/attuned flags. */
@@ -1021,6 +1037,16 @@ function limitedUseToPool(
   const recharge =
     limitedUse.resetType === 1 ? 'SR' : limitedUse.resetType === 2 ? 'LR' : '';
   return recharge ? { max, recharge } : { max };
+}
+
+/**
+ * True when a blurb says a single use is regained on a short rest on top of the
+ * full reset the reset type already captures (e.g. Channel Divinity's "regain
+ * one of its expended uses when you finish a Short Rest").
+ */
+function regainsOneOnShortRest(...texts: (string | null | undefined)[]): boolean {
+  const text = texts.filter(Boolean).join(' ');
+  return /\bregain\s+(?:one|1|a)\b[^.]*\bshort rest\b/i.test(text);
 }
 
 /**
@@ -1250,58 +1276,12 @@ function stripRepeatableNote(text: string): string {
     .trim();
 }
 
-/**
- * Map each granting feature id to the spells it grants a capped number of free
- * casts of (e.g. Gathered Whispers -> Augury 1/LR). A spell's `componentId` can
- * point at a sub-option (a lineage's spellcasting-ability choice), so resolve it
- * through `raw.options` to the feature that actually offers it.
- */
-function spellUsesByComponent(raw: RawCharacter, level: number): Map<number, SpellUse[]> {
-  const optionParent = new Map<number, number>();
-  const options = raw.options;
-  if (options) {
-    const groups = [options.race, options.class, options.feat, options.background, options.item];
-    for (const group of groups) {
-      for (const option of asArray(group)) {
-        if (option.definition?.id != null && option.componentId != null) {
-          optionParent.set(option.definition.id, option.componentId);
-        }
-      }
-    }
-  }
-  const resolveTarget = (id: number): number => {
-    let current = id;
-    for (let hop = 0; hop < 4 && optionParent.has(current); hop += 1) {
-      current = optionParent.get(current)!;
-    }
-    return current;
-  };
-
-  const map = new Map<number, SpellUse[]>();
-  for (const group of Object.values(raw.spells ?? {})) {
-    for (const spell of asArray<RawSpell>(group)) {
-      const pool = limitedUseToPool(spell.limitedUse, level);
-      const name = spell.definition?.name;
-      if (!pool || !name || spell.componentId == null) continue;
-      const target = resolveTarget(spell.componentId);
-      const list = map.get(target);
-      if (list) {
-        if (!list.some((use) => use.name === name)) list.push({ name, pool });
-      } else {
-        map.set(target, [{ name, pool }]);
-      }
-    }
-  }
-  return map;
-}
-
 /** Features and traits grouped by source, each with its resource + sub-parts. */
 function resolveFeatures(
   raw: RawCharacter,
   resources: Map<number, ResourcePool>,
   actionNamesByComponent: Map<number, string[]>,
   detailedActionNames: Set<string>,
-  spellUses: Map<number, SpellUse[]>,
   resolvePlaceholders: (text: string) => string,
 ): FeatureGroup[] {
   const optionByComponent = selectedOptionsByComponent(raw, resolvePlaceholders);
@@ -1365,11 +1345,22 @@ function resolveFeatures(
       const summary = summarize(snippet || description, 400, resolvePlaceholders);
       return summary ? { summary } : {};
     }
-    const shown = parts.map((part) =>
-      part.label && isActionPart(id, part.label)
-        ? { label: part.label, text: '(see Actions)' }
-        : part,
-    );
+    const shown: FeaturePart[] = [];
+    for (const part of parts) {
+      if (part.label && isActionPart(id, part.label)) {
+        shown.push({ label: part.label, text: '(see Actions)' });
+      } else if (
+        !part.label &&
+        shown[shown.length - 1]?.text === '(see Actions)'
+      ) {
+        // An unlabeled rider right after an action-pointed sub-part only
+        // elaborates on that action (e.g. Divine Spark's damage scaling); the
+        // detail already lives on the Actions card, so drop it as redundant.
+        continue;
+      } else {
+        shown.push(part);
+      }
+    }
     return intro ? { summary: intro, parts: shown } : { parts: shown };
   };
 
@@ -1404,8 +1395,6 @@ function resolveFeatures(
         );
       if (parts.length) item.parts = parts;
     }
-    const uses = id != null ? spellUses.get(id) : undefined;
-    if (uses?.length) item.spellUses = uses;
     return item;
   };
 
@@ -1556,30 +1545,47 @@ function toSection(
 /** Damage/condition defence modifier types worth surfacing on the sheet. */
 const DEFENCE_TYPES = new Set(['resistance', 'immunity', 'vulnerability']);
 
-/** A short, readable label for a defensive modifier. */
-function defenceLabel(mod: RawModifier): string {
+/** A short, readable label (plus optional qualifier) for a defensive modifier. */
+function defenceEntry(mod: RawModifier): DefenceEntry {
   const type = mod.friendlyTypeName ?? mod.type ?? '';
   if (mod.type === 'advantage' || mod.type === 'disadvantage') {
-    return mod.restriction ? `${type} on saves (${mod.restriction})` : `${type} on saves`;
+    // The restriction is the useful part, so it's the main label; the
+    // advantage/disadvantage becomes a "(…)" qualifier before it. With no
+    // restriction, fall back to "Advantage on saves".
+    return mod.restriction
+      ? { text: mod.restriction, qualifier: type }
+      : { text: `${type} on saves` };
   }
   const sub = mod.friendlySubtypeName ?? mod.subType ?? '';
-  return `${sub} ${type}`.trim();
+  return { text: `${sub} ${type}`.trim() };
 }
 
 /** Resistances, immunities, vulnerabilities, and save advantages/disadvantages. */
-function resolveDefences(raw: RawCharacter): string[] {
+function resolveDefences(raw: RawCharacter): DefenceEntry[] {
   if (!raw.modifiers) return [];
-  const labels = new Set<string>();
+  const seen = new Set<string>();
+  const entries: DefenceEntry[] = [];
   for (const mods of Object.values(raw.modifiers)) {
     for (const mod of asArray<RawModifier>(mods)) {
       const isDamageDefence = DEFENCE_TYPES.has(mod.type ?? '');
       const isSaveMod =
         (mod.type === 'advantage' || mod.type === 'disadvantage') &&
         mod.subType === 'saving-throws';
-      if (isDamageDefence || isSaveMod) labels.add(defenceLabel(mod));
+      if (!isDamageDefence && !isSaveMod) continue;
+      const entry = defenceEntry(mod);
+      const key = `${entry.text}|${entry.qualifier ?? ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        entries.push(entry);
+      }
     }
   }
-  return [...labels];
+  // Longest first, so the wordier restrictions lead and the terse resistances
+  // trail (a stable sort keeps first-seen order among equal lengths).
+  const lengthOf = (entry: DefenceEntry) =>
+    entry.text.length + (entry.qualifier?.length ?? 0);
+  entries.sort((a, b) => lengthOf(b) - lengthOf(a));
+  return entries;
 }
 
 /** Passive skills shown on the Senses card, by skill key and label. */
@@ -1656,7 +1662,6 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     resources,
     actionNamesByComponent,
     detailedActionNames,
-    spellUsesByComponent(raw, level),
     resolvePlaceholders,
   );
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);

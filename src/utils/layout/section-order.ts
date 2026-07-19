@@ -19,8 +19,15 @@ const CASTER_CLASSES = new Set([
 /** Half / partial casters — attacks and spells both feature prominently. */
 const HALF_CASTER_CLASSES = new Set(['paladin', 'ranger', 'artificer']);
 
-/** Default section priority (best first) for each play style. */
+/**
+ * Default section priority (best first) for each play style. All styles share
+ * the same lead — vitals (basics, attributes, portrait) then the at-a-glance
+ * checks (skills, saves, senses, proficiencies) — and the same reference tail —
+ * features, then gear (inventory, wealth), then the blank notes page. Only the
+ * combat/magic block in the middle is class-specific.
+ */
 const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
+  // Full casters: spells first, then class actions, then a backup weapon.
   caster: [
     'basics',
     'attributes',
@@ -29,14 +36,15 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'savingThrows',
     'senses',
     'proficiencies',
-    'wealth',
     'spells',
     'actions',
     'attacks',
     'features',
     'inventory',
+    'wealth',
     'notes',
   ],
+  // Half casters lean martial: weapon attacks lead, spells support, then actions.
   half: [
     'basics',
     'attributes',
@@ -45,14 +53,16 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'savingThrows',
     'senses',
     'proficiencies',
-    'wealth',
-    'actions',
     'attacks',
     'spells',
+    'actions',
     'features',
     'inventory',
+    'wealth',
     'notes',
   ],
+  // Martials: weapon attacks then actions; spells (subclass casters) follow and
+  // auto-hide to the end when the character has none.
   martial: [
     'basics',
     'attributes',
@@ -61,12 +71,12 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'savingThrows',
     'senses',
     'proficiencies',
-    'wealth',
     'attacks',
     'actions',
+    'spells',
     'features',
     'inventory',
-    'spells',
+    'wealth',
     'notes',
   ],
 };

@@ -145,8 +145,11 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // difference ("Creating Spell Slots" vs "Create Spell Slot Level 1").
     expect(partText('Converting Spell Slots to Sorcery Points')).toBe('(see Actions)');
     expect(partText('Creating Spell Slots')).toBe('(see Actions)');
-    // The trailing rules rider (not an action) keeps its text.
-    expect(fom?.parts?.find((part) => part.label === '')?.text).toContain('vanishes');
+    // The trailing rider only restates that a created slot vanishes on a Long Rest,
+    // which the Create Spell Slot actions already show, so it's dropped as redundant.
+    expect(
+      fom?.parts?.some((part) => part.label === '' && part.text.includes('vanishes')),
+    ).toBe(false);
   });
 
   it('points the Innate Sorcery feature to its Bonus Action, which shows the full effect', () => {
@@ -181,14 +184,17 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
   });
 
   it('tracks a racial trait that grants limited-use spells', () => {
-    const { features } = normalizeCharacter(raw);
-    const legacy = features
-      .flatMap((group) => group.items)
-      .find((item) => item.name === 'Fiendish Legacy Spells');
-    // Tiefling's Fiendish Legacy grants Hellish Rebuke and Darkness once per long rest.
-    expect(legacy?.spellUses?.map((use) => use.name)).toEqual(
+    const { spells } = normalizeCharacter(raw);
+    // Tiefling's Fiendish Legacy grants Hellish Rebuke and Darkness once per long
+    // rest — the free-cast tracker now rides on each granted spell.
+    const withUses = spells.filter((spell) => spell.uses);
+    expect(withUses.map((spell) => spell.name)).toEqual(
       expect.arrayContaining(['Hellish Rebuke', 'Darkness']),
     );
+    expect(spells.find((spell) => spell.name === 'Hellish Rebuke')?.uses).toEqual({
+      max: 1,
+      recharge: 'LR',
+    });
   });
 
   it('decodes HTML entities in feature text', () => {

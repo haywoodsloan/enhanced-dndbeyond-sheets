@@ -397,9 +397,20 @@ const footprints = computed(() =>
 // positional packer seats cards most-recently-moved first, each at its home if
 // free else just after — so a freshly-dragged card takes its cell and the others
 // flow aside, while the blank a moved card leaves behind stays empty.
-const defaultPlacements = computed(() =>
-  packSections(footprints.value, gridColumns.value, rowsPerPage.value),
-);
+const defaultPlacements = computed(() => {
+  const flow = packSections(footprints.value, gridColumns.value, rowsPerPage.value);
+  // Compact the class-aware flow so a small card back-fills the gap a wider card
+  // leaves in a partial row, while keeping the priority reading order (a stable
+  // top-to-bottom re-pack). Continuations are carried with their base, matching
+  // how the sheet re-packs them.
+  const continuations = plannedCards.value.map((card) => isContinuationKey(card.key));
+  return compactPlacements(
+    flow.placements,
+    gridColumns.value,
+    rowsPerPage.value,
+    continuations,
+  );
+});
 const positionedFootprints = computed<PositionedFootprint[]>(() => {
   const perPage = rowsPerPage.value;
   const cards = plannedCards.value;
@@ -421,7 +432,7 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
     const moved = anchors.value[card.key];
     const home = moved
       ? { col: moved.col, row: moved.page * perPage + moved.row }
-      : defaultPlacements.value.placements[index];
+      : defaultPlacements.value[index];
     // Every card carries a recency: one the user moved uses its saved `seq` (≥ 1);
     // one left alone keeps a negative reading-order baseline, so a freshly-dragged
     // card always outranks the stationary ones — it takes its cell and they flow

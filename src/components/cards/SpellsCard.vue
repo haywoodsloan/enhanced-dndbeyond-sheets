@@ -89,6 +89,12 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
             :title="tag.title"
             >{{ tag.label }}</span
           >
+          <ResourceBoxes
+            v-if="spell.uses"
+            :resource="spell.uses"
+            class="spells__uses"
+            data-spell-uses
+          />
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
         </li>

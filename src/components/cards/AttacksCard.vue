@@ -21,14 +21,20 @@ const MASTERY_PROPERTIES = new Set([
 ]);
 const isMastery = (name: string) => MASTERY_PROPERTIES.has(name);
 
+/** One weapon property shown beneath an attack; mastery ones are flagged. */
+interface AttackNote {
+  name: string;
+  mastery: boolean;
+}
+
 interface AttackRow {
   name: string;
   /** To-hit (e.g. "+4") or a save prompt (e.g. "DC 14 DEX"). */
   hit: string;
   damage: string;
   range: string;
-  /** Weapon properties (e.g. "Finesse, Light"), shown beneath the row. */
-  notes: string;
+  /** Weapon properties (Finesse, Light, …), shown beneath the row. */
+  notes: AttackNote[];
 }
 
 const rows = computed<AttackRow[]>(() =>
@@ -37,15 +43,16 @@ const rows = computed<AttackRow[]>(() =>
     hit: attack.toHit != null ? formatModifier(attack.toHit) : (attack.save ?? ''),
     damage: formatDamage(attack.damage),
     range: attack.range ?? '',
-    notes: (attack.properties ?? [])
-      .map((property) => (isMastery(property.name) ? `${property.name}*` : property.name))
-      .join(', '),
+    notes: (attack.properties ?? []).map((property) => ({
+      name: property.name,
+      mastery: isMastery(property.name),
+    })),
   })),
 );
 
 // Only show the Properties column when at least one attack has properties, so an
 // all-unarmed list stays a tidy four columns.
-const hasNotes = computed(() => rows.value.some((row) => row.notes));
+const hasNotes = computed(() => rows.value.some((row) => row.notes.length > 0));
 
 // The distinct weapon properties in play (only those with a description), in
 // first-seen order — defined in a legend at the foot of the card.
@@ -85,18 +92,28 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
         <span class="attacks__hit">{{ row.hit }}</span>
         <span class="attacks__damage">{{ row.damage }}</span>
         <span class="attacks__range">{{ row.range }}</span>
-        <span v-if="hasNotes" class="attacks__notes">{{ row.notes }}</span>
+        <span v-if="hasNotes" class="attacks__notes">
+          <span
+            v-for="(note, noteIndex) in row.notes"
+            :key="noteIndex"
+            class="attacks__note-item"
+          >
+            <span v-if="note.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ note.name }}
+          </span>
+        </span>
       </div>
     </div>
     <dl v-if="legend.length" class="attacks__legend">
       <div v-for="entry in legend" :key="entry.name" class="attacks__legend-item">
-        <dt>{{ entry.name }}{{ entry.mastery ? '*' : '' }}</dt>
+        <dt>
+          <span v-if="entry.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ entry.name }}
+        </dt>
         <dd>{{ entry.description }}</dd>
       </div>
     </dl>
     <p v-if="hasMastery" class="attacks__mastery-note" data-mastery-note>
-      * To use a weapon's mastery property, you must have a feature, such as
-      Weapon Mastery, that lets you use it.
+      <span class="attacks__mastery-mark" aria-hidden="true">*</span> To use a weapon's mastery property, you must
+      have a feature, such as Weapon Mastery, that lets you use it.
     </p>
   </div>
 </template>
@@ -167,6 +184,19 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
   color: var(--p-text-muted-color, #888);
 }
 
+/* Comma-separate the property names within the row's Properties cell. */
+.attacks__note-item:not(:last-child)::after {
+  content: ', ';
+}
+
+/* The "*" flagging a weapon-mastery property — set apart from the property name
+   by weight and a hair of space, and keyed to the footnote below. */
+.attacks__mastery-mark {
+  margin-right: 2px;
+  font-weight: 700;
+  color: #1c1c1e;
+}
+
 /* Legend at the foot of the card defining only the properties that appear in the
    list above. Each entry is a bold term followed by its rules text. */
 .attacks__legend {
@@ -175,7 +205,7 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
   border-top: 1px solid var(--p-primary-200, #e4e4e7);
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
   color: var(--p-text-muted-color, #888);
 }
@@ -200,7 +230,7 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
 .attacks__mastery-note {
   margin: 0;
   padding-top: 6px;
-  font-size: 11px;
+  font-size: 13px;
   font-style: italic;
   line-height: 1.35;
   color: var(--p-text-muted-color, #888);

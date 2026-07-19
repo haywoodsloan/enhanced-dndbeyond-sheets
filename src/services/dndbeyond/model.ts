@@ -198,6 +198,8 @@ export interface SpellEntry {
   prepared?: boolean;
   /** A one-line blurb of what the spell does. */
   summary?: string;
+  /** A feature-granted free-cast tracker (e.g. Augury 1/long rest), when any. */
+  uses?: ResourcePool;
 }
 
 /** At-a-glance spellcasting stats shown at the top of the Spells card. */
@@ -235,7 +237,8 @@ export interface Coins {
 export interface ResourcePool {
   /** Number of empty checkboxes to print (the maximum uses). */
   max: number;
-  /** Recharge shorthand: 'SR' (short rest), 'LR' (long rest), or '' (none). */
+  /** Recharge shorthand: 'SR' (short rest), 'LR' (long rest), 'SR1_LR' (one use
+   * back on a short rest, all on a long rest), or '' (none). */
   recharge?: string;
 }
 
@@ -256,14 +259,6 @@ export interface FeatureItem {
   summary?: string;
   /** Named sub-parts, when the feature bundles several distinct benefits. */
   parts?: FeaturePart[];
-  /** Spells the feature grants a capped number of free casts of, with a tracker each. */
-  spellUses?: SpellUse[];
-}
-
-/** A spell a feature grants a limited number of free casts of (e.g. Augury 1/LR). */
-export interface SpellUse {
-  name: string;
-  pool: ResourcePool;
 }
 
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */
@@ -277,6 +272,14 @@ export interface SenseEntry {
   label: string;
   /** The displayable value, e.g. "14" or "60 ft.". */
   value: string;
+}
+
+/** A defensive trait: a main label plus an optional leading qualifier. */
+export interface DefenceEntry {
+  /** The main label, e.g. a save's restriction or "Fire Resistance". */
+  text: string;
+  /** A short qualifier shown in parentheses before the text, e.g. "Advantage". */
+  qualifier?: string;
 }
 
 export interface Character {
@@ -296,7 +299,7 @@ export interface Character {
   /** The six saving throws in canonical order. */
   savingThrows: SavingThrow[];
   /** Defensive traits: resistances, immunities, and save advantages. */
-  defences: string[];
+  defences: DefenceEntry[];
   /** Passive skill scores and special senses (darkvision, etc.). */
   senses: SenseEntry[];
   /** The 18 skills in canonical order. */

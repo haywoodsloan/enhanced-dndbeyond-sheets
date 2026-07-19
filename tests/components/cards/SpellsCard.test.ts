@@ -107,4 +107,23 @@ describe('SpellsCard', () => {
     );
     expect(spells[1].find('.spells__summary').exists()).toBe(false);
   });
+
+  it('shows a free-cast tracker next to a feature-granted spell', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          { name: 'Augury', level: 1, uses: { max: 1, recharge: 'LR' } },
+          { name: 'Bless', level: 1 },
+        ],
+      },
+    });
+    const spells = wrapper.findAll('[data-spell]');
+    // The granted spell carries its own limited-use checkbox + recharge tag.
+    const uses = spells[0].find('[data-spell-uses]');
+    expect(uses.exists()).toBe(true);
+    expect(uses.findAll('.resource__box')).toHaveLength(1);
+    expect(uses.text()).toContain('Long rest');
+    // A spell without a feature grant shows no tracker.
+    expect(spells[1].find('[data-spell-uses]').exists()).toBe(false);
+  });
 });

@@ -86,6 +86,9 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
     expect(items).toHaveLength(13);
+    // The default layout is the class-aware priority order (section-order.test.ts)
+    // then compacted, so small cards (e.g. wealth) back-fill the gaps wider cards
+    // leave in a partial row.
     expect(items.map((item) => item.attributes('data-section-key'))).toEqual([
       'basics',
       'attributes',
@@ -94,11 +97,11 @@ describe('sheet App', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
       'spells',
+      'wealth',
       'actions',
-      'features',
       'inventory',
+      'features',
       'notes',
     ]);
     const attributesCard = wrapper.get('[data-section-key="attributes"]');
@@ -335,9 +338,9 @@ describe('sheet App', () => {
   });
 
   it('compacts scattered cards into fewer pages from the Compact button', async () => {
-    // Seed a stray placement far down the sheet so a card sits alone on a late
-    // page with empty space before it.
-    await sectionAnchorsPref.set({ notes: { page: 6, col: 0, row: 0, seq: 1 } });
+    // Seed a stray placement far down the sheet so a small card sits alone on a
+    // late page with empty space before it that compaction can reclaim.
+    await sectionAnchorsPref.set({ wealth: { page: 6, col: 0, row: 0, seq: 1 } });
     mockedLoad.mockResolvedValue(sampleCharacter);
     const wrapper = mount(App, { props: { characterId: 166869100 } });
     try {

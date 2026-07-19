@@ -31,10 +31,18 @@ describe('SavingThrowsCard', () => {
 
   it('renders the defences list when provided', () => {
     const wrapper = mount(SavingThrowsCard, {
-      props: { saves, defences: ['Advantage on saves vs. charm', 'Magic sleep immunity'] },
+      props: {
+        saves,
+        defences: [
+          { text: 'against being charmed', qualifier: 'Advantage' },
+          { text: 'Magic sleep immunity' },
+        ],
+      },
     });
     const block = wrapper.get('[data-defences]');
-    expect(block.text()).toContain('Advantage on saves vs. charm');
+    expect(block.text()).toContain('against being charmed');
+    // The type renders as a leading "(…)" qualifier before the restriction.
+    expect(block.find('.defences__qualifier').text()).toBe('(Advantage)');
     expect(wrapper.findAll('.defences__item')).toHaveLength(2);
   });
 

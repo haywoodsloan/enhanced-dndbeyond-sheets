@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import type { SavingThrow } from '@/services/dndbeyond/model';
+import type { DefenceEntry, SavingThrow } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 
-withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
+withDefaults(defineProps<{ saves: SavingThrow[]; defences?: DefenceEntry[] }>(), {
   defences: () => [],
 });
 </script>
@@ -23,8 +23,9 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 
     <div v-if="defences.length" class="defences" data-defences>
       <ul class="defences__list">
-        <li v-for="entry in defences" :key="entry" class="defences__item">
-          {{ entry }}
+        <li v-for="(entry, index) in defences" :key="index" class="defences__item">
+          <span v-if="entry.qualifier" class="defences__qualifier">({{ entry.qualifier }})</span
+          >{{ entry.text }}
         </li>
       </ul>
     </div>
@@ -107,6 +108,13 @@ withDefaults(defineProps<{ saves: SavingThrow[]; defences?: string[] }>(), {
 .defences__item {
   font-size: 13px;
   line-height: 1.3;
+}
+
+/* The advantage/disadvantage type shown as a muted "(…)" qualifier before the
+   restriction, which is the part worth reading. */
+.defences__qualifier {
+  margin-right: 4px;
+  color: var(--p-text-muted-color, #888);
 }
 
 .defences__item + .defences__item {

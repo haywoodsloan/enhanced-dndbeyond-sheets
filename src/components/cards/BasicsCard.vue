@@ -291,6 +291,7 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 }
 
 .hitdice__sep {
+  margin-left: 3px;
   color: var(--p-text-muted-color, #888);
 }
 

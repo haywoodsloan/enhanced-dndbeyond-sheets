@@ -80,12 +80,21 @@ describe('normalizeCharacter', () => {
 
   it('lists defensive traits from modifiers', () => {
     const { defences } = normalizeCharacter(raw);
-    expect(defences).toContain('Magical Sleep Immunity');
-    expect(defences).toContain(
-      'Advantage on saves (Made to avoid or end the Charmed condition)',
-    );
+    expect(defences).toContainEqual({ text: 'Magical Sleep Immunity' });
+    // The restriction is the main label; the advantage is a leading qualifier.
+    expect(defences).toContainEqual({
+      text: 'Made to avoid or end the Charmed condition',
+      qualifier: 'Advantage',
+    });
     // A non-save advantage (item Stealth) is not counted as a defence.
-    expect(defences.some((entry) => entry.toLowerCase().includes('stealth'))).toBe(false);
+    expect(defences.some((entry) => entry.text.toLowerCase().includes('stealth'))).toBe(
+      false,
+    );
+    // Entries are ordered longest-first.
+    const lengths = defences.map(
+      (entry) => entry.text.length + (entry.qualifier?.length ?? 0),
+    );
+    expect(lengths).toEqual([...lengths].sort((a, b) => b - a));
   });
 
   it('computes 18 skills consistent with abilities and proficiency', () => {
@@ -118,6 +127,9 @@ describe('normalizeCharacter', () => {
     // Actions get a plain one-line summary with placeholders stripped.
     expect(channelDivinity?.summary).toContain('channel');
     expect(channelDivinity?.summary).not.toContain('{{');
+    // Two uses; regains one on a short rest and all on a long rest — the reset
+    // type only records the long rest, so the short-rest recovery is inferred.
+    expect(channelDivinity?.resource).toEqual({ max: 2, recharge: 'SR1_LR' });
   });
 
   it('resolves save-DC and proficiency placeholders in summaries', () => {
@@ -238,8 +250,9 @@ describe('normalizeCharacter', () => {
         expect(part.text).not.toContain('<');
       }
     }
+    // Channel Divinity is itself an Actions-card ability, so it just points there.
     const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
-    expect(channelDivinity?.summary).toContain('channel divine energy');
+    expect(channelDivinity?.summary).toBe('(see Actions)');
   });
 
   it('drops sentences that reference a rules table (absent from the sheet)', () => {
@@ -249,10 +262,6 @@ describe('normalizeCharacter', () => {
       expect(item.summary ?? '').not.toMatch(/\btables?\b/i);
       for (const part of item.parts ?? []) expect(part.text).not.toMatch(/\btables?\b/i);
     }
-    // … Channel Divinity keeps its useful text, only losing the table sentence.
-    const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
-    expect(channelDivinity?.summary).toContain('channel divine energy');
-    expect(channelDivinity?.summary).not.toContain('as shown in');
     // A feature whose lone sentence pointed at a table keeps the sentence with
     // just the table pointer trimmed off, rather than losing all of its info.
     const domainSpells = items.find((item) => item.name === 'Grave Domain Spells');
@@ -279,6 +288,12 @@ describe('normalizeCharacter', () => {
     expect(
       circle?.parts?.some((part) => part.label === '' && part.text.includes('restore 8')),
     ).toBe(true);
+
+    // Channel Divinity is itself an Actions-card ability (its Divine Spark / Turn
+    // Undead effects are actions), so the whole feature collapses to a pointer.
+    const channel = items.find((item) => item.name === 'Channel Divinity');
+    expect(channel?.summary).toBe('(see Actions)');
+    expect(channel?.parts).toBeUndefined();
 
     const whispers = items.find((item) => item.name === 'Gathered Whispers');
     expect(whispers?.parts?.map((part) => part.label)).toEqual(
@@ -362,22 +377,20 @@ describe('normalizeCharacter', () => {
   });
 
   it('tracks the limited free-cast spells a feature grants', () => {
-    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
+    const spells = normalizeCharacter(raw).spells;
     // Gathered Whispers grants a free Augury once per long rest.
-    const whispers = items.find((item) => item.name === 'Gathered Whispers');
-    expect(whispers?.spellUses).toContainEqual({
-      name: 'Augury',
-      pool: { max: 1, recharge: 'LR' },
+    expect(spells.find((spell) => spell.name === 'Augury')?.uses).toEqual({
+      max: 1,
+      recharge: 'LR',
     });
     // The Elven lineage grants a free Faerie Fire once per long rest — its spell
-    // is granted via a lineage sub-option, resolved back to the trait.
-    const lineageSpells = items.find((item) => item.name === 'Elven Lineage Spells');
-    expect(lineageSpells?.spellUses).toContainEqual({
-      name: 'Faerie Fire',
-      pool: { max: 1, recharge: 'LR' },
+    // is granted via a lineage sub-option but the tracker still lands on the spell.
+    expect(spells.find((spell) => spell.name === 'Faerie Fire')?.uses).toEqual({
+      max: 1,
+      recharge: 'LR',
     });
-    // A feature that grants no limited spells has none.
-    expect(items.find((item) => item.name === 'Fey Ancestry')?.spellUses).toBeUndefined();
+    // A normal prepared/known spell carries no free-cast tracker.
+    expect(spells.some((spell) => spell.uses == null)).toBe(true);
   });
 
   it('does not duplicate an action\'s limited-use checkboxes on its feature', () => {
@@ -386,11 +399,11 @@ describe('normalizeCharacter', () => {
     const channelDivinity = classFeatures?.items.find(
       (item) => item.name === 'Channel Divinity',
     );
-    // The Channel Divinity ACTION already shows the "2 / long rest" tracker, so
-    // the feature omits the duplicate checkboxes.
+    // The Channel Divinity ACTION already shows the use tracker, so the feature
+    // omits the duplicate checkboxes.
     expect(channelDivinity?.resource).toBeUndefined();
     expect(actions.find((action) => action.name === 'Channel Divinity')?.resource).toEqual(
-      { max: 2, recharge: 'LR' },
+      { max: 2, recharge: 'SR1_LR' },
     );
     // A passive feature has no resource tracker either.
     const passive = classFeatures?.items.find((item) => item.name === 'Circle of Mortality');
@@ -497,8 +510,8 @@ describe('normalizeCharacter', () => {
 
   it('enriches actions with resources, damage, saves, and range', () => {
     const byName = new Map(normalizeCharacter(raw).actions.map((a) => [a.name, a]));
-    // Channel Divinity is usable twice per long rest.
-    expect(byName.get('Channel Divinity')?.resource).toEqual({ max: 2, recharge: 'LR' });
+    // Channel Divinity is usable twice; one use returns on a short rest, all on a long rest.
+    expect(byName.get('Channel Divinity')?.resource).toEqual({ max: 2, recharge: 'SR1_LR' });
     // Divine Spark rolls 1d8 + Wisdom (+4), forces a DC 14 Con save, range 30 ft.
     const spark = byName.get('Channel Divinity: Divine Spark');
     expect(spark?.damage).toMatchObject({ dice: '1d8', bonus: 4 });

@@ -7,6 +7,7 @@ defineProps<{ resource: ResourcePool }>();
 function rechargeLabel(recharge: string): string {
   if (recharge === 'SR') return 'short rest';
   if (recharge === 'LR') return 'Long rest';
+  if (recharge === 'SR1_LR') return '1/short rest, all/long rest';
   return recharge;
 }
 </script>

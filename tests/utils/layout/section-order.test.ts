@@ -37,17 +37,17 @@ describe('defaultSectionOrder', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
       'spells',
       'actions',
       'attacks',
       'features',
       'inventory',
+      'wealth',
       'notes',
     ]);
   });
 
-  it('puts checks before actions with spells last for a martial class', () => {
+  it('leads with attacks then actions, spells after, for a martial class', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Fighter', level: 5 }]))).toEqual([
       'basics',
       'attributes',
@@ -56,17 +56,17 @@ describe('defaultSectionOrder', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
       'attacks',
       'actions',
+      'spells',
       'features',
       'inventory',
-      'spells',
+      'wealth',
       'notes',
     ]);
   });
 
-  it('puts checks before actions and spells for a half-caster', () => {
+  it('leads with attacks then spells for a half-caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Paladin', level: 6 }]))).toEqual([
       'basics',
       'attributes',
@@ -75,12 +75,12 @@ describe('defaultSectionOrder', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
-      'actions',
       'attacks',
       'spells',
+      'actions',
       'features',
       'inventory',
+      'wealth',
       'notes',
     ]);
   });
@@ -97,11 +97,11 @@ describe('defaultSectionOrder', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
       'spells',
       'attacks',
       'features',
       'inventory',
+      'wealth',
       'notes',
       'actions',
     ]);
@@ -123,12 +123,12 @@ describe('defaultSectionOrder', () => {
       'savingThrows',
       'senses',
       'proficiencies',
-      'wealth',
       'attacks',
       'actions',
+      'spells',
       'features',
       'inventory',
-      'spells',
+      'wealth',
       'notes',
     ]);
   });
