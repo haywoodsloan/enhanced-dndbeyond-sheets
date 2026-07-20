@@ -16,6 +16,8 @@ export const SECTION_KEYS = [
   'attacks',
   'actions',
   'spells',
+  'companions',
+  'tables',
   'inventory',
   'wealth',
   'features',
@@ -129,6 +131,8 @@ export interface CharacterAction {
   resource?: ResourcePool;
   /** Damage dice, when the action deals damage. */
   damage?: DamageInfo;
+  /** Non-damage dice/effect roll, e.g. a Superiority Die or healing roll. */
+  roll?: string;
   /** Save prompt, e.g. "DC 14 CON", when the action forces a save. */
   save?: string;
   /** Range / reach shorthand, e.g. "30 ft.". */
@@ -198,22 +202,45 @@ export interface SpellEntry {
   prepared?: boolean;
   /** A one-line blurb of what the spell does. */
   summary?: string;
-  /** A feature-granted free-cast tracker (e.g. Augury 1/long rest), when any. */
-  uses?: ResourcePool;
+  /** Named options or rules sections rendered as a semantic list. */
+  list?: StructuredList;
+  /** Independent feature-granted cast pools (e.g. Augury via Gathered Whispers). */
+  featureUses?: FeatureSpellUse[];
+  /** Ability used for this spell when a character has multiple casting profiles. */
+  ability?: string;
+}
+
+/** One feature that grants its own limited pool of casts for a spell. */
+export interface FeatureSpellUse {
+  /** Display name of the feature that grants the casts. */
+  source: string;
+  pool: ResourcePool;
 }
 
 /** At-a-glance spellcasting stats shown at the top of the Spells card. */
 export interface Spellcasting {
-  /** Spellcasting ability abbreviation, e.g. "WIS". */
-  ability: string;
-  /** Spell modifier (signed). */
-  modifier: number;
-  /** Spell attack bonus (modifier + proficiency). */
-  attack: number;
-  /** Spell save DC. */
-  saveDc: number;
+  /** One profile per casting class/ability. */
+  profiles: SpellcastingProfile[];
   /** Max slots per spell level; index 0 = 1st-level. Trailing zero levels trimmed. */
   slots: number[];
+  /** Pact Magic's separate short-rest slot pools, when present. */
+  pactSlots?: PactSlotPool[];
+}
+
+export interface SpellcastingProfile {
+  /** Class/subclass that owns this casting profile. */
+  source: string;
+  /** Spellcasting ability abbreviation, e.g. "WIS". */
+  ability: string;
+  modifier: number;
+  attack: number;
+  saveDc: number;
+}
+
+export interface PactSlotPool {
+  source: string;
+  level: number;
+  max: number;
 }
 
 /** A carried inventory item. */
@@ -237,17 +264,39 @@ export interface Coins {
 export interface ResourcePool {
   /** Number of empty checkboxes to print (the maximum uses). */
   max: number;
-  /** Recharge shorthand: 'SR' (short rest), 'LR' (long rest), 'SR1_LR' (one use
-   * back on a short rest, all on a long rest), or '' (none). */
-  recharge?: string;
+  recovery?: ResourceRecovery;
+  /** Other ways to restore uses by spending another tracked resource. */
+  alternateRecovery?: AlternateRecovery[];
+}
+
+export interface AlternateRecovery {
+  /** Number of uses restored, or every use. */
+  restores: number | 'all';
+  /** Display-ready cost, e.g. "1 Superiority Die" or "3 Sorcery Points". */
+  cost: string;
+}
+
+/** How a limited resource pool recovers expended uses. */
+export type ResourceRecovery =
+  | { kind: 'rest'; rest: 'short' | 'long' }
+  | { kind: 'partial-short-full-long'; shortRestUses: number };
+
+export interface StructuredList {
+  /** Optional heading for the list, e.g. "Crafted Gear". */
+  label?: string;
+  items: { label?: string; text: string }[];
 }
 
 /** A named sub-section of a feature (e.g. Circle of Mortality's "Pull of Death"). */
 export interface FeaturePart {
   /** The sub-part name; '' for an un-named trailing rider. */
   label: string;
-  /** The sub-part text; '' when the detail lives on a matching action instead. */
+  /** The sub-part text; '' when the detail lives on another card. */
   text: string;
+  /** Structured option rows that should render as a list rather than prose. */
+  list?: StructuredList;
+  /** Dedicated card that owns this part's full mechanics. */
+  reference?: SectionKey;
 }
 
 /** A single feature/trait, with an optional limited-use resource tracker. */
@@ -257,6 +306,12 @@ export interface FeatureItem {
   resource?: ResourcePool;
   /** A one-line blurb of what the feature does (the intro for multi-part features). */
   summary?: string;
+  /** Spells added or prepared by this feature; tracking remains on the Spells card. */
+  grantedSpells?: string[];
+  /** Dedicated card that owns this feature's full mechanics. */
+  reference?: SectionKey;
+  /** Supporting cards containing structured companion/table details. */
+  related?: SectionKey[];
   /** Named sub-parts, when the feature bundles several distinct benefits. */
   parts?: FeaturePart[];
 }
@@ -265,6 +320,39 @@ export interface FeatureItem {
 export interface FeatureGroup {
   label: string;
   items: FeatureItem[];
+}
+
+export interface CompanionAbility {
+  key: string;
+  score: string;
+  modifier?: string;
+  save?: string;
+}
+
+export interface CompanionDetail {
+  section: string;
+  label: string;
+  text: string;
+}
+
+/** A companion or summon stat block embedded in a feature definition. */
+export interface CompanionEntry {
+  name: string;
+  source: string;
+  meta?: string;
+  armorClass?: string;
+  hitPoints?: string;
+  speed?: string;
+  abilities: CompanionAbility[];
+  details: CompanionDetail[];
+}
+
+/** A compact, rollable rules table extracted from a feature. */
+export interface RuleTable {
+  title: string;
+  source: string;
+  columns: string[];
+  rows: string[][];
 }
 
 /** A passive score or special sense, split into a label and its value. */
@@ -314,6 +402,10 @@ export interface Character {
   spells: SpellEntry[];
   /** Spellcasting stats (modifier, attack, save DC, slots); absent for non-casters. */
   spellcasting?: Spellcasting;
+  /** Companion/summon stat blocks granted by character features. */
+  companions: CompanionEntry[];
+  /** Rollable rules tables used by character features. */
+  ruleTables: RuleTable[];
   /** Carried items. */
   inventory: InventoryEntry[];
   /** Coins held. */

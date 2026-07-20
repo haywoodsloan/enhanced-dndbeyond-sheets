@@ -24,7 +24,7 @@ const groups = computed(() =>
 
 /** Compact meta line for an action: "1d8+4 · DC 14 CON · 30 ft.". */
 function metaOf(action: CharacterAction): string {
-  return [formatDamage(action.damage), action.save, action.range]
+  return [formatDamage(action.damage), action.roll, action.save, action.range]
     .filter(Boolean)
     .join(' · ');
 }

@@ -46,6 +46,22 @@ describe('InventoryCard', () => {
     expect(threeCol.findAll('.column')).toHaveLength(3);
   });
 
+  it('reflows write-in rows when the requested column count changes', async () => {
+    const inventory = Array.from({ length: 4 }, (_, index) => ({
+      name: `Item ${index}`,
+      quantity: 1,
+      equipped: false,
+      attuned: false,
+    }));
+    const wrapper = mount(InventoryCard, { props: { inventory, columns: 1 } });
+
+    await wrapper.setProps({ columns: 2 });
+    await nextTick();
+
+    expect(wrapper.findAll('.column')).toHaveLength(2);
+    expect(wrapper.findAll('[data-item-blank]')).toHaveLength(4);
+  });
+
   it('adds blank write-in rows without counting them as items or filled circles', () => {
     const wrapper = mount(InventoryCard, {
       props: {

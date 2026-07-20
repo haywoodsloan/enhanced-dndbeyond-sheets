@@ -31,5 +31,10 @@ describe('PortraitCard', () => {
 
     expect(wrapper.find('img').exists()).toBe(false);
     expect(wrapper.find('[data-portrait-empty]').exists()).toBe(true);
+
+    await wrapper.setProps({ avatarUrl: 'https://example.com/replacement.png' });
+    expect(wrapper.get('img').attributes('src')).toBe(
+      'https://example.com/replacement.png',
+    );
   });
 });

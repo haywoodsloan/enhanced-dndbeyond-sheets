@@ -97,12 +97,18 @@ describe('AttacksCard', () => {
     expect(notes).toContain('*Nick');
     expect(notes).toContain('Finesse');
     expect(notes).not.toContain('*Finesse');
+    expect(wrapper.find('.attacks__note-item .attacks__sr-only').text()).toBe(
+      'Mastery property:',
+    );
 
     // The legend term is starred for the mastery property, plain for the ordinary one.
     const terms = wrapper.findAll('.attacks__legend dt').map((dt) => dt.text());
-    expect(terms).toContain('*Nick');
+    expect(terms.some((term) => term.includes('*Nick'))).toBe(true);
     expect(terms).toContain('Finesse');
-    expect(terms).not.toContain('*Finesse');
+    expect(terms.some((term) => term.includes('*Finesse'))).toBe(false);
+    expect(wrapper.find('.attacks__legend dt .attacks__sr-only').text()).toBe(
+      'Mastery property:',
+    );
 
     // The footnote is keyed to the "*".
     expect(wrapper.find('[data-mastery-note]').text().startsWith('*')).toBe(true);

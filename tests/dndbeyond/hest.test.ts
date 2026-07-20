@@ -23,7 +23,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     ]);
   });
 
-  it('produces all fourteen sections in the stable order', () => {
+  it('omits generated sections when no feature requires them', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -52,10 +52,9 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
   it('summarizes Charisma-based spellcasting with level-6 slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
     expect(spellcasting).toEqual({
-      ability: 'CHA',
-      modifier: 4,
-      attack: 7,
-      saveDc: 15,
+      profiles: [
+        { source: 'Sorcerer', ability: 'CHA', modifier: 4, attack: 7, saveDc: 15 },
+      ],
       slots: [4, 3, 3],
     });
   });
@@ -70,6 +69,9 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
+    expect(namesOf('Racial Traits')).toContain('Otherworldly Presence (Charisma)');
+    expect(namesOf('Racial Traits')).not.toContain('Charisma');
+    expect(namesOf('Racial Traits')).not.toContain('Ability Score Increases');
     // Infernal Legacy keeps its info even though its lone sentence pointed at a
     // "Fiendish Legacies table" — the pointer is trimmed, not the whole sentence.
     const infernal = itemsOf('Racial Traits').find(
@@ -80,6 +82,47 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The base feature is shown; its option-form duplicate is not listed too.
     expect(namesOf('Class Features')).toContain('Innate Sorcery');
     expect(namesOf('Class Features')).not.toContain('Activate Innate Sorcery');
+
+    expect(
+      itemsOf('Class Features').find((item) => item.name === 'Draconic Spells')
+        ?.grantedSpells,
+    ).toEqual([
+      'Alter Self',
+      'Chromatic Orb',
+      'Command',
+      "Dragon's Breath",
+      'Fear',
+      'Fly',
+    ]);
+    const fiendishSpells = itemsOf('Racial Traits').find(
+      (item) => item.name === 'Fiendish Legacy Spells',
+    );
+    expect(fiendishSpells?.grantedSpells).toEqual([
+      'Fire Bolt',
+      'Hellish Rebuke',
+      'Darkness',
+    ]);
+    expect(fiendishSpells?.summary).toBe(
+      'Your Fiendish Legacy grants the spells listed below. You always have them ' +
+        'prepared. Each leveled spell can be cast once without a spell slot, and you ' +
+        'regain that casting after a Long Rest. You can also cast it using an ' +
+        'appropriate spell slot.',
+    );
+
+    // Multi-choice systems keep every selected option under their owning
+    // feature instead of silently retaining only the first selection.
+    const metamagicOptions = itemsOf('Class Features').find(
+      (item) => item.name === 'Metamagic Options',
+    );
+    expect(metamagicOptions?.parts?.map((part) => part.label)).toEqual([
+      'Empowered Spell',
+      'Careful Spell',
+    ]);
+    expect(
+      metamagicOptions?.parts?.every(
+        (part) => part.reference === 'actions' && part.text === '',
+      ),
+    ).toBe(true);
 
     // The Ability Score Improvement feat shows just the bumps it granted…
     const asi = itemsOf('Feats').find((item) => item.name === 'Ability Score Improvement');
@@ -98,7 +141,10 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // {{classlevel}} -> 6, {{modifier:cha}} -> +4, {{modifier:cha@min:1#unsigned}} -> 4.
     expect(summaryOf('Draconic Resilience')).toContain('increases by 6');
     expect(summaryOf('Elemental Affinity (Fire)')).toContain('add +4 to one damage roll');
-    expect(summaryOf('Empowered Spell')).toContain('reroll up to 4 damage dice');
+    expect(
+      normalizeCharacter(raw).actions.find((action) => action.name.endsWith('Empowered Spell'))
+        ?.summary,
+    ).toContain('reroll up to 4 damage dice');
     // No unresolved placeholder braces remain in any feature text.
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
@@ -139,12 +185,13 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const fom = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Font of Magic');
-    const partText = (label: string) => fom?.parts?.find((part) => part.label === label)?.text;
+    const partReference = (label: string) =>
+      fom?.parts?.find((part) => part.label === label)?.reference;
     // These options are fully defined as actions ("Convert Spell Slots" / "Create
     // Spell Slot Level N"), so the feature just points there despite the wording
     // difference ("Creating Spell Slots" vs "Create Spell Slot Level 1").
-    expect(partText('Converting Spell Slots to Sorcery Points')).toBe('(see Actions)');
-    expect(partText('Creating Spell Slots')).toBe('(see Actions)');
+    expect(partReference('Converting Spell Slots to Sorcery Points')).toBe('actions');
+    expect(partReference('Creating Spell Slots')).toBe('actions');
     // The trailing rider only restates that a created slot vanishes on a Long Rest,
     // which the Create Spell Slot actions already show, so it's dropped as redundant.
     expect(
@@ -160,7 +207,8 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The feature IS a Bonus Action detailed on the Actions card, so it just
     // references it rather than repeating the text.
     const feature = featureNamed('Innate Sorcery');
-    expect(feature?.summary).toBe('(see Actions)');
+    expect(feature?.reference).toBe('actions');
+    expect(feature?.summary).toBeUndefined();
     expect(feature?.parts).toBeUndefined();
 
     // The Bonus Action carries the full effect — the benefits the snippet dropped —
@@ -178,32 +226,36 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // A passive "other" option that merely shares a name with an action is NOT
     // collapsed — it keeps its own description in the feature list.
     expect(featureNamed('Sorcerous Restoration')?.summary).toContain(
-      'regain expended Sorcery Points',
+      'regain up to 3 Sorcery Points',
     );
-    expect(featureNamed('Empowered Spell')?.summary).toContain('reroll up to 4 damage dice');
+    expect(
+      featureNamed('Metamagic Options')?.parts?.find(
+        (part) => part.label === 'Empowered Spell',
+      )?.reference,
+    ).toBe('actions');
   });
 
   it('tracks a racial trait that grants limited-use spells', () => {
     const { spells } = normalizeCharacter(raw);
     // Tiefling's Fiendish Legacy grants Hellish Rebuke and Darkness once per long
     // rest — the free-cast tracker now rides on each granted spell.
-    const withUses = spells.filter((spell) => spell.uses);
+    const withUses = spells.filter((spell) => spell.featureUses?.length);
     expect(withUses.map((spell) => spell.name)).toEqual(
       expect.arrayContaining(['Hellish Rebuke', 'Darkness']),
     );
-    expect(spells.find((spell) => spell.name === 'Hellish Rebuke')?.uses).toEqual({
-      max: 1,
-      recharge: 'LR',
-    });
+    expect(spells.find((spell) => spell.name === 'Hellish Rebuke')?.featureUses).toEqual([
+      {
+        source: 'Fiendish Legacy Spells',
+        pool: { max: 1, recovery: { kind: 'rest', rest: 'long' } },
+      },
+    ]);
   });
 
-  it('decodes HTML entities in feature text', () => {
+  it('uses the active level-scaled class feature snippet', () => {
     const metamagic = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Metamagic');
-    // The Metamagic description references &ldquo;Metamagic Options&rdquo; — the
-    // curly-quote entities should be decoded, not rendered raw.
-    expect(metamagic?.summary).toContain('"Metamagic Options"');
-    expect(metamagic?.summary).not.toMatch(/&(?:ldquo|rdquo|amp|#\d+);/);
+    expect(metamagic?.summary).toContain('you know 2 Metamagic options');
+    expect(metamagic?.summary).not.toContain('{{scalevalue}}');
   });
 });

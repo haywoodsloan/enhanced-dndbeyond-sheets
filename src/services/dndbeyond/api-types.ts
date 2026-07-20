@@ -27,11 +27,23 @@ export interface RawClassDefinition {
   spellCastingAbilityId?: number | null;
   /** Hit die size for this class (e.g. 8 means a d8). */
   hitDice?: number | null;
+  spellRules?: RawSpellRules | null;
   classFeatures?: RawClassFeature[];
 }
 
 export interface RawSubclassDefinition {
   name?: string;
+  canCastSpells?: boolean;
+  spellCastingAbilityId?: number | null;
+}
+
+export interface RawSpellRules {
+  /** Multiclass effective-caster divisor (1 full, 2 half, 3 third). */
+  multiClassSpellSlotDivisor?: number | null;
+  /** D&D Beyond rounding: 1 down, 2 up. */
+  multiClassSpellSlotRounding?: number | null;
+  /** Per class level (index), then slots by spell level (index 0 = level 1). */
+  levelSpellSlots?: number[][] | null;
 }
 
 export interface RawClassFeature {
@@ -40,9 +52,18 @@ export interface RawClassFeature {
   requiredLevel?: number;
   snippet?: string | null;
   description?: string | null;
+  levelScales?: RawLevelScale[] | null;
+}
+
+export interface RawLevelScale {
+  level?: number | null;
+  fixedValue?: number | null;
+  dice?: RawDice | null;
 }
 
 export interface RawGrantedFeature {
+  /** Scale entry active at the character's current class level. */
+  levelScale?: RawLevelScale | null;
   definition?: {
     id?: number;
     name?: string;
@@ -51,6 +72,7 @@ export interface RawGrantedFeature {
     requiredLevel?: number;
     snippet?: string | null;
     description?: string | null;
+    levelScales?: RawLevelScale[] | null;
   };
 }
 
@@ -192,6 +214,7 @@ export interface RawSpellDefinition {
 export interface RawSpell {
   definition?: RawSpellDefinition;
   prepared?: boolean;
+  spellCastingAbilityId?: number | null;
   /** Id of the feature/feat/trait (or its option) that granted this spell. */
   componentId?: number | null;
   componentTypeId?: number | null;
@@ -282,6 +305,31 @@ export interface RawCharacterOptions {
   item?: RawSelectedOption[] | null;
 }
 
+export interface RawChoice {
+  componentId?: number | null;
+  componentTypeId?: number | null;
+  optionValue?: number | null;
+  optionIds?: number[] | null;
+}
+
+export interface RawChoiceDefinition {
+  id?: string;
+  options?: {
+    id?: number;
+    label?: string | null;
+    description?: string | null;
+  }[] | null;
+}
+
+export interface RawCharacterChoices {
+  race?: RawChoice[] | null;
+  class?: RawChoice[] | null;
+  feat?: RawChoice[] | null;
+  background?: RawChoice[] | null;
+  item?: RawChoice[] | null;
+  choiceDefinitions?: RawChoiceDefinition[] | null;
+}
+
 /** Coin counts held by the character. */
 export interface RawCurrencies {
   cp?: number;
@@ -300,6 +348,8 @@ export interface RawModifier {
   friendlyTypeName?: string;
   friendlySubtypeName?: string;
   restriction?: string | null;
+  /** Ability id whose modifier supplies this dynamic bonus. */
+  statId?: number | null;
   /** Id of the feature/feat/trait that granted this modifier. */
   componentId?: number | null;
   /** Dice for a damage/healing modifier (e.g. a spell's damage). */
@@ -347,6 +397,8 @@ export interface RawCharacter {
   feats?: RawFeat[];
   /** Selected "choose one" options, keyed by the offering feature's id. */
   options?: RawCharacterOptions | null;
+  /** Builder choice records, including required choices not yet resolved. */
+  choices?: RawCharacterChoices | null;
   optionalClassFeatures?: unknown[];
   conditions?: RawCondition[] | null;
   currencies?: RawCurrencies | null;

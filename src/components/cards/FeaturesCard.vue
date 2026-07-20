@@ -1,9 +1,19 @@
 <script lang="ts" setup>
-import type { FeatureGroup } from '@/services/dndbeyond/model';
+import type { FeatureGroup, SectionKey } from '@/services/dndbeyond/model';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import StructuredList from '@/components/StructuredList.vue';
 
 defineProps<{ features: FeatureGroup[] }>();
+
+function referenceLabel(section: SectionKey): string {
+  if (section === 'actions') return 'Actions';
+  if (section === 'attacks') return 'Attacks';
+  if (section === 'spells') return 'Spells';
+  if (section === 'companions') return 'Companions';
+  if (section === 'tables') return 'Tables';
+  return section;
+}
 </script>
 
 <template>
@@ -20,16 +30,38 @@ defineProps<{ features: FeatureGroup[] }>();
         <li v-for="(item, index) in group.items" :key="index" class="features__item" data-feature>
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
+          <span v-if="item.reference" class="features__reference features__reference--item">
+            (see {{ referenceLabel(item.reference) }})
+          </span>
+          <span
+            v-for="related in item.related"
+            :key="related"
+            class="features__reference features__reference--item"
+          >
+            (see {{ referenceLabel(related) }})
+          </span>
           <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
-          <p
+          <span v-if="item.grantedSpells?.length" class="features__spells" data-feature-spells>
+            <span class="features__spells-label">Spells:</span>
+            {{ item.grantedSpells.join(', ') }}
+          </span>
+          <div
             v-for="(part, pIndex) in item.parts"
             :key="pIndex"
             class="features__part"
             data-feature-part
           >
-            <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
-            <span v-if="part.text">{{ part.text }}</span>
-          </p>
+            <p class="features__part-line">
+              <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
+              <span v-if="part.reference" class="features__reference">
+                (see {{ referenceLabel(part.reference) }})
+              </span>
+              <span v-if="part.text">{{ part.text }}</span>
+            </p>
+            <div v-if="part.list?.items.length" class="features__part-list" data-feature-list>
+              <StructuredList :list="part.list" />
+            </div>
+          </div>
         </li>
       </ul>
     </div>
@@ -106,6 +138,28 @@ defineProps<{ features: FeatureGroup[] }>();
   color: var(--p-text-muted-color, #888);
 }
 
+.features__spells {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.features__spells-label {
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+.features__reference {
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+}
+
+.features__reference--item {
+  display: block;
+  line-height: 1.3;
+}
+
 /* A named sub-part of a feature (e.g. Circle of Mortality's "Pull of Death"),
    rendered as a run-in bold heading followed by its text. An action sub-part
    has no text (its detail lives on the Actions card); an un-named rider has no
@@ -117,8 +171,17 @@ defineProps<{ features: FeatureGroup[] }>();
   color: var(--p-text-muted-color, #888);
 }
 
+.features__part-line {
+  margin: 0;
+}
+
 .features__part-name {
   margin-right: 5px;
   color: #1c1c1e;
 }
+
+.features__part-list {
+  margin-top: 3px;
+}
+
 </style>

@@ -144,6 +144,44 @@ describe('SectionCard', () => {
     expect(wrapper.text()).toContain('+6');
   });
 
+  it('dispatches companion and rules-table sections to their dedicated cards', () => {
+    const character = makeCharacter({
+      companions: [
+        {
+          name: 'Steel Defender',
+          source: 'Steel Defender',
+          abilities: [],
+          details: [{ section: 'Actions', label: 'Rend', text: 'Melee Attack Roll.' }],
+        },
+      ],
+      ruleTables: [
+        {
+          title: 'Experimental Elixir',
+          source: 'Experimental Elixir',
+          columns: ['d6', 'Effect'],
+          rows: [['1', 'Healing']],
+        },
+      ],
+    });
+    const companionCard = mount(SectionCard, {
+      props: {
+        section: { key: 'companions', title: 'Companions', count: 2, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        character,
+      },
+    });
+    const tableCard = mount(SectionCard, {
+      props: {
+        section: { key: 'tables', title: 'Tables', count: 1, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        character,
+      },
+    });
+
+    expect(companionCard.get('[data-companion]').text()).toContain('Steel Defender');
+    expect(tableCard.get('[data-rule-table]').text()).toContain('Experimental Elixir');
+  });
+
   it('emits hide with the section key from the toggle button', async () => {
     const wrapper = mount(SectionCard, {
       props: {

@@ -10,6 +10,8 @@ import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
 import AttacksCard from '@/components/cards/AttacksCard.vue';
 import ActionsCard from '@/components/cards/ActionsCard.vue';
 import SpellsCard from '@/components/cards/SpellsCard.vue';
+import CompanionsCard from '@/components/cards/CompanionsCard.vue';
+import RuleTablesCard from '@/components/cards/RuleTablesCard.vue';
 import SpellCard from '@/components/cards/SpellCard.vue';
 import InventoryCard from '@/components/cards/InventoryCard.vue';
 import WealthCard from '@/components/cards/WealthCard.vue';
@@ -171,7 +173,8 @@ const bodyRef = ref<HTMLElement | null>(null);
 
 // The per-item elements a card may break between when its content overflows
 // onto a continuation card (one selector across every content-fit card type).
-const BREAK_ITEMS = '[data-spell],[data-action],[data-attack],[data-feature]';
+const BREAK_ITEMS =
+  '[data-spell],[data-action],[data-attack],[data-feature],[data-companion-part],[data-rule-row]';
 
 function measure() {
   if (props.hidden) return;
@@ -403,6 +406,15 @@ watch(
           v-else-if="bodyKey === 'spells' && character"
           :spells="character.spells"
           :spellcasting="character.spellcasting"
+        />
+        <CompanionsCard
+          v-else-if="bodyKey === 'companions' && character"
+          :companions="character.companions"
+          :columns="span.cols"
+        />
+        <RuleTablesCard
+          v-else-if="bodyKey === 'tables' && character"
+          :tables="character.ruleTables"
         />
         <InventoryCard
           v-else-if="bodyKey === 'inventory' && character"

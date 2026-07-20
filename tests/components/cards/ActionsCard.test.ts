@@ -46,7 +46,7 @@ describe('ActionsCard', () => {
           {
             name: 'Divine Spark',
             category: 'action',
-            resource: { max: 2, recharge: 'LR' },
+            resource: { max: 2, recovery: { kind: 'rest', rest: 'long' } },
             damage: { dice: '1d8', bonus: 4 },
             save: 'DC 14 CON',
             range: '30 ft.',
@@ -61,6 +61,25 @@ describe('ActionsCard', () => {
     expect(item.text()).toContain('1d8+4');
     expect(item.text()).toContain('DC 14 CON');
     expect(item.text()).toContain('30 ft.');
+  });
+
+  it('renders non-damage effect dice without modeling them as damage', () => {
+    const wrapper = mount(ActionsCard, {
+      props: {
+        actions: [
+          {
+            name: 'Superiority Dice',
+            category: 'other',
+            resource: { max: 5, recovery: { kind: 'rest', rest: 'short' } },
+            roll: '1d10',
+          },
+        ],
+      },
+    });
+
+    const item = wrapper.get('[data-action]');
+    expect(item.text()).toContain('1d10');
+    expect(item.findAll('.resource__box')).toHaveLength(5);
   });
 
   it('renders an action summary blurb when present', () => {

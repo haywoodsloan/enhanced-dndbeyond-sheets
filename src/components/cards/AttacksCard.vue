@@ -98,6 +98,7 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
             :key="noteIndex"
             class="attacks__note-item"
           >
+            <span v-if="note.mastery" class="attacks__sr-only">Mastery property: </span>
             <span v-if="note.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ note.name }}
           </span>
         </span>
@@ -106,6 +107,7 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
     <dl v-if="legend.length" class="attacks__legend">
       <div v-for="entry in legend" :key="entry.name" class="attacks__legend-item">
         <dt>
+          <span v-if="entry.mastery" class="attacks__sr-only">Mastery property: </span>
           <span v-if="entry.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ entry.name }}
         </dt>
         <dd>{{ entry.description }}</dd>
@@ -195,6 +197,19 @@ const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
   margin-right: 2px;
   font-weight: 700;
   color: #1c1c1e;
+}
+
+.attacks__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Legend at the foot of the card defining only the properties that appear in the

@@ -1,10 +1,11 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
+import type { PactSlotPool, SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import StructuredList from '@/components/StructuredList.vue';
 
 const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
 
@@ -21,17 +22,26 @@ const groups = computed(() => {
     byLevel.set(spell.level, list);
   }
   const slots = props.spellcasting?.slots ?? [];
-  const maxLevel = Math.max(slots.length, 0, ...byLevel.keys());
-  const result: { level: number; label: string; spells: SpellEntry[]; slots: number }[] = [];
+  const pactSlots = props.spellcasting?.pactSlots ?? [];
+  const maxLevel = Math.max(slots.length, 0, ...pactSlots.map((pool) => pool.level), ...byLevel.keys());
+  const result: {
+    level: number;
+    label: string;
+    spells: SpellEntry[];
+    slots: number;
+    pactSlots: PactSlotPool[];
+  }[] = [];
   for (let level = 0; level <= maxLevel; level += 1) {
     const levelSpells = byLevel.get(level) ?? [];
     const levelSlots = level >= 1 ? (slots[level - 1] ?? 0) : 0;
-    if (levelSpells.length === 0 && levelSlots === 0) continue;
+    const levelPactSlots = pactSlots.filter((pool) => pool.level === level);
+    if (levelSpells.length === 0 && levelSlots === 0 && levelPactSlots.length === 0) continue;
     result.push({
       level,
       label: level === 0 ? 'Cantrips' : `Level ${level}`,
       spells: levelSpells,
       slots: levelSlots,
+      pactSlots: levelPactSlots,
     });
   }
   return result;
@@ -40,7 +50,8 @@ const groups = computed(() => {
 /** Compact per-spell shorthand: "A · 60 ft. · V,S · 1d8 Radiant · DEX save". */
 function spellMeta(spell: SpellEntry): string {
   const hit = spell.save ? `${spell.save} save` : spell.attack ? 'Spell attack' : '';
-  return [spell.castingTime, spell.range, spell.components, formatDamage(spell.damage), hit]
+  const ability = (props.spellcasting?.profiles.length ?? 0) > 1 ? spell.ability : '';
+  return [ability, spell.castingTime, spell.range, spell.components, formatDamage(spell.damage), hit]
     .filter(Boolean)
     .join(' · ');
 }
@@ -57,10 +68,20 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 <template>
   <div class="spells">
     <div v-if="spellcasting" class="spells__casting" data-spellcasting>
-      <span class="spells__stat">Spell attack <b>{{ formatModifier(spellcasting.attack) }}</b></span>
-      <span class="spells__stat">Save <b>DC {{ spellcasting.saveDc }}</b></span>
-      <span class="spells__stat">
-        Modifier ({{ spellcasting.ability }}) <b>{{ formatModifier(spellcasting.modifier) }}</b>
+      <span
+        v-for="profile in spellcasting.profiles"
+        :key="`${profile.source}-${profile.ability}`"
+        class="spells__profile"
+        data-spellcasting-profile
+      >
+        <b v-if="spellcasting.profiles.length > 1" class="spells__profile-source">
+          {{ profile.source }}
+        </b>
+        <span class="spells__stat">Attack <b>{{ formatModifier(profile.attack) }}</b></span>
+        <span class="spells__stat">Save <b>DC {{ profile.saveDc }}</b></span>
+        <span class="spells__stat">
+          {{ profile.ability }} <b>{{ formatModifier(profile.modifier) }}</b>
+        </span>
       </span>
     </div>
     <div
@@ -73,6 +94,20 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
       <div class="spells__group-head">
         <span class="spells__label">{{ group.label }}</span>
         <ResourceBoxes v-if="group.slots > 0" :resource="{ max: group.slots }" data-slots />
+        <span
+          v-for="pool in group.pactSlots"
+          :key="pool.source"
+          class="spells__pact"
+          data-pact-slots
+        >
+          <span class="spells__pact-label">{{ pool.source }} Pact</span>
+          <ResourceBoxes
+            :resource="{
+              max: pool.max,
+              recovery: { kind: 'rest', rest: 'short' },
+            }"
+          />
+        </span>
       </div>
       <ul v-if="group.spells.length" class="spells__list">
         <li
@@ -89,14 +124,24 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
             :title="tag.title"
             >{{ tag.label }}</span
           >
-          <ResourceBoxes
-            v-if="spell.uses"
-            :resource="spell.uses"
-            class="spells__uses"
-            data-spell-uses
-          />
+          <span
+            v-for="(use, useIndex) in spell.featureUses"
+            :key="`${use.source}-${useIndex}`"
+            class="spells__feature-use"
+            data-spell-use
+          >
+            <span class="spells__feature-source">{{ use.source }}:</span>
+            <ResourceBoxes :resource="use.pool" />
+          </span>
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
+          <StructuredList
+            v-if="spell.list?.items.length"
+            :list="spell.list"
+            :bullets="false"
+            class="spells__structured-list"
+            data-spell-list
+          />
         </li>
       </ul>
     </div>
@@ -125,8 +170,18 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 }
 
 .spells__stat b {
-  color: inherit;
+  color: var(--p-text-color, #1c1c1e);
   font-weight: 700;
+}
+
+.spells__profile {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.spells__profile-source {
+  color: var(--p-text-color, #1c1c1e);
 }
 
 .spells__group {
@@ -156,6 +211,22 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   height: 13px;
 }
 
+.spells__pact {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+}
+
+.spells__pact-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--p-text-muted-color, #888);
+}
+
+.spells__pact :deep(.resource) {
+  margin-left: 4px;
+}
+
 .spells__label {
   font-size: 14px;
   font-weight: 600;
@@ -178,6 +249,7 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 
 .spells__name {
   font-weight: 600;
+  color: var(--p-text-color, #1c1c1e);
 }
 
 /* Concentration/ritual marker box after the spell name. */
@@ -192,6 +264,24 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   border-radius: 3px;
 }
 
+/* A feature's own casts are distinct from spell slots and name their source. */
+.spells__feature-use {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.spells__feature-source {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--p-text-muted-color, #888);
+}
+
+.spells__feature-use :deep(.resource) {
+  margin-left: 4px;
+}
+
 .spells__meta {
   margin-left: 6px;
   font-size: 12px;
@@ -204,5 +294,17 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   font-size: 12px;
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);
+}
+
+.spells__structured-list {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.spells__structured-list :deep(.structured-list__label),
+.spells__structured-list :deep(.structured-list__item strong) {
+  color: var(--p-text-color, #1c1c1e);
 }
 </style>
