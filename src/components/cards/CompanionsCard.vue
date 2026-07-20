@@ -139,7 +139,7 @@ function formatAbilityName(key: string): string {
   gap: 4px 18px;
   margin: 5px 0;
   padding: 4px 0;
-  border-block: 1px solid var(--p-primary-200, #e4e4e7);
+  border-block: 1px solid var(--p-primary-100, #f4f4f5);
   font-size: 12px;
 }
 
