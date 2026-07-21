@@ -34,6 +34,7 @@ describe('SavingThrowsCard', () => {
       props: {
         saves,
         defences: [
+          { text: 'Intelligence saves', qualifier: 'Advantage' },
           { text: 'against being charmed', qualifier: 'Advantage' },
           { text: 'Magic sleep immunity' },
         ],
@@ -43,7 +44,10 @@ describe('SavingThrowsCard', () => {
     expect(block.text()).toContain('against being charmed');
     // The type renders as a leading "(…)" qualifier before the restriction.
     expect(block.find('.defences__qualifier').text()).toBe('(Advantage)');
-    expect(wrapper.findAll('.defences__item')).toHaveLength(2);
+    expect(wrapper.findAll('.defences__item')[0].text()).toContain(
+      '(Advantage)Intelligence saves',
+    );
+    expect(wrapper.findAll('.defences__item')).toHaveLength(3);
   });
 
   it('omits the defences block when there are none', () => {

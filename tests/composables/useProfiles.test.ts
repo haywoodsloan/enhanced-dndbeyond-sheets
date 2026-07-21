@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { fakeBrowser } from 'wxt/testing';
 import { useProfiles } from '@/composables/useProfiles';
-import { SECTION_ANCHORS_KEY, profilesPref, scopedKey } from '@/utils/settings/preferences';
+import {
+  AUTO_SHOWN_SECTIONS_KEY,
+  SECTION_ANCHORS_KEY,
+  profilesPref,
+  scopedKey,
+} from '@/utils/settings/preferences';
 import { mountComposable } from '../fixtures/mount-composable';
 
 describe('useProfiles', () => {
@@ -80,8 +85,10 @@ describe('useProfiles', () => {
 
     // Give the Default profile some settings to copy.
     const sourceKey = scopedKey(SECTION_ANCHORS_KEY, 'default');
+    const sourceAutoShownKey = scopedKey(AUTO_SHOWN_SECTIONS_KEY, 'default');
     await fakeBrowser.storage.sync.set({
       [sourceKey]: { basics: { page: 0, col: 1, row: 2, seq: 3 } },
+      [sourceAutoShownKey]: ['portrait'],
     });
 
     await result.duplicate('default');
@@ -97,6 +104,10 @@ describe('useProfiles', () => {
     expect((await fakeBrowser.storage.sync.get(copyKey))[copyKey]).toEqual({
       basics: { page: 0, col: 1, row: 2, seq: 3 },
     });
+    const copyAutoShownKey = scopedKey(AUTO_SHOWN_SECTIONS_KEY, copy.id);
+    expect((await fakeBrowser.storage.sync.get(copyAutoShownKey))[copyAutoShownKey]).toEqual([
+      'portrait',
+    ]);
 
     // Duplicating an unknown id is a no-op.
     await result.duplicate('nope');

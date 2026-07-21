@@ -41,9 +41,18 @@ function formatAbilityName(key: string): string {
         </header>
 
         <dl
-          v-if="companion.armorClass || companion.hitPoints || companion.speed"
+          v-if="
+            companion.challengeRating ||
+            companion.armorClass ||
+            companion.hitPoints ||
+            companion.speed
+          "
           class="companion__vitals"
         >
+          <div v-if="companion.challengeRating">
+            <dt>CR</dt>
+            <dd>{{ companion.challengeRating }}</dd>
+          </div>
           <div v-if="companion.armorClass">
             <dt>AC</dt>
             <dd>{{ companion.armorClass }}</dd>
@@ -137,9 +146,7 @@ function formatAbilityName(key: string): string {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 18px;
-  margin: 5px 0;
-  padding: 4px 0;
-  border-block: 1px solid var(--p-primary-100, #f4f4f5);
+  margin: 10px 0;
   font-size: 12px;
 }
 
@@ -149,7 +156,13 @@ function formatAbilityName(key: string): string {
 }
 
 .companion__vitals dt {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--p-primary-100, #f4f4f5);
+  font-size: 10px;
   font-weight: 700;
+  line-height: 1.4;
 }
 
 .companion__vitals dd {

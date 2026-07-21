@@ -68,6 +68,7 @@ export const PAGE_MARGIN_KEY = 'pref-page-margin';
 export const PAGE_ORIENTATION_KEY = 'pref-page-orientation';
 export const THEME_COLOR_KEY = 'pref-theme-color';
 export const HIDDEN_SECTIONS_KEY = 'pref-hidden-sections';
+export const AUTO_SHOWN_SECTIONS_KEY = 'pref-auto-shown-sections';
 export const SECTION_LAYOUT_KEY = 'pref-section-layout';
 export const SECTION_ANCHORS_KEY = 'pref-section-anchors';
 export const SPELLS_EXPANDED_KEY = 'pref-spells-expanded';
@@ -89,6 +90,7 @@ export const pageMarginPref = definePreference<string>(PAGE_MARGIN_KEY);
 export const pageOrientationPref = definePreference<string>(PAGE_ORIENTATION_KEY);
 export const themeColorPref = definePreference<string>(THEME_COLOR_KEY);
 export const hiddenSectionsPref = definePreference<SectionKey[]>(HIDDEN_SECTIONS_KEY);
+export const autoShownSectionsPref = definePreference<SectionKey[]>(AUTO_SHOWN_SECTIONS_KEY);
 /** Per-section chosen layout-option index (section key → index). */
 export const sectionLayoutPref = definePreference<Record<string, number>>(SECTION_LAYOUT_KEY);
 /** Per-section placement: section key → the cell it was moved to + a recency

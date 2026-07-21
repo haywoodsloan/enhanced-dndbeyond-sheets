@@ -1,9 +1,15 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
-import type { CardKey, Character, CharacterSection } from '@/services/dndbeyond/model';
+import type {
+  CardKey,
+  Character,
+  CharacterSection,
+  SectionKey,
+} from '@/services/dndbeyond/model';
 import { defaultSectionOrder } from '@/utils/layout/section-order';
 import { sectionLayoutCount } from '@/utils/layout/section-layout';
 import { spellCardKey } from '@/utils/layout/spell-cards';
 import {
+  AUTO_SHOWN_SECTIONS_KEY,
   DEFAULT_PROFILE_ID,
   HIDDEN_SECTIONS_KEY,
   SECTION_ANCHORS_KEY,
@@ -52,6 +58,7 @@ export function useSectionLayout(
 ) {
   const sections = ref<CharacterSection[]>([]);
   const hiddenKeys = ref<CardKey[]>([]);
+  const autoShownKeys = ref<SectionKey[]>([]);
   const layoutIndices = ref<Record<string, number>>({});
   /** Card placements: section key → the cell (page, col, row-in-page) the user
    * moved it to, plus a `seq` recency stamp (higher = moved more recently). A
@@ -64,6 +71,8 @@ export function useSectionLayout(
   // The active profile's scoped settings (the default profile uses the original,
   // unscoped keys). Recomputed per call so a profile switch takes effect.
   const hiddenPref = () => scopedPreference<CardKey[]>(HIDDEN_SECTIONS_KEY, profileId.value);
+  const autoShownPref = () =>
+    scopedPreference<SectionKey[]>(AUTO_SHOWN_SECTIONS_KEY, profileId.value);
   const layoutPref = () =>
     scopedPreference<Record<string, number>>(SECTION_LAYOUT_KEY, profileId.value);
   const anchorsPref = (id = profileId.value) =>
@@ -83,12 +92,14 @@ export function useSectionLayout(
   }
 
   async function load() {
-    const [hidden, layout, anchorData] = await Promise.all([
+    const [hidden, autoShown, layout, anchorData] = await Promise.all([
       hiddenPref().get([]),
+      autoShownPref().get([]),
       layoutPref().get({}),
       anchorsPref().get({}),
     ]);
     hiddenKeys.value = hidden;
+    autoShownKeys.value = autoShown;
     layoutIndices.value = layout;
     anchors.value = anchorData;
     nextSeq = Object.values(anchors.value).reduce((max, p) => Math.max(max, p.seq ?? 0), 0) + 1;
@@ -107,7 +118,11 @@ export function useSectionLayout(
     void load();
   });
 
-  const hiddenSet = computed(() => new Set(hiddenKeys.value));
+  const autoHiddenKeys = computed<CardKey[]>(() => {
+    if (character.value?.avatarUrl || autoShownKeys.value.includes('portrait')) return [];
+    return sections.value.some((section) => section.key === 'portrait') ? ['portrait'] : [];
+  });
+  const hiddenSet = computed(() => new Set([...hiddenKeys.value, ...autoHiddenKeys.value]));
   /** Sections shown on the printable pages (drag order, minus hidden). */
   const visibleSections = computed(() =>
     sections.value.filter((section) => !hiddenSet.value.has(section.key)),
@@ -118,11 +133,27 @@ export function useSectionLayout(
   );
 
   function setHidden(key: CardKey, hidden: boolean) {
-    if (hiddenKeys.value.includes(key) === hidden) return;
-    hiddenKeys.value = hidden
-      ? [...hiddenKeys.value, key]
+    const nextHidden = hidden
+      ? hiddenKeys.value.includes(key)
+        ? hiddenKeys.value
+        : [...hiddenKeys.value, key]
       : hiddenKeys.value.filter((candidate) => candidate !== key);
-    void hiddenPref().set(hiddenKeys.value);
+    if (nextHidden !== hiddenKeys.value) {
+      hiddenKeys.value = nextHidden;
+      void hiddenPref().set(hiddenKeys.value);
+    }
+
+    if (key === 'portrait' && !character.value?.avatarUrl) {
+      const nextAutoShown: SectionKey[] = hidden
+        ? autoShownKeys.value.filter((candidate) => candidate !== 'portrait')
+        : autoShownKeys.value.includes('portrait')
+          ? autoShownKeys.value
+          : [...autoShownKeys.value, 'portrait'];
+      if (nextAutoShown !== autoShownKeys.value) {
+        autoShownKeys.value = nextAutoShown;
+        void autoShownPref().set(autoShownKeys.value);
+      }
+    }
     // A hidden card shouldn't keep a stale placement; it re-joins the flow when
     // shown again.
     if (hidden) clearAnchor(key);
@@ -201,8 +232,8 @@ export function useSectionLayout(
     persistAnchors();
   }
 
-  /** Restore the default layout — default order, nothing hidden, default card
-   * layouts — and clear the saved preferences. */
+  /** Restore the default order, automatic visibility, and card layouts, then
+   * clear all saved layout preferences. */
   function reset() {
     // Drop any pending debounced save so it can't overwrite the reset.
     if (anchorTimer !== undefined) {
@@ -211,10 +242,12 @@ export function useSectionLayout(
     }
     pendingAnchors = null;
     hiddenKeys.value = [];
+    autoShownKeys.value = [];
     layoutIndices.value = {};
     anchors.value = {};
     rebuild();
     void hiddenPref().set([]);
+    void autoShownPref().set([]);
     void layoutPref().set({});
     void anchorsPref().set({});
   }

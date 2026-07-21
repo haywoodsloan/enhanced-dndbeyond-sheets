@@ -340,6 +340,7 @@ export interface CompanionEntry {
   name: string;
   source: string;
   meta?: string;
+  challengeRating?: string;
   armorClass?: string;
   hitPoints?: string;
   speed?: string;

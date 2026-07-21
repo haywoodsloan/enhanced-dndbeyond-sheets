@@ -123,6 +123,8 @@ describe('normalizeCharacter', () => {
           { type: 'advantage', subType: 'intelligence-saving-throws' },
           { type: 'advantage', subType: 'wisdom-saving-throws' },
           { type: 'advantage', subType: 'charisma-saving-throws' },
+          { type: 'disadvantage', subType: 'strength-saving-throws' },
+          { type: 'advantage', subType: 'saving-throws' },
           { type: 'advantage', subType: 'stealth' },
         ],
       },
@@ -130,9 +132,11 @@ describe('normalizeCharacter', () => {
 
     expect(normalizeCharacter(character).defences).toEqual(
       expect.arrayContaining([
-        { text: 'advantage on Intelligence saves' },
-        { text: 'advantage on Wisdom saves' },
-        { text: 'advantage on Charisma saves' },
+        { text: 'Intelligence saves', qualifier: 'Advantage' },
+        { text: 'Wisdom saves', qualifier: 'Advantage' },
+        { text: 'Charisma saves', qualifier: 'Advantage' },
+        { text: 'Strength saves', qualifier: 'Disadvantage' },
+        { text: 'saves', qualifier: 'Advantage' },
       ]),
     );
     expect(
@@ -1065,6 +1069,7 @@ describe('normalizeCharacter', () => {
                   '<p>You create a loyal defender.</p>' +
                   '<div class="stat-block"><h5>Steel Defender</h5>' +
                   '<p>Medium Construct, Neutral</p>' +
+                  '<p><strong>Challenge</strong> 1</p>' +
                   '<p><strong>AC</strong> 15</p><p><strong>HP</strong> 35</p>' +
                   '<p><strong>Speed</strong> 40 ft.</p>' +
                   '<table><tbody><tr><th>STR</th><td>14</td><td>+2</td><td>+2</td></tr>' +
@@ -1115,6 +1120,7 @@ describe('normalizeCharacter', () => {
     expect(normalized.companions).toHaveLength(2);
     expect(normalized.companions[0]).toMatchObject({
       name: 'Steel Defender',
+      challengeRating: '1',
       armorClass: '15',
       hitPoints: '35',
       speed: '40 ft.',
@@ -1239,6 +1245,7 @@ describe('normalizeCharacter', () => {
                   '<p><strong>AC</strong> 11 + the spell’s level</p>' +
                   '<p><strong>HP</strong> 20 or 30 + 5 for each spell level above 2</p>' +
                   '<p><strong>Speed</strong> 30 ft.; Fly 60 ft. (Air only)</p>' +
+                  '<p><strong>CR</strong> None (XP 0; PB equals your Proficiency Bonus)</p>' +
                   '<table><tbody><tr><th>STR</th><td>18</td><td>+4</td><td>+4</td></tr>' +
                   '<tr><th>DEX</th><td>11</td><td>&minus;3</td><td>&minus;3</td></tr></tbody></table>' +
                   '<p><strong>Resistances</strong> Cold</p>' +
@@ -1279,6 +1286,7 @@ describe('normalizeCharacter', () => {
         name: 'Bestial Spirit',
         source: 'Summon Beast',
         meta: 'Small Beast, Neutral',
+        challengeRating: 'None (XP 0; PB equals your Proficiency Bonus)',
         armorClass: '11 + the spell’s level',
         hitPoints: '20 or 30 + 5 for each spell level above 2',
         speed: '30 ft.; Fly 60 ft. (Air only)',
@@ -1650,6 +1658,12 @@ describe('normalizeCharacter', () => {
     expect(character.avatarUrl).not.toContain('fit=crop');
     const portrait = character.sections.find((section) => section.key === 'portrait');
     expect(portrait?.isEmpty).toBe(false);
+  });
+
+  it('keeps a missing portrait in its structural default position for auto-hiding', () => {
+    const character = normalizeCharacter({ id: 1, name: 'No Portrait' } as RawCharacter);
+    expect(character.avatarUrl).toBeUndefined();
+    expect(character.sections.find((section) => section.key === 'portrait')?.isEmpty).toBe(false);
   });
 
   it('omits generated sections when no feature requires them', () => {

@@ -5,6 +5,7 @@ import { fakeBrowser } from 'wxt/testing';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import {
   DEFAULT_PROFILE_ID,
+  autoShownSectionsPref,
   hiddenSectionsPref,
   sectionAnchorsPref,
   sectionLayoutPref,
@@ -16,6 +17,7 @@ import { mountComposable } from '../fixtures/mount-composable';
 /** A Fighter (martial layout) with every section present and non-empty. */
 function fighter(): Character {
   return makeCharacter({
+    avatarUrl: 'https://example.com/fighter.png',
     classes: [{ name: 'Fighter', level: 5 }],
     level: 5,
     sections: SECTION_KEYS.map((key) => ({ key, title: key, count: 1, isEmpty: false })),
@@ -56,6 +58,36 @@ describe('useSectionLayout', () => {
     await flushPromises();
     expect(keys(result.hiddenSections.value)).not.toContain('notes');
     expect(await hiddenSectionsPref.get(['notes'])).toEqual([]);
+  });
+
+  it('auto-hides a missing portrait but persists an explicit show override', async () => {
+    const withoutPortrait = fighter();
+    delete withoutPortrait.avatarUrl;
+    const character = ref<Character | null>(withoutPortrait);
+    const first = mountComposable(() => useSectionLayout(character));
+    await flushPromises();
+
+    expect(keys(first.result.sections.value)).not.toContain('portrait');
+    expect(keys(first.result.hiddenSections.value)).toContain('portrait');
+
+    first.result.show('portrait');
+    await flushPromises();
+    expect(keys(first.result.sections.value).slice(0, 3)).toEqual([
+      'basics',
+      'attributes',
+      'portrait',
+    ]);
+    expect(await autoShownSectionsPref.get([])).toContain('portrait');
+    first.wrapper.unmount();
+
+    const second = mountComposable(() => useSectionLayout(character));
+    await flushPromises();
+    expect(keys(second.result.sections.value)).toContain('portrait');
+
+    second.result.reset();
+    await flushPromises();
+    expect(keys(second.result.hiddenSections.value)).toContain('portrait');
+    expect(await autoShownSectionsPref.get(['portrait'])).toEqual([]);
   });
 
   it('expands the spells section into per-spell cards, keeping hidden state', async () => {

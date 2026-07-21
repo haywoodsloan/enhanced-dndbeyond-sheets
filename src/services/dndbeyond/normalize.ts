@@ -1907,7 +1907,9 @@ function parseCompanion(block: string, source: string): CompanionEntry | undefin
       if (key === 'ac' || key === 'armor class') basic.set('armorClass', labeled.rest);
       else if (key === 'hp' || key === 'hit points') basic.set('hitPoints', labeled.rest);
       else if (key === 'speed') basic.set('speed', labeled.rest);
-      else {
+      else if (key === 'challenge' || key === 'challenge rating' || key === 'cr') {
+        basic.set('challengeRating', labeled.rest);
+      } else {
         details.push({
           section: /resistances|immunities|vulnerabilities|senses|languages|challenge|^cr$/i.test(
             labeled.label,
@@ -1949,6 +1951,7 @@ function parseCompanion(block: string, source: string): CompanionEntry | undefin
     name,
     source,
     ...(meta ? { meta } : {}),
+    ...(basic.get('challengeRating') ? { challengeRating: basic.get('challengeRating') } : {}),
     ...(basic.get('armorClass') ? { armorClass: basic.get('armorClass') } : {}),
     ...(basic.get('hitPoints') ? { hitPoints: basic.get('hitPoints') } : {}),
     ...(basic.get('speed') ? { speed: basic.get('speed') } : {}),
@@ -2814,13 +2817,13 @@ function defenceEntry(mod: RawModifier): DefenceEntry {
   const type = mod.friendlyTypeName ?? mod.type ?? '';
   if (mod.type === 'advantage' || mod.type === 'disadvantage') {
     // The restriction is the useful part, so it's the main label; the
-    // advantage/disadvantage becomes a "(…)" qualifier before it. With no
-    // restriction, fall back to "Advantage on saves".
-    if (mod.restriction) return { text: mod.restriction, qualifier: type };
+    // advantage/disadvantage becomes a "(…)" qualifier before it.
+    const qualifier = type.charAt(0).toUpperCase() + type.slice(1);
+    if (mod.restriction) return { text: mod.restriction, qualifier };
     const ability = ABILITIES.find(
       (entry) => mod.subType === `${entry.name.toLowerCase()}-saving-throws`,
     );
-    return { text: ability ? `${type} on ${ability.name} saves` : `${type} on saves` };
+    return { text: ability ? `${ability.name} saves` : 'saves', qualifier };
   }
   const sub = mod.friendlySubtypeName ?? mod.subType ?? '';
   return { text: `${sub} ${type}`.trim() };
@@ -2952,7 +2955,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   );
 
   const sections: CharacterSection[] = [
-    toSection('portrait', 'Portrait', 0, { alwaysPresent: Boolean(avatarUrl) }),
+    toSection('portrait', 'Portrait', 0, { alwaysPresent: true }),
     toSection('basics', 'Basics', asArray(raw.conditions).length, { alwaysPresent: true }),
     toSection('attributes', 'Attributes', asArray(raw.stats).length, { alwaysPresent: true }),
     toSection('skills', 'Skills', SKILL_COUNT, { alwaysPresent: true }),

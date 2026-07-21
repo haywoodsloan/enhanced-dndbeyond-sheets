@@ -141,6 +141,20 @@ describe('sheet App', () => {
     expect(wrapper.find('.hidden-tray').exists()).toBe(false);
   });
 
+  it('auto-hides a missing portrait and allows restoring its placeholder', async () => {
+    mockedLoad.mockResolvedValue({ ...sampleCharacter, avatarUrl: undefined });
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+
+    expect(wrapper.find('.page [data-section-key="portrait"]').exists()).toBe(false);
+    const hiddenPortrait = wrapper.get('.hidden-tray [data-section-key="portrait"]');
+    await hiddenPortrait.get('.card__toggle').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.page [data-section-key="portrait"]').exists()).toBe(true);
+    expect(wrapper.find('.hidden-tray [data-section-key="portrait"]').exists()).toBe(false);
+  });
+
   it('cycles a card layout from its button, keeping its top-left cell', async () => {
     mockedLoad.mockResolvedValue(sampleCharacter);
     const wrapper = mount(App, { props: { characterId: 166869100 } });

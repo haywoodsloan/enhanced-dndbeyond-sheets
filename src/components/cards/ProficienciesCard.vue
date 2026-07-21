@@ -1,10 +1,15 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { CharacterProficiencies } from '@/services/dndbeyond/model';
 
 const props = defineProps<{ proficiencies: CharacterProficiencies; columns?: number }>();
 
-const groups = computed(() =>
+interface ProficiencyGroup {
+  label: string;
+  items: string[];
+}
+
+const groups = computed<ProficiencyGroup[]>(() =>
   [
     { label: 'Languages', items: props.proficiencies.languages },
     { label: 'Weapons', items: props.proficiencies.weapons },
@@ -13,24 +18,105 @@ const groups = computed(() =>
   ].filter((group) => group.items.length > 0),
 );
 
-// Split the groups into N balanced columns (from the chosen layout) so the wide
-// layout uses its width; each column still spreads down the full height.
-const columnCount = computed(() => Math.max(1, props.columns ?? 1));
+const requestedColumnCount = computed(() => Math.max(1, props.columns ?? 1));
+const fittedColumnCount = ref(requestedColumnCount.value);
+const columnCount = computed(() => fittedColumnCount.value);
+const compact = ref(false);
 
 // Multi-column layouts stack each category as a heading with one item per line;
 // the single-column layout keeps the compact "Label: a, b, c" inline form.
-const stacked = computed(() => columnCount.value > 1);
+const stacked = computed(() => columnCount.value > 1 && !compact.value);
+
+function groupWeight(group: ProficiencyGroup): number {
+  return group.items.reduce(
+    (total, item) => total + Math.max(1, Math.ceil(item.length / 24)),
+    1,
+  );
+}
+
+function balanceGroups(source: ProficiencyGroup[], count: number): ProficiencyGroup[][] {
+  const columns = Array.from({ length: count }, () => ({
+    groups: [] as ProficiencyGroup[],
+    weight: 0,
+  }));
+  for (const group of source) {
+    const target = columns.reduce((lightest, column) =>
+      column.weight < lightest.weight ? column : lightest,
+    );
+    target.groups.push(group);
+    target.weight += groupWeight(group);
+  }
+  return columns.map((column) => column.groups).filter((column) => column.length > 0);
+}
 
 const columnGroups = computed(() => {
-  const size = Math.ceil(groups.value.length / columnCount.value);
-  return Array.from({ length: columnCount.value }, (_, index) =>
-    groups.value.slice(index * size, (index + 1) * size),
-  ).filter((column) => column.length > 0);
+  const count = Math.min(columnCount.value, Math.max(1, groups.value.length));
+  if (count >= 3) {
+    const dedicated = groups.value.reduce((longest, group) => {
+      const difference = groupWeight(group) - groupWeight(longest);
+      return difference > 0 || (difference === 0 && group.label === 'Tools') ? group : longest;
+    });
+    const remaining = groups.value.filter((group) => group !== dedicated);
+    return [...balanceGroups(remaining, count - 1), [dedicated]];
+  }
+  return balanceGroups(groups.value, count);
 });
+
+const profsRef = ref<HTMLElement | null>(null);
+let fitRequest = 0;
+
+function overflows(root: HTMLElement): boolean {
+  return [...root.querySelectorAll<HTMLElement>('.profs__column')].some(
+    (column) => column.scrollHeight > root.clientHeight + 1,
+  );
+}
+
+async function fitColumns() {
+  const request = ++fitRequest;
+  fittedColumnCount.value = requestedColumnCount.value;
+  compact.value = false;
+  if (requestedColumnCount.value !== 2 || groups.value.length < 3) return;
+  await nextTick();
+  if (request !== fitRequest) return;
+  const root = profsRef.value;
+  if (!root || root.clientHeight <= 0 || !overflows(root)) return;
+  fittedColumnCount.value = 3;
+  await nextTick();
+  if (request !== fitRequest) return;
+  if (overflows(root)) compact.value = true;
+}
+
+let observer: ResizeObserver | null = null;
+onMounted(() => {
+  void fitColumns();
+  if (typeof document !== 'undefined') void document.fonts?.ready?.then(() => fitColumns());
+  if (typeof ResizeObserver !== 'undefined' && profsRef.value) {
+    observer = new ResizeObserver(() => void fitColumns());
+    observer.observe(profsRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  fitRequest += 1;
+  observer?.disconnect();
+  observer = null;
+});
+watch(
+  () => [props.columns, props.proficiencies],
+  () => void fitColumns(),
+  { deep: true },
+);
 </script>
 
 <template>
-  <div class="profs" :class="{ 'profs--stacked': stacked }">
+  <div
+    ref="profsRef"
+    class="profs"
+    :class="{
+      'profs--stacked': stacked,
+      'profs--dense': columnCount >= 3,
+      'profs--compact': compact,
+    }"
+  >
     <div v-for="(column, colIndex) in columnGroups" :key="colIndex" class="profs__column">
       <div
         v-for="group in column"
@@ -62,6 +148,10 @@ const columnGroups = computed(() => {
   height: 100%;
 }
 
+.profs--dense {
+  gap: 10px;
+}
+
 .profs__column {
   flex: 1;
   min-width: 0;
@@ -79,6 +169,18 @@ const columnGroups = computed(() => {
 .profs--stacked .profs__column {
   justify-content: flex-start;
   gap: 12px;
+}
+
+.profs--dense .profs__column {
+  gap: 6px;
+}
+
+.profs--dense .profs__group {
+  line-height: 1.25;
+}
+
+.profs--compact .profs__column {
+  justify-content: flex-start;
 }
 
 .profs__group {
@@ -114,6 +216,7 @@ const columnGroups = computed(() => {
 
 .profs__item {
   color: #1c1c1e;
+  overflow-wrap: anywhere;
 }
 
 .profs__empty {

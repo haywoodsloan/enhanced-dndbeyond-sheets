@@ -6,6 +6,7 @@ const companion = {
   name: 'Steel Defender',
   source: 'Steel Defender',
   meta: 'Medium Construct, Neutral',
+  challengeRating: '1',
   armorClass: '12 plus your Intelligence modifier',
   hitPoints: '5 plus five times your Artificer level',
   speed: '40 ft.',
@@ -27,6 +28,12 @@ describe('CompanionsCard', () => {
     expect(wrapper.find('.companion__source').exists()).toBe(false);
     expect(wrapper.text()).toContain('Medium Construct, Neutral');
     expect(wrapper.text()).toContain('12 plus your Intelligence modifier');
+    expect(wrapper.findAll('.companion__vitals dt').map((label) => label.text())).toEqual([
+      'CR',
+      'AC',
+      'HP',
+      'Speed',
+    ]);
     expect(wrapper.findAll('.companion__ability')).toHaveLength(2);
     expect(wrapper.findAll('.companion__ability-key').map((label) => label.text())).toEqual([
       'Strength',
