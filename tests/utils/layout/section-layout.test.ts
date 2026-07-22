@@ -42,6 +42,7 @@ describe('sectionSpan dynamic height', () => {
   });
 
   it('grows rows as entries increase', () => {
+    expect(sectionSpan('savingThrows', 7).rows).toBe(2);
     expect(sectionSpan('actions', 40).rows).toBe(4); // ceil(40/12)
     expect(sectionSpan('spells', 40).rows).toBe(4); // ceil(40/12)
     expect(sectionSpan('companions', 30).rows).toBe(3); // ceil(30/10)
@@ -56,7 +57,6 @@ describe('sectionSpan dynamic height', () => {
   });
 
   it('ignores count for fixed sections', () => {
-    expect(sectionSpan('skills', 999)).toEqual({ cols: 3, rows: 1 });
     expect(sectionSpan('basics', 999)).toEqual({ cols: 3, rows: 1 });
   });
 
@@ -85,6 +85,7 @@ describe('section layout options', () => {
     expect(sectionLayoutCount('skills')).toBe(2);
     expect(sectionLayoutCount('attributes')).toBe(2);
     expect(sectionLayoutCount('proficiencies')).toBe(2);
+    expect(sectionLayoutCount('savingThrows')).toBe(1);
     expect(sectionLayoutCount('portrait')).toBe(4);
     expect(sectionLayoutCount('notes')).toBe(4);
     // Sections without curated options have a single fixed layout (no toggle).
@@ -122,11 +123,16 @@ describe('section layout options', () => {
     expect(sectionSpan('inventory', 4, 9)).toEqual({ cols: 1, rows: 2 });
   });
 
-  it('sizes fixed-count cards per layout (skills has no dynamic growth)', () => {
+  it('grows skill layouts when custom skills exceed their base capacity', () => {
     expect(sectionSpan('skills', 18, 0)).toEqual({ cols: 3, rows: 1 });
+    expect(sectionSpan('skills', 19, 0)).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('skills', 18, 1)).toEqual({ cols: 1, rows: 3 });
+    expect(sectionSpan('skills', 19, 1)).toEqual({ cols: 1, rows: 4 });
     // Out-of-range clamps to the last option.
     expect(sectionSpan('skills', 18, 9)).toEqual({ cols: 1, rows: 3 });
+  });
+
+  it('sizes fixed-count cards per layout', () => {
     // Attributes: 2×1 / 1×2 footprints.
     expect(sectionSpan('attributes', 6, 0)).toEqual({ cols: 2, rows: 1 });
     expect(sectionSpan('attributes', 6, 1)).toEqual({ cols: 1, rows: 2 });

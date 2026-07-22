@@ -280,15 +280,20 @@ const pageStyle = computed(() => ({
 
 const sheetRef = ref<HTMLElement | null>(null);
 
-// A content-fit card (attacks/actions/spells/features) measures its body
+// A content-fit card (attacks/actions/spells/features or an expanded spell) measures its body
 // geometry and reports it here; `plannedCards` sizes that card to its content
 // and slices an over-tall one onto continuation cards. Cards that fill their
-// height (and per-spell cards) are ignored, so they keep their curated estimate.
+// height are ignored, so they keep their curated estimate.
 const measuredHeights = ref<Record<string, CardMeasurement>>({});
 function onMeasure(key: CardKey, measurement: CardMeasurement) {
-  // Only content-fit base sections size to their text: ignore spell cards,
-  // continuation cards (they mirror their base), and fill cards.
-  if (isSpellCardKey(key) || isContinuationKey(key) || !CONTENT_FIT_SECTIONS.has(key)) return;
+  // Only content-fit base cards size to their text: ignore continuation cards
+  // (they mirror their base) and fill cards.
+  if (
+    isContinuationKey(key) ||
+    (!isSpellCardKey(key) && !CONTENT_FIT_SECTIONS.has(key as SectionKey))
+  ) {
+    return;
+  }
   const prev = measuredHeights.value[key];
   if (
     prev &&
@@ -344,7 +349,7 @@ const plannedCards = computed<PlannedCard[]>(() => {
     const layoutIndex = layoutIndices.value[section.key] ?? 0;
     const estimate = sectionSpan(section.key, section.count, layoutIndex, perPage);
     const measured = measuredHeights.value[section.key];
-    // No measurement (fill cards, per-spell cards, pre-measure, and tests without
+    // No measurement (fill cards, pre-measure, and tests without
     // a layout engine): keep the curated count-based estimate as a single card.
     if (measured === undefined) {
       cards.push({
@@ -1442,6 +1447,10 @@ body {
   .sheet {
     width: var(--page-width);
     margin: 0;
+  }
+
+  .page:not(:last-child) {
+    margin-bottom: 0;
   }
 
   .page {

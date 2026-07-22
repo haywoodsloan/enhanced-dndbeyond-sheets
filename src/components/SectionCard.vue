@@ -97,6 +97,11 @@ const cardSubtitle = computed(() =>
     ? characterSubtitle(props.character)
     : '',
 );
+const cardMeta = computed(() =>
+  props.section.key === 'basics' && props.character
+    ? [props.character.size, props.character.creatureType].filter(Boolean).join(' · ')
+    : '',
+);
 
 // A continuation card renders the SAME body as its base card, shifted up to show
 // the overflow slice; `bodyKey` is the base key its content dispatches on.
@@ -161,6 +166,12 @@ const spellControl = computed<'expand' | 'collapse' | null>(() => {
 });
 // Sits left of the layout button when one is present, else in the layout slot.
 const spellControlRight = computed(() => ((props.layoutCount ?? 1) > 1 ? '52px' : '28px'));
+const spellLegendMargin = computed(() => {
+  if (isContinuation.value) return '0px';
+  if (props.hidden) return '28px';
+  if (spellControl.value) return `${Number.parseInt(spellControlRight.value, 10) + 24}px`;
+  return (props.layoutCount ?? 1) > 1 ? '52px' : '28px';
+});
 
 // Report the card's body geometry so the sheet can size a content-fit card's
 // footprint to its text and split an over-tall card across continuation cards.
@@ -174,7 +185,7 @@ const bodyRef = ref<HTMLElement | null>(null);
 // The per-item elements a card may break between when its content overflows
 // onto a continuation card (one selector across every content-fit card type).
 const BREAK_ITEMS =
-  '[data-spell],[data-action],[data-attack],[data-feature],[data-companion-part],[data-rule-row]';
+  '[data-spell],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-companion-part],[data-rule-row]';
 
 function measure() {
   if (props.hidden) return;
@@ -274,7 +285,26 @@ watch(
             <span class="card__title-sep" aria-hidden="true">|</span>
             <span class="card__subtitle">{{ cardSubtitle }}</span>
           </template>
+          <template v-if="cardMeta">
+            <span class="card__title-sep" aria-hidden="true">|</span>
+            <span class="card__meta">{{ cardMeta }}</span>
+          </template>
         </span>
+        <div
+          v-if="bodyKey === 'spells'"
+          class="card__spell-legend"
+          :style="{ '--spell-legend-margin': spellLegendMargin }"
+          aria-label="Spell tags"
+        >
+          <span class="card__spell-legend-item">
+            <b class="card__spell-legend-tag">C</b>
+            <span>Concentration</span>
+          </span>
+          <span class="card__spell-legend-item">
+            <b class="card__spell-legend-tag">R</b>
+            <span>Ritual</span>
+          </span>
+        </div>
       </div>
     </template>
     <template #content>
@@ -453,6 +483,40 @@ watch(
 .card__body {
   display: block;
   overflow: hidden;
+}
+
+.card__spell-legend {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+  margin-right: var(--spell-legend-margin, 0);
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--p-text-muted-color, #888);
+}
+
+.card__spell-legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.card__spell-legend-tag {
+  padding: 0 3px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--p-text-muted-color, #888);
+  border: 1px solid var(--p-primary-200, #e4e4e7);
+  border-radius: 3px;
+}
+
+@media print {
+  .card__spell-legend {
+    margin-right: 0;
+  }
 }
 
 /* Drag handle: a grip bar at the top-center that appears on hover; the only
@@ -662,22 +726,46 @@ watch(
   color: var(--p-primary-color);
 }
 
-/* The Basics card puts the name and the race / class line on one row. */
+/* The Basics card puts name, race/class, and size/type on one row. */
 .card__heading {
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.card__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card__title-sep {
+  flex: none;
   font-weight: 300;
   color: var(--p-primary-300, #cbd5e1);
 }
 
 /* Subtitle only appears on the Basics card (the race / class line). */
 .card__subtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
+  font-weight: 400;
+  color: var(--p-primary-700, #6b7280);
+}
+
+.card__meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
   font-weight: 400;
   color: var(--p-primary-700, #6b7280);
 }

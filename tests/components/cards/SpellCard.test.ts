@@ -10,8 +10,17 @@ const fireBolt: SpellEntry = {
   castingTime: 'A',
   range: '120 ft.',
   components: 'V, S',
+  concentration: true,
+  duration: '1 minute',
+  material: 'a ruby worth 50 GP',
+  related: ['companions'],
+  summary: 'A concise spell effect.',
   attack: true,
-  damage: { dice: '1d10', type: 'Fire' },
+  damage: {
+    dice: '1d10',
+    type: 'Fire',
+    scaling: '+1d10 per slot level above 1st',
+  },
 };
 
 describe('SpellCard', () => {
@@ -22,7 +31,11 @@ describe('SpellCard', () => {
     const text = wrapper.text();
     expect(text).toContain('120 ft.');
     expect(text).toContain('V, S');
-    expect(text).toContain('1d10 Fire');
+    expect(text).toContain('a ruby worth 50 GP');
+    expect(text).toContain('Concentration, 1 minute');
+    expect(text).toContain('1d10 Fire (+1d10 per slot level above 1st)');
     expect(text).toContain('Spell attack');
+    expect(text).toContain('See Companions');
+    expect(text).toContain('A concise spell effect.');
   });
 });

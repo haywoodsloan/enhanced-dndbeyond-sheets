@@ -3,11 +3,18 @@ import { computed } from 'vue';
 import type { SpellEntry } from '@/services/dndbeyond/model';
 import { spellSchoolStyle } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
+import RichText from '@/components/RichText.vue';
 
 const props = defineProps<{ spell: SpellEntry }>();
 
 const school = computed(() => spellSchoolStyle(props.spell.school));
 const levelLabel = computed(() => (props.spell.level === 0 ? '0' : String(props.spell.level)));
+const durationLabel = computed(() => {
+  if (!props.spell.concentration) return props.spell.duration;
+  return props.spell.duration
+    ? `Concentration, ${props.spell.duration}`
+    : 'Concentration';
+});
 
 /** Detail rows (label + value), dropping any the spell doesn't have. */
 const rows = computed(() => {
@@ -17,7 +24,8 @@ const rows = computed(() => {
     ['Cast', spell.castingTime],
     ['Range', spell.range],
     ['Comp', spell.components],
-    ['Dur', spell.duration],
+    ['Material', spell.material],
+    ['Dur', durationLabel.value],
     ['Hit', hit],
     ['Dmg', formatDamage(spell.damage)],
   ];
@@ -27,7 +35,7 @@ const rows = computed(() => {
 
 <template>
   <div class="spell-card" :style="{ '--school-color': school.color }" data-spell-card>
-    <div class="spell-card__head">
+    <div class="spell-card__head" data-spell-card-part>
       <span
         class="spell-card__level"
         :title="spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`"
@@ -37,11 +45,29 @@ const rows = computed(() => {
       <span class="spell-card__school" :title="spell.school">{{ school.abbr }}</span>
     </div>
     <dl class="spell-card__rows">
-      <div v-for="[label, value] in rows" :key="label" class="spell-card__row">
+      <div
+        v-for="[label, value] in rows"
+        :key="label"
+        class="spell-card__row"
+        data-spell-card-part
+      >
         <dt class="spell-card__key">{{ label }}</dt>
         <dd class="spell-card__value">{{ value }}</dd>
       </div>
     </dl>
+    <span
+      v-if="spell.related?.includes('companions')"
+      class="spell-card__reference"
+      data-spell-card-part
+    >
+      See Companions
+    </span>
+    <RichText
+      v-if="spell.summary"
+      :text="spell.summary"
+      class="spell-card__summary"
+      data-spell-card-part
+    />
   </div>
 </template>
 
@@ -99,5 +125,20 @@ const rows = computed(() => {
 
 .spell-card__value {
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.spell-card__reference,
+.spell-card__summary {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--p-text-muted-color, #888);
+  overflow-wrap: anywhere;
+}
+
+.spell-card__reference {
+  font-weight: 600;
 }
 </style>

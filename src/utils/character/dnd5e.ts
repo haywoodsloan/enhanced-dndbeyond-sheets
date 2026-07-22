@@ -105,6 +105,10 @@ export interface ArmorClassInput {
   shieldBonus?: number;
   /** Flat AC bonuses from magic items, feats, etc. */
   bonus?: number;
+  /** Extra bonus used only by an unarmored AC formula (e.g. Con/Wis/Cha). */
+  unarmoredBonus?: number;
+  /** Maximum Dexterity modifier allowed by medium armor (normally +2). */
+  mediumDexCap?: number;
 }
 
 /**
@@ -114,20 +118,28 @@ export interface ArmorClassInput {
  * unarmored defense) are not modeled here.
  */
 export function armorClass(input: ArmorClassInput): number {
-  const { category, dexModifier, armorBase = 0, shieldBonus = 0, bonus = 0 } = input;
+  const {
+    category,
+    dexModifier,
+    armorBase = 0,
+    shieldBonus = 0,
+    bonus = 0,
+    unarmoredBonus = 0,
+    mediumDexCap = 2,
+  } = input;
   let base: number;
   switch (category) {
     case 'light':
       base = armorBase + dexModifier;
       break;
     case 'medium':
-      base = armorBase + Math.min(dexModifier, 2);
+      base = armorBase + Math.min(dexModifier, mediumDexCap);
       break;
     case 'heavy':
       base = armorBase;
       break;
     default:
-      base = 10 + dexModifier;
+      base = 10 + dexModifier + unarmoredBonus;
   }
   return base + shieldBonus + bonus;
 }
@@ -254,26 +266,28 @@ export interface SkillMeta {
   key: string;
   name: string;
   ability: AbilityKey;
+  /** D&D Beyond skill value id used by characterValues customizations. */
+  valueId: number;
 }
 
 /** The 18 standard skills with their governing ability. */
 export const SKILLS: readonly SkillMeta[] = [
-  { key: 'acrobatics', name: 'Acrobatics', ability: 'dex' },
-  { key: 'animal-handling', name: 'Animal Handling', ability: 'wis' },
-  { key: 'arcana', name: 'Arcana', ability: 'int' },
-  { key: 'athletics', name: 'Athletics', ability: 'str' },
-  { key: 'deception', name: 'Deception', ability: 'cha' },
-  { key: 'history', name: 'History', ability: 'int' },
-  { key: 'insight', name: 'Insight', ability: 'wis' },
-  { key: 'intimidation', name: 'Intimidation', ability: 'cha' },
-  { key: 'investigation', name: 'Investigation', ability: 'int' },
-  { key: 'medicine', name: 'Medicine', ability: 'wis' },
-  { key: 'nature', name: 'Nature', ability: 'int' },
-  { key: 'perception', name: 'Perception', ability: 'wis' },
-  { key: 'performance', name: 'Performance', ability: 'cha' },
-  { key: 'persuasion', name: 'Persuasion', ability: 'cha' },
-  { key: 'religion', name: 'Religion', ability: 'int' },
-  { key: 'sleight-of-hand', name: 'Sleight of Hand', ability: 'dex' },
-  { key: 'stealth', name: 'Stealth', ability: 'dex' },
-  { key: 'survival', name: 'Survival', ability: 'wis' },
+  { key: 'acrobatics', name: 'Acrobatics', ability: 'dex', valueId: 3 },
+  { key: 'animal-handling', name: 'Animal Handling', ability: 'wis', valueId: 11 },
+  { key: 'arcana', name: 'Arcana', ability: 'int', valueId: 6 },
+  { key: 'athletics', name: 'Athletics', ability: 'str', valueId: 2 },
+  { key: 'deception', name: 'Deception', ability: 'cha', valueId: 16 },
+  { key: 'history', name: 'History', ability: 'int', valueId: 7 },
+  { key: 'insight', name: 'Insight', ability: 'wis', valueId: 12 },
+  { key: 'intimidation', name: 'Intimidation', ability: 'cha', valueId: 17 },
+  { key: 'investigation', name: 'Investigation', ability: 'int', valueId: 8 },
+  { key: 'medicine', name: 'Medicine', ability: 'wis', valueId: 13 },
+  { key: 'nature', name: 'Nature', ability: 'int', valueId: 9 },
+  { key: 'perception', name: 'Perception', ability: 'wis', valueId: 14 },
+  { key: 'performance', name: 'Performance', ability: 'cha', valueId: 18 },
+  { key: 'persuasion', name: 'Persuasion', ability: 'cha', valueId: 19 },
+  { key: 'religion', name: 'Religion', ability: 'int', valueId: 10 },
+  { key: 'sleight-of-hand', name: 'Sleight of Hand', ability: 'dex', valueId: 4 },
+  { key: 'stealth', name: 'Stealth', ability: 'dex', valueId: 5 },
+  { key: 'survival', name: 'Survival', ability: 'wis', valueId: 15 },
 ];

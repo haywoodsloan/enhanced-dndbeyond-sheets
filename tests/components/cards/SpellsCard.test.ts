@@ -22,12 +22,50 @@ describe('SpellsCard', () => {
     expect(first.text()).toContain('Bless');
   });
 
+  it('points summon spells to extracted companion details', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          {
+            name: 'Summon Beast',
+            level: 2,
+            summary: 'You call forth a bestial spirit.',
+            related: ['companions'],
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('[data-spell]').text()).toContain('(see Companions)');
+  });
+
+  it('shows costly or consumed spell materials', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          { name: 'Chromatic Orb', level: 1, material: 'a diamond worth 50+ GP' },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.spells__material').text()).toContain('a diamond worth 50+ GP');
+  });
+
   it('shows the spellcasting header and per-level slot checkboxes', () => {
     const wrapper = mount(SpellsCard, {
       props: {
         spells: [{ name: 'Guidance', level: 0 }],
         spellcasting: {
-          profiles: [{ source: 'Cleric', ability: 'WIS', modifier: 4, attack: 6, saveDc: 14 }],
+          profiles: [
+            {
+              source: 'Cleric',
+              ability: 'WIS',
+              modifier: 4,
+              attack: 6,
+              saveDc: 14,
+              focus: 'Holy Symbol',
+            },
+          ],
           slots: [4, 3],
         },
       },
@@ -37,6 +75,7 @@ describe('SpellsCard', () => {
     expect(header.text()).toContain('+6');
     expect(header.text()).toContain('DC 14');
     expect(header.text()).toContain('WIS');
+    expect(header.text()).toContain('Focus Holy Symbol');
     // Slots sit at the start of their level: 1st (4) + 2nd (3) = 7 boxes total.
     expect(wrapper.findAll('[data-slots]')).toHaveLength(2);
     expect(wrapper.findAll('.resource__box')).toHaveLength(7);
@@ -119,7 +158,12 @@ describe('SpellsCard', () => {
             castingTime: 'A',
             range: '30 ft.',
             concentration: true,
-            duration: 'Conc, 1 min',
+            duration: '1 minute',
+            damage: {
+              dice: '2d8',
+              type: 'Thunder',
+              scaling: '+1d8 per slot level above 1st',
+            },
           },
           {
             name: 'Sacred Flame',
@@ -140,6 +184,11 @@ describe('SpellsCard', () => {
     expect(spells[1].text()).toContain('DEX save');
     // The concentration spell shows a "C" tag.
     expect(spells[2].text()).toContain('C');
+    expect(spells[2].text()).toContain('1 minute');
+    expect(spells[2].text()).not.toContain('Concentration');
+    expect(spells[2].text()).toContain(
+      '2d8 Thunder (+1d8 per slot level above 1st)',
+    );
   });
 
   it('shows concentration and ritual as separate boxes', () => {

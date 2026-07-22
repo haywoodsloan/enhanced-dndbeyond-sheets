@@ -17,6 +17,8 @@ describe('normalizeCharacter', () => {
     expect(character.name).toBe('Noct');
     expect(character.race).toBe('Elf');
     expect(character.background).toBe('Spirit Medium');
+    expect(character.size).toBe('Medium');
+    expect(character.creatureType).toBe('Humanoid');
   });
 
   it('summarizes classes and total level', () => {
@@ -79,6 +81,241 @@ describe('normalizeCharacter', () => {
     ]);
   });
 
+  it('preserves special movement speeds from the character payload', () => {
+    const character = normalizeCharacter({
+      id: 1,
+      name: 'Many Speeds',
+      race: {
+        weightSpeeds: {
+          normal: { walk: 30, fly: 50, swim: 30, climb: 20, burrow: 0 },
+        },
+      },
+    } as RawCharacter);
+
+    expect(character.basics.speed).toBe(30);
+    expect(character.basics.specialSpeeds).toEqual([
+      { label: 'Fly', value: 50 },
+      { label: 'Swim', value: 30 },
+      { label: 'Climb', value: 20 },
+    ]);
+  });
+
+  it('applies custom movement and sense overrides', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Explorer',
+      stats: [],
+      classes: [{ level: 1, definition: { name: 'Ranger' } }],
+      race: { weightSpeeds: { normal: { walk: 30, fly: 20, swim: 30 } } },
+      customSpeeds: [
+        { movementId: 1, distance: 40 },
+        { movementId: 2, distance: 10 },
+        { movementId: 4, distance: 60 },
+      ],
+      customSenses: [
+        { senseId: 1, distance: 10 },
+        { senseId: 2, distance: 120 },
+      ],
+      modifiers: {
+        race: [
+          {
+            type: 'set-base',
+            subType: 'darkvision',
+            friendlySubtypeName: 'Darkvision',
+            fixedValue: 60,
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.basics.speed).toBe(40);
+    expect(normalized.basics.specialSpeeds).toEqual([
+      { label: 'Fly', value: 60 },
+      { label: 'Swim', value: 30 },
+      { label: 'Burrow', value: 10 },
+    ]);
+    expect(normalized.senses).toEqual(
+      expect.arrayContaining([
+        { label: 'Darkvision', value: '120 ft.' },
+        { label: 'Blindsight', value: '10 ft.' },
+      ]),
+    );
+  });
+
+  it('includes custom damage and condition defences without duplicates', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Defences',
+      stats: [],
+      classes: [{ level: 1, definition: { name: 'Fighter' } }],
+      modifiers: {
+        race: [
+          {
+            type: 'resistance',
+            subType: 'fire',
+            friendlyTypeName: 'Resistance',
+            friendlySubtypeName: 'Fire',
+          },
+        ],
+      },
+      customDefenseAdjustments: [
+        { type: 2, adjustmentId: 9 },
+        { type: 2, adjustmentId: 25 },
+        { type: 2, adjustmentId: 41 },
+        { type: 2, adjustmentId: 57 },
+        { type: 2, adjustmentId: 60 },
+        { type: 1, adjustmentId: 5 },
+        { type: 1, adjustmentId: 16 },
+      ],
+    } as unknown as RawCharacter;
+
+    const defences = normalizeCharacter(character).defences.map((entry) => entry.text);
+    expect(defences.filter((entry) => entry === 'Fire Resistance')).toHaveLength(1);
+    expect(defences).toEqual(
+      expect.arrayContaining([
+        'Fire Immunity',
+        'Fire Vulnerability',
+        'Damage from Spells Resistance',
+        'Frightened Immunity',
+        'Diseased Immunity',
+      ]),
+    );
+    expect(
+      normalizeCharacter(character).sections.find((section) => section.key === 'savingThrows')
+        ?.count,
+    ).toBeGreaterThan(6);
+  });
+
+  it('preserves levels on leveled conditions such as Exhaustion', () => {
+    const character = normalizeCharacter({
+      id: 1,
+      name: 'Exhausted',
+      conditions: [{ id: 4, level: 2 }],
+    } as RawCharacter);
+
+    expect(character.basics.conditions).toEqual(['Exhaustion']);
+    expect(character.basics.conditionLevels).toEqual({ Exhaustion: 2 });
+  });
+
+  it('applies only the AC bonuses legal for the current armor state', () => {
+    const character = {
+      id: 1,
+      name: 'Armor State',
+      stats: [{ id: 2, name: null, value: 14 }],
+      inventory: [
+        {
+          id: 1,
+          equipped: true,
+          definition: {
+            name: 'Leather Armor',
+            filterType: 'Armor',
+            armorTypeId: 1,
+            armorClass: 11,
+          },
+        },
+      ],
+      modifiers: {
+        test: [
+          { type: 'bonus', subType: 'armor-class', fixedValue: 1 },
+          { type: 'bonus', subType: 'armored-armor-class', fixedValue: 2 },
+          { type: 'bonus', subType: 'unarmored-armor-class', fixedValue: 3 },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    // Leather 11 + Dex 2 + global 1 + armored-only 2. Unarmored-only +3 is excluded.
+    expect(normalizeCharacter(character).basics.armorClass).toBe(16);
+
+    character.inventory = [];
+    // Unarmored 10 + Dex 2 + global 1 + unarmored-only 3. Armored-only +2 is excluded.
+    expect(normalizeCharacter(character).basics.armorClass).toBe(16);
+  });
+
+  it('honors an explicit D&D Beyond Armor Class override', () => {
+    const character = {
+      id: 1,
+      name: 'AC Override',
+      stats: [{ id: 2, name: null, value: 20 }],
+      characterValues: [{ typeId: 1, value: 22 }],
+    } as unknown as RawCharacter;
+
+    expect(normalizeCharacter(character).basics.armorClass).toBe(22);
+  });
+
+  it('uses fixed unarmored adjustments and raised medium-armor Dexterity caps', () => {
+    const character = {
+      id: 1,
+      name: 'Alternate AC',
+      stats: [
+        { id: 2, name: null, value: 18 },
+        { id: 5, name: null, value: 16 },
+      ],
+      modifiers: {
+        class: [
+          {
+            type: 'set',
+            subType: 'unarmored-armor-class',
+            statId: 5,
+            fixedValue: 1,
+          },
+          { type: 'set', subType: 'ac-max-dex-armored-modifier', fixedValue: 3 },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    // 10 + Dex 4 + Wisdom 3 + fixed 1.
+    expect(normalizeCharacter(character).basics.armorClass).toBe(18);
+
+    character.inventory = [
+      {
+        id: 1,
+        equipped: true,
+        definition: {
+          name: 'Half Plate',
+          filterType: 'Armor',
+          armorTypeId: 2,
+          armorClass: 15,
+        },
+      },
+    ];
+    // Half plate 15 + raised medium-armor Dex cap 3.
+    expect(normalizeCharacter(character).basics.armorClass).toBe(18);
+  });
+
+  it('scales per-level hit-point bonuses by their owning class or total level', () => {
+    const character = {
+      id: 1,
+      name: 'Durable Multiclass',
+      stats: [{ id: 3, value: 10 }],
+      baseHitPoints: 30,
+      classes: [
+        {
+          level: 3,
+          definition: {
+            name: 'Sorcerer',
+            classFeatures: [{ id: 100, name: 'Class Resilience' }],
+          },
+        },
+        { level: 2, definition: { name: 'Fighter' } },
+      ],
+      modifiers: {
+        class: [
+          {
+            type: 'bonus',
+            subType: 'hit-points-per-level',
+            value: 1,
+            componentId: 100,
+          },
+        ],
+        feat: [{ type: 'bonus', subType: 'hit-points-per-level', value: 2 }],
+      },
+    } as unknown as RawCharacter;
+
+    // Class feature: 1 × 3 Sorcerer levels; feat: 2 × 5 character levels.
+    expect(normalizeCharacter(character).basics.hitPoints.max).toBe(43);
+  });
+
   it('computes saving throws with proficiency', () => {
     const character = normalizeCharacter(raw);
     const byKey = Object.fromEntries(
@@ -91,6 +328,165 @@ describe('normalizeCharacter', () => {
     expect(byKey.dex).toMatchObject({ modifier: 0, proficient: false });
     expect(byKey.con).toMatchObject({ modifier: 2, proficient: false });
     expect(byKey.int).toMatchObject({ modifier: 1, proficient: false });
+  });
+
+  it('honors custom save proficiency and bonus overrides', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Saves',
+      stats: [
+        { id: 1, name: null, value: 12 },
+        { id: 5, name: null, value: 14 },
+      ],
+      classes: [{ level: 1, definition: { name: 'Cleric' } }],
+      modifiers: {
+        class: [{ type: 'proficiency', subType: 'wisdom-saving-throws' }],
+      },
+      characterValues: [
+        { typeId: 41, valueId: 1, value: 3 },
+        { typeId: 39, valueId: 1, value: 1 },
+        { typeId: 40, valueId: 1, value: 2 },
+        { typeId: 41, valueId: 5, value: 1 },
+      ],
+    } as unknown as RawCharacter;
+
+    const saves = normalizeCharacter(character).savingThrows;
+    expect(saves.find((save) => save.key === 'str')).toMatchObject({
+      modifier: 6,
+      proficient: true,
+    });
+    expect(saves.find((save) => save.key === 'wis')).toMatchObject({
+      modifier: 2,
+      proficient: false,
+    });
+  });
+
+  it('applies ability-score setters without lowering a higher natural score', () => {
+    const character = {
+      id: 1,
+      name: 'Ability Setters',
+      stats: [
+        { id: 1, name: null, value: 12 },
+        { id: 4, name: null, value: 20 },
+        { id: 6, name: null, value: 10 },
+      ],
+      modifiers: {
+        item: [
+          { type: 'set', subType: 'strength-score', fixedValue: 19 },
+          { type: 'set', subType: 'intelligence-score', fixedValue: 19 },
+          {
+            type: 'set',
+            subType: 'charisma-score',
+            fixedValue: 22,
+            restriction: 'Only while transformed',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const scores = Object.fromEntries(
+      normalizeCharacter(character).abilities.map((ability) => [ability.key, ability.score]),
+    );
+    expect(scores.str).toBe(19);
+    expect(scores.int).toBe(20);
+    expect(scores.cha).toBe(10);
+  });
+
+  it('does not bake restricted numeric bonuses into baseline stats', () => {
+    const character = {
+      id: 1,
+      name: 'Conditional Bonuses',
+      stats: [
+        { id: 2, name: null, value: 12 },
+        { id: 5, name: null, value: 14 },
+      ],
+      classes: [{ level: 1, definition: { name: 'Cleric' } }],
+      modifiers: {
+        test: [
+          { type: 'bonus', subType: 'initiative', fixedValue: 5, restriction: 'At night' },
+          { type: 'bonus', subType: 'saving-throws', fixedValue: 5, restriction: 'Against spells' },
+          { type: 'bonus', subType: 'wisdom-score', fixedValue: 5, restriction: 'While raging' },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.basics.initiative).toBe(1);
+    expect(normalized.abilities.find((ability) => ability.key === 'wis')?.score).toBe(14);
+    expect(normalized.savingThrows.find((save) => save.key === 'wis')?.modifier).toBe(2);
+  });
+
+  it('pluralizes duration units from the singular API values', () => {
+    const character = {
+      id: 1,
+      name: 'Durations',
+      spells: {
+        class: [
+          {
+            definition: {
+              name: 'Ten Minutes',
+              level: 1,
+              duration: {
+                durationInterval: 10,
+                durationUnit: 'Minute',
+                durationType: 'Concentration',
+              },
+              concentration: true,
+            },
+          },
+          {
+            definition: {
+              name: 'One Hour',
+              level: 1,
+              duration: {
+                durationInterval: 1,
+                durationUnit: 'Hour',
+                durationType: 'Time',
+              },
+            },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    expect(normalizeCharacter(character).spells.map((spell) => spell.duration)).toEqual([
+      '1 hour',
+      '10 minutes',
+    ]);
+  });
+
+  it('labels upcast damage by the spell slot level above the base level', () => {
+    const spell = (name: string, level: number, type: string) => ({
+      definition: {
+        name,
+        level,
+        modifiers: [
+          {
+            type: 'damage',
+            friendlySubtypeName: type,
+            die: { diceString: '2d8' },
+            atHigherLevels: {
+              higherLevelDefinitions: [{ level: level + 1, dice: { diceString: '1d8' } }],
+            },
+          },
+        ],
+      },
+    });
+    const character = {
+      id: 1,
+      name: 'Upcasting',
+      spells: {
+        class: [spell('Thunderwave', 1, 'Thunder'), spell('Heat Metal', 2, 'Fire')],
+      },
+    } as unknown as RawCharacter;
+
+    const spells = normalizeCharacter(character).spells;
+    expect(spells.find((entry) => entry.name === 'Thunderwave')?.damage?.scaling).toBe(
+      '+1d8 per slot level above 1st',
+    );
+    expect(spells.find((entry) => entry.name === 'Heat Metal')?.damage?.scaling).toBe(
+      '+1d8 per slot level above 2nd',
+    );
   });
 
   it('lists defensive traits from modifiers', () => {
@@ -158,6 +554,168 @@ describe('normalizeCharacter', () => {
     }
   });
 
+  it('honors custom skill ability, proficiency, and bonus overrides', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Skills',
+      stats: [
+        { id: 1, name: null, value: 16 },
+        { id: 2, name: null, value: 10 },
+      ],
+      classes: [{ level: 5, definition: { name: 'Rogue' } }],
+      modifiers: {
+        class: [{ type: 'proficiency', subType: 'athletics' }],
+      },
+      characterValues: [
+        { typeId: 27, valueId: 3, value: 1 },
+        { typeId: 26, valueId: 3, value: 4 },
+        { typeId: 24, valueId: 3, value: 1 },
+        { typeId: 25, valueId: 3, value: 2 },
+        { typeId: 26, valueId: 2, value: 1 },
+      ],
+    } as unknown as RawCharacter;
+
+    const skills = normalizeCharacter(character).skills;
+    expect(skills.find((skill) => skill.key === 'acrobatics')).toMatchObject({
+      ability: 'str',
+      proficiency: 'expertise',
+      modifier: 12,
+    });
+    expect(skills.find((skill) => skill.key === 'athletics')).toMatchObject({
+      proficiency: 'none',
+      modifier: 3,
+    });
+  });
+
+  it('preserves custom skills, tools, and languages', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Proficiencies',
+      stats: [{ id: 4, name: null, value: 16 }],
+      classes: [{ level: 5, definition: { name: 'Artificer' } }],
+      customProficiencies: [
+        {
+          type: 1,
+          name: 'Planar Engineering',
+          statId: 4,
+          proficiencyLevel: 4,
+          miscBonus: 1,
+          magicBonus: 2,
+        },
+        { type: 2, name: 'Airship Tools' },
+        { type: 3, name: 'Deep Speech' },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.skills.find((skill) => skill.name === 'Planar Engineering')).toMatchObject({
+      ability: 'int',
+      proficiency: 'expertise',
+      modifier: 12,
+    });
+    expect(normalized.proficiencies.tools).toContain('Airship Tools');
+    expect(normalized.proficiencies.languages).toContain('Deep Speech');
+  });
+
+  it('includes custom inventory items without duplicating mirrored ids', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Inventory',
+      stats: [],
+      classes: [{ level: 1, definition: { name: 'Fighter' } }],
+      inventory: [
+        { id: 10, quantity: 1, definition: { name: 'Rope' } },
+      ],
+      customItems: [
+        { id: 20, name: 'Clockwork Key', quantity: 2 },
+        {
+          id: 30,
+          quantity: 1,
+          equipped: true,
+          isAttuned: true,
+          definition: { name: 'Soul Compass' },
+        },
+        { id: 10, name: 'Mirrored Rope', quantity: 1 },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.inventory).toEqual([
+      { name: 'Rope', quantity: 1, equipped: false, attuned: false },
+      { name: 'Clockwork Key', quantity: 2, equipped: false, attuned: false },
+      { name: 'Soul Compass', quantity: 1, equipped: true, attuned: true },
+    ]);
+    expect(normalized.sections.find((section) => section.key === 'inventory')?.count).toBe(3);
+  });
+
+  it('routes detailed custom attacks into the Attacks card', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Combatant',
+      stats: [{ id: 1, name: null, value: 16 }],
+      classes: [{ level: 5, definition: { name: 'Fighter' } }],
+      customActions: [
+        {
+          name: 'Thunder Gauntlet',
+          displayAsAttack: true,
+          statId: 1,
+          isProficient: true,
+          toHitBonus: 1,
+          diceCount: 2,
+          diceType: 6,
+          fixedValue: 1,
+          damageBonus: 2,
+          damageTypeId: 9,
+          range: 5,
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    expect(
+      normalizeCharacter(character).attacks.find((attack) => attack.name === 'Thunder Gauntlet'),
+    ).toEqual({
+      name: 'Thunder Gauntlet',
+      toHit: 7,
+      damage: { dice: '2d6', bonus: 6, type: 'Thunder' },
+      range: '5 ft.',
+    });
+  });
+
+  it('routes custom actions by activation and omits blank placeholders', () => {
+    const character = {
+      id: 1,
+      name: 'Custom Actions',
+      stats: [{ id: 5, name: null, value: 14 }],
+      classes: [{ level: 5, definition: { name: 'Fighter' } }],
+      customActions: [
+        {
+          name: 'Mind Pulse',
+          activationType: 3,
+          statId: 5,
+          saveStatId: 4,
+          range: 30,
+          description: '<p>Disorient one creature until your next turn.</p>',
+        },
+        { name: 'Custom Action 1' },
+      ],
+    } as unknown as RawCharacter;
+
+    const actions = normalizeCharacter(character).actions;
+    expect(actions.find((action) => action.name === 'Mind Pulse')).toMatchObject({
+      category: 'bonus',
+      save: 'DC 13 INT',
+      range: '30 ft.',
+      summary: 'Disorient one creature until your next turn.',
+    });
+    expect(actions.map((action) => action.name)).not.toContain('Custom Action 1');
+  });
+
+  it('omits Noct\'s untouched custom-action placeholder', () => {
+    expect(normalizeCharacter(raw).actions.map((action) => action.name)).not.toContain(
+      'Custom Action 1',
+    );
+  });
+
   it('groups languages and training proficiencies', () => {
     const { proficiencies } = normalizeCharacter(raw);
     expect(proficiencies.languages).toEqual(
@@ -223,6 +781,9 @@ describe('normalizeCharacter', () => {
     // Actions get a plain one-line summary with placeholders stripped.
     expect(channelDivinity?.summary).toContain('channel');
     expect(channelDivinity?.summary).not.toContain('{{');
+    expect(channelDivinity?.roll).toBeUndefined();
+    expect(actions.find((action) => action.name === 'Channel Divinity: Turn Undead')?.damage)
+      .toBeUndefined();
     // Two uses; regains one on a short rest and all on a long rest — the reset
     // type only records the long rest, so the short-rest recovery is inferred.
     expect(channelDivinity?.resource).toEqual({
@@ -247,6 +808,19 @@ describe('normalizeCharacter', () => {
     expect(voices?.summary).not.toContain('(DC )');
     for (const action of actions) {
       expect(action.summary ?? '').not.toContain('{{');
+    }
+  });
+
+  it('leaves no unresolved or empty dynamic values in real fixture output', () => {
+    const hest = JSON.parse(
+      readFileSync('tests/fixtures/hest.json', 'utf-8'),
+    ) as RawCharacter;
+    for (const fixture of [raw, hest]) {
+      const text = JSON.stringify(normalizeCharacter(fixture));
+      expect(text).not.toContain('{{');
+      expect(text).not.toMatch(
+        /\b(?:AC|DC|bonus|damage|distance|HP|modifier|range|score|uses?)\s+is\s+(?:unless|until|when|if|[.,;])/i,
+      );
     }
   });
 
@@ -289,6 +863,87 @@ describe('normalizeCharacter', () => {
       .find((item) => item.name === 'Sneak Attack');
     expect(sneakAttack?.summary).toContain('4d6');
     expect(sneakAttack?.summary).not.toContain('1d6');
+  });
+
+  it('resolves Circle Forms AC and other arithmetic ability placeholders', () => {
+    const character = {
+      id: 1,
+      name: 'Moon Druid',
+      stats: [{ id: 5, name: null, value: 20 }],
+      classes: [
+        {
+          level: 9,
+          definition: {
+            name: 'Druid',
+            classFeatures: [
+              {
+                id: 100,
+                name: 'Circle Forms',
+                requiredLevel: 3,
+              },
+            ],
+          },
+          classFeatures: [
+            {
+              levelScale: { fixedValue: 3 },
+              definition: {
+                id: 100,
+                name: 'Circle Forms',
+                requiredLevel: 3,
+                snippet:
+                  'When you assume a Wild Shape form, you gain the following benefits: ' +
+                  'The max CR for the form is {{scalevalue}}. ' +
+                  "Until you leave the form, your AC is {{13+modifier:wis}} unless the Beast's AC is higher. " +
+                  'You gain {{3*classlevel}} Temporary HP.',
+              },
+            },
+          ],
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const circleForms = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Circle Forms');
+    expect(circleForms?.summary).toContain('max CR for the form is 3');
+    expect(circleForms?.summary).toContain("your AC is 18 unless the Beast's AC is higher");
+    expect(circleForms?.summary).toContain('You gain 27 Temporary HP');
+  });
+
+  it('resolves tiered class-level expressions at every breakpoint', () => {
+    const expression =
+      '{{1+(classlevel/7)@rounddown,max:1+(classlevel/13)@rounddown+(classlevel/18)@rounddown}}';
+    const diceAtLevel = (level: number) => {
+      const character = {
+        id: level,
+        name: `Cleric ${level}`,
+        stats: [{ id: 5, name: null, value: 18 }],
+        classes: [
+          {
+            level,
+            definition: {
+              name: 'Cleric',
+              classFeatures: [{ id: 100, name: 'Channel Divinity', requiredLevel: 2 }],
+            },
+          },
+        ],
+        actions: {
+          class: [
+            {
+              name: 'Channel Divinity: Divine Spark',
+              componentId: 100,
+              snippet: `Restore ${expression}d8{{modifier:wis}} HP.`,
+            },
+          ],
+        },
+      } as unknown as RawCharacter;
+      return normalizeCharacter(character).actions[0]?.summary;
+    };
+
+    expect(diceAtLevel(2)).toBe('Restore 1d8+4 HP.');
+    expect(diceAtLevel(7)).toBe('Restore 2d8+4 HP.');
+    expect(diceAtLevel(13)).toBe('Restore 3d8+4 HP.');
+    expect(diceAtLevel(18)).toBe('Restore 4d8+4 HP.');
   });
 
   it('resolves action-local and character-level placeholder values', () => {
@@ -409,12 +1064,67 @@ describe('normalizeCharacter', () => {
     }
   });
 
+  it('uses explicit cantrip tiers and keeps multi-attack damage per hit', () => {
+    const cantrip = (
+      name: string,
+      description: string,
+      higherLevelDefinitions: { level: number; dice: { diceString: string } }[] = [],
+    ) => ({
+      definition: {
+        name,
+        level: 0,
+        scaleType: 'characterlevel',
+        description,
+        modifiers: [
+          {
+            type: 'damage',
+            friendlySubtypeName: 'Force',
+            die: { diceCount: 1, diceValue: 10, diceString: '1d10' },
+            atHigherLevels: { higherLevelDefinitions },
+          },
+        ],
+      },
+    });
+    const character = {
+      id: 1,
+      name: 'Scaling Cantrips',
+      classes: [{ level: 5, definition: { name: 'Warlock' } }],
+      spells: {
+        class: [
+          cantrip(
+            'Tiered Bolt',
+            '<p>Deal damage.</p><p><strong>Cantrip Upgrade.</strong> The damage increases.</p>',
+            [{ level: 5, dice: { diceString: '1d12' } }],
+          ),
+          cantrip(
+            'Many Beams',
+            '<p>Deal damage.</p><p><strong>Cantrip Upgrade.</strong> Make one additional beam.</p>',
+          ),
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const spells = normalizeCharacter(character).spells;
+    expect(spells.find((spell) => spell.name === 'Tiered Bolt')?.damage?.dice).toBe('1d12');
+    expect(spells.find((spell) => spell.name === 'Many Beams')?.damage?.dice).toBe('1d10');
+    expect(spells.find((spell) => spell.name === 'Many Beams')?.summary).toContain(
+      'additional beam',
+    );
+  });
+
   it('summarizes spellcasting: modifier, attack, save DC, and slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
     // WIS 18 (+4), proficiency +2 at level 4.
     expect(spellcasting).toEqual({
       profiles: [
-        { source: 'Cleric', ability: 'WIS', modifier: 4, attack: 6, saveDc: 14 },
+        {
+          source: 'Cleric',
+          ability: 'WIS',
+          modifier: 4,
+          attack: 6,
+          saveDc: 14,
+          focus: 'Holy Symbol',
+        },
       ],
       // A level-4 full caster has four 1st-level and three 2nd-level slots.
       slots: [4, 3],
@@ -676,6 +1386,58 @@ describe('normalizeCharacter', () => {
     ]);
   });
 
+  it('keeps class-specific casting bonuses separate for classes sharing an ability', () => {
+    const rows: number[][] = [];
+    rows[3] = [4, 2];
+    const character = {
+      id: 1,
+      name: 'Two Charisma Casters',
+      stats: [{ id: 6, name: null, value: 18 }],
+      classes: [
+        {
+          level: 3,
+          definition: {
+            name: 'Bard',
+            canCastSpells: true,
+            spellCastingAbilityId: 6,
+            spellRules: { multiClassSpellSlotDivisor: 1, levelSpellSlots: rows },
+            classFeatures: [{ id: 100, name: 'Bardic Power', requiredLevel: 1 }],
+          },
+        },
+        {
+          level: 3,
+          definition: {
+            name: 'Sorcerer',
+            canCastSpells: true,
+            spellCastingAbilityId: 6,
+            spellRules: { multiClassSpellSlotDivisor: 1, levelSpellSlots: rows },
+            classFeatures: [{ id: 200, name: 'Sorcerous Power', requiredLevel: 1 }],
+          },
+        },
+      ],
+      modifiers: {
+        item: [{ type: 'bonus', subType: 'spell-attacks', fixedValue: 1 }],
+        class: [{ type: 'bonus', subType: 'sorcerer-spell-save-dc', fixedValue: 1 }],
+      },
+      actions: {
+        class: [
+          { name: 'Bardic Save', componentId: 100, saveStatId: 2 },
+          { name: 'Sorcerous Save', componentId: 200, saveStatId: 2 },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.spellcasting?.profiles).toEqual([
+      { source: 'Bard', ability: 'CHA', modifier: 4, attack: 8, saveDc: 15 },
+      { source: 'Sorcerer', ability: 'CHA', modifier: 4, attack: 8, saveDc: 16 },
+    ]);
+    expect(normalized.actions.map((action) => [action.name, action.save])).toEqual([
+      ['Bardic Save', 'DC 15 DEX'],
+      ['Sorcerous Save', 'DC 16 DEX'],
+    ]);
+  });
+
   it('resolves spell summaries using the granting class level', () => {
     const character = {
       id: 1,
@@ -723,7 +1485,7 @@ describe('normalizeCharacter', () => {
       range: '120 ft.',
       components: 'V, S, M',
       concentration: true,
-      duration: 'Conc, 1 minute',
+      duration: '1 minute',
     });
     // A blurb of several whole sentences — enough to play with, not just the
     // first line.
@@ -776,6 +1538,12 @@ describe('normalizeCharacter', () => {
     // run-on text.
     expect(summary).not.toContain('Weal');
     expect(summary).not.toContain('Neither good nor bad');
+    expect(augury?.material).toBe(
+      'specially marked sticks, bones, cards, or other divinatory tokens worth 25+ GP',
+    );
+    expect(
+      normalizeCharacter(raw).spells.find((spell) => spell.name === 'Shield of Faith')?.material,
+    ).toBeUndefined();
   });
 
   it('lists inventory items and coins', () => {
@@ -940,6 +1708,47 @@ describe('normalizeCharacter', () => {
     expect(items.find((item) => item.name === 'Empty Power')?.summary).toBe(
       'This feature must not point to an empty action row.',
     );
+  });
+
+  it('omits hidden base class features and feats from features and generated artifacts', () => {
+    const hiddenBlock =
+      '<div class="stat-block"><h4>Hidden Companion</h4>' +
+      '<table><tbody><tr><th>STR</th><td>10</td></tr></tbody></table></div>';
+    const character = {
+      id: 1,
+      name: 'Hidden Rules',
+      classes: [
+        {
+          level: 1,
+          definition: {
+            name: 'Test Class',
+            classFeatures: [
+              {
+                id: 1,
+                name: 'Hidden Base Feature',
+                requiredLevel: 1,
+                hideInSheet: true,
+                description: hiddenBlock,
+              },
+            ],
+          },
+        },
+      ],
+      feats: [
+        {
+          definition: {
+            id: 2,
+            name: 'Hidden Feat',
+            hideInSheet: true,
+            description: hiddenBlock,
+          },
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.features.flatMap((group) => group.items)).toEqual([]);
+    expect(normalized.companions).toEqual([]);
   });
 
   it('drops sentences that reference a rules table (absent from the sheet)', () => {
@@ -1320,11 +2129,13 @@ describe('normalizeCharacter', () => {
     });
     expect(normalized.spells.find((spell) => spell.name === 'Summon Beast')).toMatchObject({
       summary: 'You call forth a bestial spirit.',
+      related: ['companions'],
     });
     expect(normalized.spells.find((spell) => spell.name === 'Summon Beast')?.list).toBeUndefined();
     expect(normalized.spells.find((spell) => spell.name === 'Summon Fey')).toMatchObject({
       summary:
         'You call forth a fey spirit. The spirit disappears when your concentration ends.',
+      related: ['companions'],
     });
     expect(normalized.spells.find((spell) => spell.name === 'Summon Fey')?.summary).not.toContain(
       'Fey Blade',
@@ -1395,25 +2206,35 @@ describe('normalizeCharacter', () => {
     expect(actions.get('Psychic Veil')?.summary).toBe('Become Invisible.');
   });
 
-  it('keeps only the intro blurb for the Spellcasting feature', () => {
+  it('points the generic Spellcasting feature to its dedicated card', () => {
     const spellcasting = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Spellcasting');
-    // The generic casting mechanics (cantrips, slots, preparing spells, …) live
-    // on the Spells card, so only the basic intro is kept — no sub-parts.
+    // Casting stats, slots, focus, and spell rows live on the Spells card.
     expect(spellcasting?.parts).toBeUndefined();
-    expect(spellcasting?.summary).toBe(
-      'You have learned to cast spells through prayer and meditation. The information below ' +
-        'details how you use those rules with Cleric spells, which appear on the Cleric spell list.',
-    );
+    expect(spellcasting?.summary).toBeUndefined();
+    expect(spellcasting?.reference).toBe('spells');
   });
 
-  it('leaves a feature without sub-parts as a plain summary', () => {
+  it('points a pure save-defense trait to Saves & Defences without duplicate prose', () => {
     const feyAncestry = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Fey Ancestry');
     expect(feyAncestry?.parts).toBeUndefined();
-    expect(feyAncestry?.summary?.length ?? 0).toBeGreaterThan(0);
+    expect(feyAncestry?.summary).toBeUndefined();
+    expect(feyAncestry?.related).toEqual(['savingThrows']);
+  });
+
+  it('omits pure Speed/Darkvision traits and resolves selected skill traits', () => {
+    const racialTraits =
+      normalizeCharacter(raw).features.find((group) => group.label === 'Racial Traits')?.items ?? [];
+    expect(racialTraits.map((item) => item.name)).not.toEqual(
+      expect.arrayContaining(['Speed', 'Darkvision']),
+    );
+    expect(racialTraits.find((item) => item.name === 'Keen Senses')).toMatchObject({
+      summary: 'Perception',
+      related: ['skills'],
+    });
   });
 
   it('summarizes ability-score features as just the bumps they grant', () => {
@@ -1703,12 +2524,13 @@ describe('normalizeCharacter', () => {
     expect(counts.spells).toBe(18);
     expect(counts.inventory).toBe(24);
     // The count is the distinct features actually shown: deduped and minus
-    // hidden traits, structural placeholders (ASI / the subclass choice /
+    // hidden traits, pure Speed/Darkvision duplicates, structural placeholders (ASI / the subclass choice /
     // "Core Cleric Traits"), above-level granted features (Divine Intervention),
     // disguise-feat placeholders (Dark Bargain, Runestones), and choice prompts
-    // replaced by their selected option (Elven Lineage -> Drow Lineage), plus
-    // generic ability-score prompts that produced no concrete modifiers.
-    expect(counts.features).toBe(18);
+    // replaced by their selected option (Elven Lineage -> Drow Lineage), generic
+    // ability-score prompts without concrete modifiers, and Size / Creature Type
+    // now owned by the Basics title line.
+    expect(counts.features).toBe(14);
     expect(counts.basics).toBe(0); // Noct has no active conditions
     expect(counts.proficiencies).toBeGreaterThan(0);
     expect(counts.actions).toBeGreaterThan(0);
@@ -1781,6 +2603,85 @@ describe('normalizeCharacter', () => {
     expect(attack).toMatchObject({
       toHit: 8,
       damage: { dice: '1d8', bonus: 6, type: 'Slashing' },
+    });
+  });
+
+  it('applies contextual weapon attack bonuses without leaking between modes', () => {
+    const weapon = (id: number, name: string, attackType: number) => ({
+      id,
+      equipped: true,
+      definition: {
+        name,
+        filterType: 'Weapon',
+        damage: { diceCount: 1, diceValue: 8, diceString: '1d8' },
+        damageType: attackType === 2 ? 'Piercing' : 'Slashing',
+        attackType,
+        categoryId: 2,
+        range: attackType === 2 ? 80 : 5,
+      },
+    });
+    const character = {
+      id: 1,
+      name: 'Attack Bonuses',
+      stats: [
+        { id: 1, name: null, value: 16 },
+        { id: 2, name: null, value: 16 },
+      ],
+      classes: [{ level: 1, definition: { name: 'Fighter' } }],
+      inventory: [weapon(1, 'Longsword', 1), weapon(2, 'Longbow', 2)],
+      modifiers: {
+        class: [
+          { type: 'proficiency', subType: 'martial-weapons' },
+          { type: 'bonus', subType: 'weapon-attacks', fixedValue: 1 },
+          { type: 'bonus', subType: 'ranged-weapon-attacks', fixedValue: 2 },
+          {
+            type: 'bonus',
+            subType: 'melee-weapon-attacks',
+            fixedValue: 9,
+            restriction: 'Only during a special stance',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const attacks = normalizeCharacter(character).attacks;
+    expect(attacks.find((attack) => attack.name === 'Longsword')?.toHit).toBe(6);
+    expect(attacks.find((attack) => attack.name === 'Longbow')?.toHit).toBe(8);
+  });
+
+  it('does not add an ability modifier to fixed weapon damage', () => {
+    const character = {
+      id: 1,
+      name: 'Fixed Damage',
+      stats: [{ id: 2, name: null, value: 18 }],
+      classes: [{ level: 1, definition: { name: 'Fighter' } }],
+      inventory: [
+        {
+          id: 1,
+          equipped: true,
+          definition: {
+            name: 'Blowgun',
+            filterType: 'Weapon',
+            fixedDamage: 1,
+            damageType: 'Piercing',
+            attackType: 2,
+            categoryId: 2,
+            range: 25,
+            longRange: 100,
+          },
+        },
+      ],
+      modifiers: {
+        class: [{ type: 'proficiency', subType: 'martial-weapons' }],
+      },
+    } as unknown as RawCharacter;
+
+    expect(
+      normalizeCharacter(character).attacks.find((attack) => attack.name === 'Blowgun'),
+    ).toMatchObject({
+      toHit: 6,
+      damage: { dice: '', bonus: 1, type: 'Piercing' },
+      range: '25/100 ft.',
     });
   });
 

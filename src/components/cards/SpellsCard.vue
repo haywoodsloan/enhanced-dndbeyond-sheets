@@ -47,11 +47,19 @@ const groups = computed(() => {
   return result;
 });
 
-/** Compact per-spell shorthand: "A · 60 ft. · V,S · 1d8 Radiant · DEX save". */
+/** Compact per-spell metadata joined with middots. */
 function spellMeta(spell: SpellEntry): string {
   const hit = spell.save ? `${spell.save} save` : spell.attack ? 'Spell attack' : '';
   const ability = (props.spellcasting?.profiles.length ?? 0) > 1 ? spell.ability : '';
-  return [ability, spell.castingTime, spell.range, spell.components, formatDamage(spell.damage), hit]
+  return [
+    ability,
+    spell.castingTime,
+    spell.range,
+    spell.components,
+    spell.duration,
+    formatDamage(spell.damage),
+    hit,
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -82,6 +90,7 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
         <span class="spells__stat">
           {{ profile.ability }} <b>{{ formatModifier(profile.modifier) }}</b>
         </span>
+        <span v-if="profile.focus" class="spells__stat">Focus <b>{{ profile.focus }}</b></span>
       </span>
     </div>
     <div
@@ -117,6 +126,9 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
           data-spell
         >
           <span class="spells__name">{{ spell.name }}</span>
+          <span v-if="spell.related?.includes('companions')" class="spells__reference">
+            (see Companions)
+          </span>
           <span
             v-for="tag in spellTags(spell)"
             :key="tag.key"
@@ -134,6 +146,9 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
             <ResourceBoxes :resource="use.pool" />
           </span>
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
+          <span v-if="spell.material" class="spells__material">
+            <strong>Material:</strong> {{ spell.material }}
+          </span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
           <StructuredList
             v-if="spell.list?.items.length"
@@ -252,6 +267,12 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   color: var(--p-text-color, #1c1c1e);
 }
 
+.spells__reference {
+  margin-left: 5px;
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+}
+
 /* Concentration/ritual marker box after the spell name. */
 .spells__spell-tag {
   margin-left: 4px;
@@ -294,6 +315,17 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   font-size: 12px;
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);
+}
+
+.spells__material {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.spells__material strong {
+  color: var(--p-text-color, #1c1c1e);
 }
 
 .spells__structured-list {

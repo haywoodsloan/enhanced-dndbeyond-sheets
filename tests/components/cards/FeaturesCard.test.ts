@@ -132,7 +132,7 @@ describe('FeaturesCard', () => {
     expect(items[1].text()).toContain('(see Spells)');
     expect(items[2].text()).toContain('(see Companions)');
     expect(items[3].text()).toContain('(see Tables)');
-    expect(items[4].text()).toContain('(see basics)');
+    expect(items[4].text()).toContain('(see Basics)');
   });
 
   it('lists feature-granted spells without rendering their use trackers', () => {

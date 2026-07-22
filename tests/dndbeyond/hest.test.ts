@@ -17,6 +17,8 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(character.name).toBe('Hest');
     expect(character.race).toBe('Tiefling');
     expect(character.background).toBe('Charlatan');
+    expect(character.size).toBe('Medium');
+    expect(character.creatureType).toBe('Humanoid');
     expect(character.level).toBe(6);
     expect(character.classes).toEqual([
       { name: 'Sorcerer', level: 6, subclass: 'Draconic Sorcery' },
@@ -49,11 +51,26 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(scoreByKey).toEqual({ str: 9, dex: 14, con: 12, int: 14, wis: 10, cha: 18 });
   });
 
+  it('applies Draconic Resilience to AC and maximum hit points', () => {
+    const { basics } = normalizeCharacter(raw);
+    // 10 + Dex (+2) + Cha (+4), while unarmored.
+    expect(basics.armorClass).toBe(16);
+    // Base 26 + Con (+1) × 6 + Draconic Resilience (1 × 6 Sorcerer levels).
+    expect(basics.hitPoints).toEqual({ current: 38, max: 38, temp: 0 });
+  });
+
   it('summarizes Charisma-based spellcasting with level-6 slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
     expect(spellcasting).toEqual({
       profiles: [
-        { source: 'Sorcerer', ability: 'CHA', modifier: 4, attack: 7, saveDc: 15 },
+        {
+          source: 'Sorcerer',
+          ability: 'CHA',
+          modifier: 4,
+          attack: 8,
+          saveDc: 16,
+          focus: 'Arcane Focus',
+        },
       ],
       slots: [4, 3, 3],
     });
@@ -69,6 +86,9 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
+    expect(namesOf('Racial Traits')).not.toEqual(
+      expect.arrayContaining(['Speed', 'Darkvision', 'Size', 'Creature Type']),
+    );
     expect(namesOf('Racial Traits')).toContain('Otherworldly Presence (Charisma)');
     expect(namesOf('Racial Traits')).not.toContain('Charisma');
     expect(namesOf('Racial Traits')).not.toContain('Ability Score Increases');
@@ -171,6 +191,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const skilled = items.find((item) => item.name === 'Skilled');
     // The generic "any combination of your choice" blurb is replaced by the picks.
     expect(skilled?.summary).toBe('Stealth, Perception, Insight');
+    expect(skilled?.related).toEqual(['skills']);
     expect(skilled?.summary).not.toMatch(/of your choice/i);
     // The repeatable-feat boilerplate note is dropped.
     expect((skilled?.parts ?? []).some((part) => part.label === 'Repeatable')).toBe(
@@ -249,6 +270,45 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
         pool: { max: 1, recovery: { kind: 'rest', rest: 'long' } },
       },
     ]);
+  });
+
+  it('keeps costly spell materials but omits ordinary focus components', () => {
+    const { spells } = normalizeCharacter(raw);
+    expect(spells.find((spell) => spell.name === 'Chromatic Orb')?.material).toBe(
+      'a diamond worth 50+ GP',
+    );
+    expect(spells.find((spell) => spell.name === 'Fireball')?.material).toBeUndefined();
+  });
+
+  it('does not mislabel choose-your-damage-type spells as Acid', () => {
+    const { spells } = normalizeCharacter(raw);
+    expect(spells.find((spell) => spell.name === 'Sorcerous Burst')?.damage).toMatchObject({
+      dice: '2d8',
+      type: 'chosen type',
+    });
+    expect(spells.find((spell) => spell.name === 'Chromatic Orb')?.damage).toMatchObject({
+      dice: '3d8',
+      type: 'chosen type',
+    });
+    expect(spells.find((spell) => spell.name === "Dragon's Breath")?.damage).toMatchObject({
+      dice: '3d6',
+      type: 'chosen type',
+    });
+  });
+
+  it('does not repeat damage scaling already shown in spell metadata', () => {
+    const { spells } = normalizeCharacter(raw);
+    const fireBolt = spells.find((spell) => spell.name === 'Fire Bolt');
+    expect(fireBolt?.damage?.dice).toBe('2d10');
+    expect(fireBolt?.summary).not.toMatch(/Cantrip Upgrade|increases by 1d10/i);
+
+    const burningHands = spells.find((spell) => spell.name === 'Burning Hands');
+    expect(burningHands?.damage?.scaling).toBe('+1d6 per slot level above 1st');
+    expect(burningHands?.summary).not.toMatch(/Higher-Level Spell Slot|increases by 1d6/i);
+
+    // Non-damage upcast mechanics remain in prose/list content.
+    const command = spells.find((spell) => spell.name === 'Command');
+    expect(JSON.stringify(command?.list)).toContain('Using a Higher-Level Spell Slot');
   });
 
   it('uses the active level-scaled class feature snippet', () => {

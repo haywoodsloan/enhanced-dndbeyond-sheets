@@ -8,6 +8,11 @@ const props = defineProps<{ basics: CharacterBasics }>();
 // Every condition is listed with a checkbox so the printed sheet can be marked
 // by hand during play; conditions already active on the character are pre-checked.
 const activeConditions = computed(() => new Set(props.basics.conditions));
+
+function conditionLabel(name: string): string {
+  const level = props.basics.conditionLevels?.[name];
+  return level ? `${name} (${level})` : name;
+}
 </script>
 
 <template>
@@ -39,6 +44,9 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 
       <div class="basics__stat" data-stat="speed">
         <span class="basics__value">{{ basics.speed }}<small> ft</small></span>
+        <span v-if="basics.specialSpeeds?.length" class="basics__speed-extra">
+          {{ basics.specialSpeeds.map((speed) => `${speed.label} ${speed.value}`).join(' · ') }}
+        </span>
         <span class="basics__label">Speed</span>
       </div>
 
@@ -115,7 +123,7 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
           <li v-for="name in CONDITION_NAMES" :key="name" class="conditions__item">
             <label class="conditions__box">
               <input type="checkbox" :checked="activeConditions.has(name)" />
-              <span>{{ name }}</span>
+              <span>{{ conditionLabel(name) }}</span>
             </label>
           </li>
         </ul>
@@ -160,6 +168,10 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
   padding-bottom: 12px;
 }
 
+.basics__stack .basics__value {
+  white-space: nowrap;
+}
+
 .basics__value {
   font-size: 18px;
   font-weight: 700;
@@ -169,6 +181,13 @@ const activeConditions = computed(() => new Set(props.basics.conditions));
 .basics__value small {
   font-size: 12px;
   font-weight: 400;
+}
+
+.basics__speed-extra {
+  font-size: 9px;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--p-text-muted-color, #888);
 }
 
 .basics__sep {

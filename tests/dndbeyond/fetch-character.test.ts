@@ -19,7 +19,7 @@ function jsonResponse(
 describe('characterServiceUrl', () => {
   it('builds the v5 character endpoint url', () => {
     expect(characterServiceUrl(166869100)).toBe(
-      'https://character-service.dndbeyond.com/character/v5/character/166869100',
+      'https://character-service.dndbeyond.com/character/v5/character/166869100?includeCustomItems=true',
     );
   });
 

@@ -36,6 +36,22 @@ describe('BasicsCard', () => {
     expect(wrapper.find('[data-stat="conditions"]').text()).toContain('Blinded');
   });
 
+  it('renders non-walking movement speeds compactly', () => {
+    const wrapper = mount(BasicsCard, {
+      props: {
+        basics: {
+          ...basics,
+          specialSpeeds: [
+            { label: 'Fly', value: 50 },
+            { label: 'Swim', value: 30 },
+          ],
+        },
+      },
+    });
+
+    expect(wrapper.get('.basics__speed-extra').text()).toBe('Fly 50 · Swim 30');
+  });
+
   it('shows temp HP and active conditions when present', () => {
     const wrapper = mount(BasicsCard, {
       props: {
@@ -61,6 +77,24 @@ describe('BasicsCard', () => {
     expect((blinded!.find('input').element as HTMLInputElement).checked).toBe(
       false,
     );
+  });
+
+  it('shows a condition level while keeping its canonical checkbox active', () => {
+    const wrapper = mount(BasicsCard, {
+      props: {
+        basics: {
+          ...basics,
+          conditions: ['Exhaustion'],
+          conditionLevels: { Exhaustion: 2 },
+        },
+      },
+    });
+
+    const exhaustion = wrapper
+      .findAll('[data-stat="conditions"] .conditions__box')
+      .find((row) => row.text().includes('Exhaustion'))!;
+    expect(exhaustion.text()).toContain('Exhaustion (2)');
+    expect((exhaustion.find('input').element as HTMLInputElement).checked).toBe(true);
   });
 
   it('renders empty death save tracks', () => {

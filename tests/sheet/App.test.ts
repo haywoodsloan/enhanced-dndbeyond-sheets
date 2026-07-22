@@ -250,6 +250,150 @@ describe('sheet App', () => {
     vi.unstubAllGlobals();
   });
 
+  it('grows an expanded spell card to its measured content height', async () => {
+    const spellCharacter: Character = {
+      ...sampleCharacter,
+      spells: [
+        {
+          name: 'Encyclopedic Invocation',
+          level: 3,
+          school: 'Abjuration',
+          castingTime: 'A',
+          range: '60 ft.',
+          components: 'V, S, M',
+          concentration: true,
+          duration: '1 minute',
+          summary: 'A detailed spell summary that needs more than the fixed tile estimate.',
+        },
+      ],
+      sections: sampleCharacter.sections.map((section) =>
+        section.key === 'spells' ? { ...section, count: 1 } : section,
+      ),
+    };
+    const rect = (height: number) =>
+      ({
+        top: 0,
+        bottom: height,
+        left: 0,
+        right: 0,
+        width: 0,
+        height,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const spellCard = this.closest?.('[data-section-key^="spell:"]');
+        if (spellCard && this.classList?.contains('card__body')) return rect(650);
+        return rect(0);
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    mockedLoad.mockResolvedValue(spellCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await wrapper.get('[data-section-key="spells"] .card__spell-toggle').trigger('click');
+    await flushPromises();
+    await nextTick();
+    await flushPromises();
+
+    const style = wrapper.get('[data-section-key="spell:encyclopedic-invocation"]')
+      .attributes('style') ?? '';
+    expect(style).toMatch(/grid-row:\s*\d+\s*\/\s*span 3/);
+
+    await wrapper
+      .get('[data-section-key="spell:encyclopedic-invocation"] .card__spell-toggle')
+      .trigger('click');
+    await flushPromises();
+    wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('continues an expanded spell card at whole detail boundaries', async () => {
+    const spellCharacter: Character = {
+      ...sampleCharacter,
+      spells: [
+        {
+          name: 'Many-Part Working',
+          level: 5,
+          school: 'Conjuration',
+          castingTime: 'A',
+          range: '120 ft.',
+          components: 'V, S, M',
+          material: 'A precisely prepared focus worth 1,000 gp',
+          concentration: true,
+          duration: '10 minutes',
+          save: 'WIS',
+          summary: 'Each complete detail remains on one page rather than being cut in half.',
+        },
+      ],
+      sections: sampleCharacter.sections.map((section) =>
+        section.key === 'spells' ? { ...section, count: 1 } : section,
+      ),
+    };
+    const rect = (top: number, height: number) =>
+      ({
+        top,
+        bottom: top + height,
+        left: 0,
+        right: 0,
+        width: 0,
+        height,
+        x: 0,
+        y: top,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const card = this.closest?.('[data-section-key="spell:many-part-working"]');
+        if (!card) return rect(0, 0);
+        const parts = Array.from(card.querySelectorAll('[data-spell-card-part]'));
+        if (this.classList?.contains('card__body')) return rect(0, parts.length * 350);
+        if (this.matches?.('[data-spell-card-part]')) {
+          const index = Math.max(0, parts.indexOf(this));
+          return rect(index * 350, 350);
+        }
+        return rect(0, 0);
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    mockedLoad.mockResolvedValue(spellCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await wrapper.get('[data-section-key="spells"] .card__spell-toggle').trigger('click');
+    await flushPromises();
+    await nextTick();
+    await flushPromises();
+
+    const continuation = wrapper.find('[data-section-key="spell:many-part-working~cont~1"]');
+    expect(continuation.exists()).toBe(true);
+    expect(continuation.text()).toContain('Many-Part Working (cont.)');
+    expect(wrapper.get('[data-section-key="spell:many-part-working"] .card__body')
+      .attributes('style')).toContain('clip-path');
+
+    await wrapper
+      .get('[data-section-key="spell:many-part-working"] .card__spell-toggle')
+      .trigger('click');
+    await flushPromises();
+    wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
   it('overflows a tall content-fit card onto a continuation card', async () => {
     const actions = Array.from({ length: 6 }, (_, i) => ({
       name: `Action ${i + 1}`,

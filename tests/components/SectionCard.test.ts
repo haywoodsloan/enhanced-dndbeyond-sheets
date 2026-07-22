@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import SectionCard from '@/components/SectionCard.vue';
 import { ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
+import { continuationKey } from '@/utils/layout/card-continuation';
 import { makeCharacter } from '../fixtures/character';
 
 describe('SectionCard', () => {
@@ -45,6 +46,34 @@ describe('SectionCard', () => {
     });
     await spellCard.get('.card__spell-toggle').trigger('click');
     expect(toggle).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows the spell legend on the base card and every continuation', () => {
+    const character = makeCharacter({ spells: [{ name: 'Guidance', level: 0 }] });
+    const sections = [
+      { key: 'spells' as const, title: 'Spells' },
+      { key: continuationKey('spells', 1), title: 'Spells (cont.)' },
+    ];
+
+    for (const section of sections) {
+      const wrapper = mount(SectionCard, {
+        props: {
+          section: { ...section, count: 1, isEmpty: false },
+          span: { cols: 3, rows: 2 },
+          character,
+        },
+      });
+      const legend = wrapper.get('.card__spell-legend');
+      expect(legend.element.parentElement?.classList.contains('card__title')).toBe(true);
+      expect(legend.findAll('.card__spell-legend-tag').map((tag) => tag.text())).toEqual([
+        'C',
+        'R',
+      ]);
+      const items = legend.findAll('.card__spell-legend-item');
+      expect(items).toHaveLength(2);
+      expect(items[0].findAll('span').map((label) => label.text())).toEqual(['Concentration']);
+      expect(items[1].findAll('span').map((label) => label.text())).toEqual(['Ritual']);
+    }
   });
 
   it('shows an empty note when the section is empty', () => {
@@ -98,6 +127,11 @@ describe('SectionCard', () => {
         },
         span: { cols: 3, rows: 3 },
         character: makeCharacter({
+          name: 'Noct',
+          race: 'Elf',
+          size: 'Medium',
+          creatureType: 'Humanoid',
+          classes: [{ name: 'Cleric', level: 4, subclass: 'Grave Domain' }],
           basics: {
             armorClass: 20,
             initiative: 0,
@@ -116,6 +150,8 @@ describe('SectionCard', () => {
     // Current HP is a writable blank; only the max is printed.
     expect(wrapper.find('[data-stat="hp"] .basics__blank').exists()).toBe(true);
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
+    expect(wrapper.findAll('.card__title-sep')).toHaveLength(2);
+    expect(wrapper.get('.card__meta').text()).toBe('Medium · Humanoid');
     expect(
       wrapper.findAll('[data-stat="conditions"] input[type="checkbox"]'),
     ).toHaveLength(15);

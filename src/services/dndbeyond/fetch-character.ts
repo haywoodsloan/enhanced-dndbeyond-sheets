@@ -16,7 +16,7 @@ export function characterServiceUrl(id: number | string): string {
   if (!Number.isInteger(numericId) || numericId <= 0) {
     throw new CharacterFetchError(`Invalid character id: ${String(id)}`);
   }
-  return `${CHARACTER_SERVICE_BASE}/${numericId}`;
+  return `${CHARACTER_SERVICE_BASE}/${numericId}?includeCustomItems=true`;
 }
 
 /** Error thrown when a character cannot be fetched or the service reports failure. */

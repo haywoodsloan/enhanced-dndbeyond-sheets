@@ -83,6 +83,8 @@ export interface CharacterBasics {
   initiative: number;
   /** Walking speed in feet. */
   speed: number;
+  /** Non-walking movement speeds available to the character. */
+  specialSpeeds?: { label: string; value: number }[];
   proficiencyBonus: number;
   hitPoints: HitPoints;
   /** Hit dice grouped by die size (highest die first); empty when none. */
@@ -91,6 +93,8 @@ export interface CharacterBasics {
   inspiration: boolean;
   /** Active condition names; empty when none. */
   conditions: string[];
+  /** Levels for conditions that support them, keyed by canonical condition name. */
+  conditionLevels?: Record<string, number>;
 }
 
 /** A single saving throw with its total modifier and proficiency. */
@@ -149,7 +153,7 @@ export interface DamageInfo {
   type?: string;
   /** Flat modifier added to the roll (ability mod, magic bonus, fixed value). */
   bonus?: number;
-  /** What grows with level / upcasting, e.g. "+1d8 per slot above 1st". */
+  /** What grows with upcasting, e.g. "+1d8 per slot level above 1st". */
   scaling?: string;
 }
 
@@ -188,8 +192,10 @@ export interface SpellEntry {
   range?: string;
   /** Components present, e.g. "V, S, M". */
   components?: string;
-  /** Duration shorthand, e.g. "Instant", "1 min", "Conc, 1 min". */
+  /** Duration value, e.g. "Instant" or "1 minute"; concentration is separate. */
   duration?: string;
+  /** Costly or consumed material requirement; ordinary focus-replaceable materials are omitted. */
+  material?: string;
   concentration?: boolean;
   ritual?: boolean;
   /** Save ability abbreviation (e.g. "DEX") when the spell forces a save. */
@@ -208,6 +214,8 @@ export interface SpellEntry {
   featureUses?: FeatureSpellUse[];
   /** Ability used for this spell when a character has multiple casting profiles. */
   ability?: string;
+  /** Dedicated cards that own extracted supporting detail, such as a summon stat block. */
+  related?: SectionKey[];
 }
 
 /** One feature that grants its own limited pool of casts for a spell. */
@@ -235,6 +243,8 @@ export interface SpellcastingProfile {
   modifier: number;
   attack: number;
   saveDc: number;
+  /** Class-specific object usable as a spellcasting focus. */
+  focus?: string;
 }
 
 export interface PactSlotPool {
@@ -376,6 +386,10 @@ export interface Character {
   name: string;
   race?: string;
   background?: string;
+  /** Selected creature size, shown in the Basics title line. */
+  size?: string;
+  /** Rules-facing creature type, shown in the Basics title line. */
+  creatureType?: string;
   /** Portrait image URL, if the character has one. */
   avatarUrl?: string;
   classes: CharacterClassSummary[];

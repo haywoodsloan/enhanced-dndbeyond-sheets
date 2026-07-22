@@ -66,8 +66,11 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
     { label: 'Tall', cols: 1, rows: 2 },
   ],
   skills: [
-    { label: 'Wide', cols: 3, rows: 1 },
-    { label: 'List', cols: 1, rows: 3 },
+    { label: 'Wide', cols: 3, rows: 1, dynamic: { perRow: 18, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 3, dynamic: { perRow: 6, maxRows: 6 } },
+  ],
+  savingThrows: [
+    { label: 'Wide', cols: 2, rows: 1, dynamic: { perRow: 6, maxRows: 6 } },
   ],
   proficiencies: [
     { label: 'Wide', cols: 2, rows: 1 },

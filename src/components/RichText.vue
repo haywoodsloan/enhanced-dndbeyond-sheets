@@ -11,10 +11,16 @@ const segments = computed(() =>
 </script>
 
 <template>
-  <span
+  <span class="rich-text"
     ><template v-for="(segment, index) in segments" :key="index"
       ><strong v-if="segment.bold">{{ segment.text }}</strong
       ><template v-else>{{ segment.text }}</template></template
     ></span
   >
 </template>
+
+<style scoped>
+.rich-text {
+  overflow-wrap: anywhere;
+}
+</style>

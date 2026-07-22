@@ -3,7 +3,8 @@ import { formatModifier } from './dnd5e';
 
 /**
  * Render a damage line: "1d8+2 Piercing", a flat "3 Bludgeoning", and an
- * optional higher-level scaling note, e.g. "2d6 Fire (+1d6/slot)". Returns an
+ * optional higher-level scaling note, e.g.
+ * "2d6 Fire (+1d6 per slot level above 1st)". Returns an
  * empty string when there is nothing to show.
  */
 export function formatDamage(damage: DamageInfo | undefined | null): string {

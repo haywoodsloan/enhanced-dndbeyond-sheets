@@ -9,6 +9,7 @@ import {
   formatModifier,
   maxHitPoints,
   proficiencyBonus,
+  SKILLS,
 } from '@/utils/character/dnd5e';
 
 describe('abilityModifier', () => {
@@ -68,6 +69,14 @@ describe('ABILITIES', () => {
   });
 });
 
+describe('SKILLS', () => {
+  it('keeps the D&D Beyond value ids in canonical skill order', () => {
+    expect(SKILLS.map((skill) => skill.valueId)).toEqual([
+      3, 11, 6, 2, 16, 7, 12, 17, 8, 13, 9, 14, 18, 19, 10, 4, 5, 15,
+    ]);
+  });
+});
+
 describe('armorClass', () => {
   it('applies the Dex rule for each armor category', () => {
     expect(armorClass({ category: 'none', dexModifier: 3 })).toBe(13);
@@ -83,6 +92,26 @@ describe('armorClass', () => {
     expect(
       armorClass({ category: 'none', dexModifier: 2, shieldBonus: 2, bonus: 1 }),
     ).toBe(15);
+  });
+
+  it('uses an extra ability modifier only for unarmored AC', () => {
+    expect(
+      armorClass({ category: 'none', dexModifier: 2, unarmoredBonus: 4 }),
+    ).toBe(16);
+    expect(
+      armorClass({
+        category: 'light',
+        armorBase: 11,
+        dexModifier: 2,
+        unarmoredBonus: 4,
+      }),
+    ).toBe(13);
+  });
+
+  it('supports a raised medium-armor Dexterity cap', () => {
+    expect(
+      armorClass({ category: 'medium', armorBase: 15, dexModifier: 4, mediumDexCap: 3 }),
+    ).toBe(18);
   });
 });
 

@@ -7,6 +7,12 @@ import StructuredList from '@/components/StructuredList.vue';
 defineProps<{ features: FeatureGroup[] }>();
 
 function referenceLabel(section: SectionKey): string {
+  if (section === 'basics') return 'Basics';
+  if (section === 'attributes') return 'Attributes';
+  if (section === 'skills') return 'Skills';
+  if (section === 'savingThrows') return 'Saves & Defences';
+  if (section === 'senses') return 'Senses';
+  if (section === 'proficiencies') return 'Proficiencies';
   if (section === 'actions') return 'Actions';
   if (section === 'attacks') return 'Attacks';
   if (section === 'spells') return 'Spells';

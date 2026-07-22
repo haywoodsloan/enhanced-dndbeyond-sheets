@@ -3,6 +3,11 @@ import { mount } from '@vue/test-utils';
 import RichText from '@/components/RichText.vue';
 
 describe('RichText', () => {
+  it('allows long unbroken rule tokens to wrap inside cards', () => {
+    const wrapper = mount(RichText, { props: { text: 'x'.repeat(100) } });
+    expect(wrapper.get('.rich-text').classes()).toContain('rich-text');
+  });
+
   it('renders text wrapped in ** as bold, leaving the rest plain', () => {
     const wrapper = mount(RichText, {
       props: { text: 'Choose the command: **Approach.** The target moves toward you.' },

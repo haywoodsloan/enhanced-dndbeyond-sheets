@@ -49,6 +49,7 @@ export interface RawSpellRules {
 export interface RawClassFeature {
   id?: number;
   name?: string;
+  hideInSheet?: boolean;
   requiredLevel?: number;
   snippet?: string | null;
   description?: string | null;
@@ -96,9 +97,18 @@ export interface RawRacialTrait {
 export interface RawRace {
   fullName?: string;
   baseRaceName?: string;
+  size?: string | null;
+  sizeId?: number | null;
+  creatureTypeId?: number | null;
   racialTraits?: RawRacialTrait[];
   weightSpeeds?: {
-    normal?: { walk?: number | null } | null;
+    normal?: {
+      walk?: number | null;
+      fly?: number | null;
+      swim?: number | null;
+      climb?: number | null;
+      burrow?: number | null;
+    } | null;
   } | null;
 }
 
@@ -120,6 +130,8 @@ export interface RawInventoryItem {
     magic?: boolean;
     /** Weapon damage dice (`1d8`, etc.); absent on non-weapons. */
     damage?: RawDice | null;
+    /** Fixed weapon damage used instead of dice/ability damage (e.g. a Blowgun). */
+    fixedDamage?: number | null;
     /** Weapon damage type name, e.g. "Piercing". */
     damageType?: string | null;
     /** Weapon properties (Finesse, Light, Thrown, …). */
@@ -232,6 +244,7 @@ export interface RawFeat {
   definition?: {
     id?: number;
     name?: string;
+    hideInSheet?: boolean;
     snippet?: string | null;
     description?: string | null;
     /** Origin tags; a `__DISGUISE_FEAT` tag means this isn't a real feat. */
@@ -261,6 +274,9 @@ export interface RawAction {
   dice?: RawDice | null;
   /** Ability id whose modifier is added to the action's damage/effect. */
   abilityModifierStatId?: number | null;
+  isProficient?: boolean | null;
+  toHitBonus?: number | null;
+  damageBonus?: number | null;
   /** Flat damage value when there are no dice (e.g. a fixed rider). */
   value?: number | null;
   /** Damage type id (see DAMAGE_TYPES). */
@@ -271,6 +287,29 @@ export interface RawAction {
   fixedSaveDc?: number | null;
   /** Range / area of the action. */
   range?: RawActionRange | null;
+}
+
+export interface RawCustomAction {
+  name?: string | null;
+  description?: string | null;
+  snippet?: string | null;
+  displayAsAttack?: boolean | null;
+  isProficient?: boolean | null;
+  statId?: number | null;
+  toHitBonus?: number | null;
+  damageBonus?: number | null;
+  diceCount?: number | null;
+  diceType?: number | null;
+  fixedValue?: number | null;
+  damageTypeId?: number | null;
+  saveStatId?: number | null;
+  fixedSaveDc?: number | null;
+  range?: number | null;
+  longRange?: number | null;
+  aoeType?: number | null;
+  aoeSize?: number | null;
+  activationTime?: number | null;
+  activationType?: number | null;
 }
 
 /**
@@ -310,6 +349,7 @@ export interface RawChoice {
   componentTypeId?: number | null;
   optionValue?: number | null;
   optionIds?: number[] | null;
+  label?: string | null;
 }
 
 export interface RawChoiceDefinition {
@@ -319,6 +359,54 @@ export interface RawChoiceDefinition {
     label?: string | null;
     description?: string | null;
   }[] | null;
+}
+
+export interface RawCharacterValue {
+  typeId?: number | null;
+  value?: number | string | null;
+  valueId?: number | string | null;
+  valueTypeId?: number | null;
+  notes?: string | null;
+}
+
+export interface RawCustomProficiency {
+  /** 1 = skill, 2 = tool, 3 = language. */
+  type?: number | null;
+  name?: string | null;
+  /** Governing ability id for a custom skill. */
+  statId?: number | null;
+  /** 1 none, 2 half, 3 proficient, 4 expertise. */
+  proficiencyLevel?: number | null;
+  miscBonus?: number | string | null;
+  magicBonus?: number | string | null;
+}
+
+export interface RawCustomSense {
+  /** 1 blindsight, 2 darkvision, 3 tremorsense, 4 truesight. */
+  senseId?: number | null;
+  distance?: number | null;
+}
+
+export interface RawCustomSpeed {
+  /** 1 walk, 2 burrow, 3 climb, 4 fly, 5 swim. */
+  movementId?: number | null;
+  distance?: number | null;
+}
+
+export interface RawCustomItem {
+  id?: number | string | null;
+  name?: string | null;
+  quantity?: number | null;
+  equipped?: boolean | null;
+  isAttuned?: boolean | null;
+  definition?: { name?: string | null } | null;
+}
+
+export interface RawCustomDefenseAdjustment {
+  /** 1 = condition immunity, 2 = damage adjustment. */
+  type?: number | null;
+  /** Dictionary id identifying the exact resistance/immunity/vulnerability. */
+  adjustmentId?: number | null;
 }
 
 export interface RawCharacterChoices {
@@ -354,6 +442,10 @@ export interface RawModifier {
   componentId?: number | null;
   /** Dice for a damage/healing modifier (e.g. a spell's damage). */
   die?: RawDice | null;
+  /** Scaling attached directly to this modifier in newer spell definitions. */
+  atHigherLevels?: {
+    higherLevelDefinitions?: { level?: number | null; dice?: RawDice | null }[] | null;
+  } | null;
 }
 
 /** An active condition entry; `id` maps to a standard 5e condition. */
@@ -382,6 +474,14 @@ export interface RawCharacter {
   overrideHitPoints?: number | null;
   removedHitPoints?: number | null;
   temporaryHitPoints?: number | null;
+  /** User-entered overrides/custom bonuses; typeId 1 is Armor Class override. */
+  characterValues?: RawCharacterValue[] | null;
+  customProficiencies?: RawCustomProficiency[] | null;
+  customSenses?: RawCustomSense[] | null;
+  customSpeeds?: RawCustomSpeed[] | null;
+  customItems?: RawCustomItem[] | null;
+  customActions?: RawCustomAction[] | null;
+  customDefenseAdjustments?: RawCustomDefenseAdjustment[] | null;
   /** Heroic Inspiration flag. */
   inspiration?: boolean | null;
   stats: RawStat[];
