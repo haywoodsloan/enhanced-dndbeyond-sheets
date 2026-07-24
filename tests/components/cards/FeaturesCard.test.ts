@@ -109,9 +109,65 @@ describe('FeaturesCard', () => {
     expect(parts[2].text()).toContain('highest number possible');
   });
 
+  it('marks multipart features as full-width continuation rows', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Class Features',
+            items: [
+              {
+                name: 'Infuse Item',
+                parts: [
+                  { label: 'Infusions Known', text: 'You know four infusions.' },
+                  { label: 'Infused Items', text: 'You can infuse two items.' },
+                ],
+              },
+              {
+                name: 'List-Only Feature',
+                parts: [
+                  {
+                    label: '',
+                    text: '',
+                    list: { items: [{ text: 'First benefit.' }] },
+                  },
+                ],
+              },
+              { name: 'Simple Feature' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const items = wrapper.findAll('[data-feature]');
+    expect(items[0].classes()).toContain('features__item--multipart');
+    expect(items[1].classes()).not.toContain('features__item--multipart');
+    expect(items[2].classes()).not.toContain('features__item--multipart');
+  });
+
+  it('uses uncoupled columns until continuation-safe rows are requested', () => {
+    const features = [
+      {
+        label: 'Class Features',
+        items: [{ name: 'Short Feature' }, { name: 'Tall Feature', summary: 'Long text.' }],
+      },
+    ];
+    const compact = mount(FeaturesCard, { props: { features } });
+    expect(compact.get('.features__list').classes()).not.toContain(
+      'features__list--row-aligned',
+    );
+
+    const continued = mount(FeaturesCard, { props: { features, rowAligned: true } });
+    expect(continued.get('.features__list').classes()).toContain(
+      'features__list--row-aligned',
+    );
+  });
+
   it('labels feature references to other dedicated cards', () => {
     const wrapper = mount(FeaturesCard, {
       props: {
+        companionTitle: 'Wild Shapes',
         features: [
           {
             label: 'Class Features',
@@ -130,7 +186,7 @@ describe('FeaturesCard', () => {
     const items = wrapper.findAll('[data-feature]');
     expect(items[0].text()).toContain('(see Attacks)');
     expect(items[1].text()).toContain('(see Spells)');
-    expect(items[2].text()).toContain('(see Companions)');
+    expect(items[2].text()).toContain('(see Wild Shapes)');
     expect(items[3].text()).toContain('(see Tables)');
     expect(items[4].text()).toContain('(see Basics)');
   });
@@ -157,6 +213,29 @@ describe('FeaturesCard', () => {
       'Spells: Alter Self, Chromatic Orb, Command',
     );
     expect(wrapper.find('[data-resource]').exists()).toBe(false);
+  });
+
+  it('renders labeled language and spell grants together', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Class Features',
+            items: [
+              {
+                name: 'Druidic',
+                grants: [{ label: 'Languages', items: ['Druidic'] }],
+                grantedSpells: ['Speak with Animals'],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('[data-feature-grant]').text()).toBe('Languages: Druidic');
+    expect(wrapper.get('[data-feature-spells]').text()).toBe('Spells: Speak with Animals');
+    expect(wrapper.find('.features__summary').exists()).toBe(false);
   });
 
   it('renders structured feature options as an actual list', () => {

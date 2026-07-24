@@ -1,10 +1,17 @@
 <script lang="ts" setup>
-import type { FeatureGroup, SectionKey } from '@/services/dndbeyond/model';
+import type { FeatureGroup, FeatureItem, SectionKey } from '@/services/dndbeyond/model';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
 import StructuredList from '@/components/StructuredList.vue';
 
-defineProps<{ features: FeatureGroup[] }>();
+const props = withDefaults(
+  defineProps<{
+    features: FeatureGroup[];
+    companionTitle?: string;
+    rowAligned?: boolean;
+  }>(),
+  { companionTitle: 'Companions', rowAligned: false },
+);
 
 function referenceLabel(section: SectionKey): string {
   if (section === 'basics') return 'Basics';
@@ -16,9 +23,17 @@ function referenceLabel(section: SectionKey): string {
   if (section === 'actions') return 'Actions';
   if (section === 'attacks') return 'Attacks';
   if (section === 'spells') return 'Spells';
-  if (section === 'companions') return 'Companions';
+  if (section === 'companions') return props.companionTitle;
   if (section === 'tables') return 'Tables';
   return section;
+}
+
+function needsFullWidth(item: FeatureItem): boolean {
+  const parts = item.parts ?? [];
+  return (
+    parts.length > 1 ||
+    parts.some((part) => Boolean(part.label || part.text || part.reference))
+  );
 }
 </script>
 
@@ -32,8 +47,17 @@ function referenceLabel(section: SectionKey): string {
       data-card-group
     >
       <span class="features__label">{{ group.label }}</span>
-      <ul class="features__list">
-        <li v-for="(item, index) in group.items" :key="index" class="features__item" data-feature>
+      <ul
+        class="features__list"
+        :class="{ 'features__list--row-aligned': rowAligned }"
+      >
+        <li
+          v-for="(item, index) in group.items"
+          :key="index"
+          class="features__item"
+          :class="{ 'features__item--multipart': needsFullWidth(item) }"
+          data-feature
+        >
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
           <span v-if="item.reference" class="features__reference features__reference--item">
@@ -47,6 +71,15 @@ function referenceLabel(section: SectionKey): string {
             (see {{ referenceLabel(related) }})
           </span>
           <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
+          <span
+            v-for="grant in item.grants"
+            :key="grant.label"
+            class="features__grants"
+            data-feature-grant
+          >
+            <span class="features__grants-label">{{ grant.label }}:</span>
+            {{ grant.items.join(', ') }}
+          </span>
           <span v-if="item.grantedSpells?.length" class="features__spells" data-feature-spells>
             <span class="features__spells-label">Spells:</span>
             {{ item.grantedSpells.join(', ') }}
@@ -97,25 +130,41 @@ function referenceLabel(section: SectionKey): string {
   color: var(--p-text-muted-color, #888);
 }
 
-/* A masonry-style multi-column list: each item takes only its own height and the
-   columns pack independently, so a short item never leaves a gap before the next
-   one just because the item beside it is taller (a grid aligns rows and forces
-   that gap). As many >=240px columns as the card width allows. */
 .features__list {
   margin: 0;
   padding: 0;
   list-style: none;
-  column-width: 240px;
-  column-gap: 20px;
   font-size: 14px;
+}
+
+/* A card that fits on one page uses independent masonry-like columns, so a
+   short item never inherits empty height from a taller neighbor. */
+.features__list:not(.features__list--row-aligned) {
+  column-width: 220px;
+  column-gap: 20px;
+}
+
+/* Once a card needs continuations, align items into rows so every horizontal
+   slice boundary falls between complete features in both columns. */
+.features__list--row-aligned {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  column-gap: 20px;
+  row-gap: 6px;
 }
 
 .features__item {
   position: relative;
   padding-left: 14px;
-  margin-bottom: 6px;
-  /* Keep a feature's name and its blurb together in one column. */
   break-inside: avoid;
+}
+
+.features__list--row-aligned .features__item--multipart {
+  grid-column: 1 / -1;
+}
+
+.features__list:not(.features__list--row-aligned) .features__item:not(:last-child) {
+  margin-bottom: 6px;
 }
 
 /* A disc marker to match the other bulleted list cards (a multi-column list can
@@ -144,14 +193,16 @@ function referenceLabel(section: SectionKey): string {
   color: var(--p-text-muted-color, #888);
 }
 
-.features__spells {
+.features__spells,
+.features__grants {
   display: block;
   font-size: 12px;
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);
 }
 
-.features__spells-label {
+.features__spells-label,
+.features__grants-label {
   font-weight: 600;
   color: #1c1c1e;
 }

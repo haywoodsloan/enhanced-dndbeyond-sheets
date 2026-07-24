@@ -20,13 +20,13 @@ import {
 import type {
   RawAction,
   RawCharacter,
+  RawCreature,
   RawCustomAction,
   RawFeat,
   RawInventoryItem,
   RawLevelScale,
   RawLimitedUse,
   RawModifier,
-  RawSourceMap,
   RawSpell,
   RawSpellDefinition,
   RawStat,
@@ -86,37 +86,6 @@ function resolveAvatarUrl(raw: RawCharacter): string | undefined {
   } catch {
     return url;
   }
-}
-
-/** Sum the lengths of every array in a source-grouped map. */
-function sumSourceMap<T>(map: RawSourceMap<T> | null | undefined): number {
-  if (!map) return 0;
-  return Object.values(map).reduce<number>(
-    (total, entries) => total + asArray(entries).length,
-    0,
-  );
-}
-
-/** Known/prepared class spells plus spells granted by race, items, feats, etc. */
-function countSpells(raw: RawCharacter): number {
-  const classSpells = asArray(raw.classSpells).reduce(
-    (total, group) => total + asArray(group.spells).length,
-    0,
-  );
-  return classSpells + sumSourceMap(raw.spells);
-}
-
-/** Tool/weapon/armor/language proficiencies granted by modifiers. */
-function countProficiencies(raw: RawCharacter): number {
-  const standard = Object.values(raw.modifiers ?? {}).reduce<number>(
-    (total, mods) =>
-      total +
-      asArray<RawModifier>(mods).filter(
-        (mod) => mod.type === 'proficiency' || mod.type === 'language',
-      ).length,
-    0,
-  );
-  return standard + asArray(raw.customProficiencies).length;
 }
 
 /** True when the character carries any coins. */
@@ -671,8 +640,8 @@ function resolveProficiencies(raw: RawCharacter): CharacterProficiencies {
   if (raw.modifiers) {
     for (const mods of Object.values(raw.modifiers)) {
       for (const mod of asArray<RawModifier>(mods)) {
-        const label = mod.friendlySubtypeName;
-        if (!label) continue;
+        const label = mod.friendlySubtypeName?.trim();
+        if (!label || /^choose\b/i.test(label)) continue;
         if (mod.type === 'language') {
           pushUnique(languages, label);
         } else if (mod.type === 'proficiency') {
@@ -1693,6 +1662,25 @@ function actionDetail(
   return summarize(dropUsesSentence(dropLeadInFlavor(full)), 400);
 }
 
+function withoutRedundantActionDamage(summary: string, damage: DamageInfo | undefined): string {
+  const dice = damage?.dice.trim();
+  if (!dice) return summary;
+  const diceParts = /^(\d+)(d\d+)(.*)$/i.exec(dice);
+  const escaped = diceParts
+    ? `${diceParts[1]}(?:\\*\\*)?${diceParts[2]}(?:\\*\\*)?${diceParts[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+    : dice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return summary
+    .replace(
+      new RegExp(
+        `\\b(?:an?\\s+)?(extra\\s+)?${escaped}\\s+(?=(?:damage\\b|[A-Z][a-z]+(?:\\s+damage\\b|,|\\s+or\\b)))`,
+        'i',
+      ),
+      (_match, extra: string | undefined) => extra ?? '',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Action-economy options from every source, deduped, each enriched with its
  * limited-use checkboxes, damage, save, and range. Grouped downstream into
@@ -1717,6 +1705,7 @@ function resolveActions(
   abilities: AbilityScore[],
   level: number,
   grantedIds: Set<number>,
+  companionComponentIds: Set<number>,
   resolvePlaceholders: PlaceholderResolver,
 ): {
   actions: CharacterAction[];
@@ -1755,6 +1744,9 @@ function resolveActions(
         seen.add(action.name);
 
         const entry: CharacterAction = { name: action.name, category };
+        if (action.componentId != null && companionComponentIds.has(action.componentId)) {
+          entry.related = ['companions'];
+        }
         const resource = limitedUseToPool(action.limitedUse, level);
         if (resource) {
           // A pool that resets on a long rest but also regains one use on a
@@ -1777,7 +1769,7 @@ function resolveActions(
         }
         const damage = actionDamage(action, modByStatId);
         if (damage) entry.damage = damage;
-        const roll = actionRoll(action, modByStatId);
+        const roll = damage ? undefined : actionRoll(action, modByStatId);
         if (roll) entry.roll = roll;
         const saveKey = abilityKeyById(action.saveStatId);
         if (saveKey) {
@@ -1815,10 +1807,14 @@ function resolveActions(
             scaleValue: action.dice?.diceString ?? action.value ?? undefined,
           });
         const detail = actionDetail(action.snippet, action.description, actionResolver);
-        const summary = resource
-          ? dropUsesSentence(dropAlternateRecoverySentences(detail))
-          : detail;
-        if (summary) entry.summary = summary;
+        const structuredBenefits = structuredFeatureBenefits(action.snippet, actionResolver);
+        const summary =
+          structuredBenefits?.summary ??
+          (resource ? dropUsesSentence(dropAlternateRecoverySentences(detail)) : detail);
+        const conciseSummary = withoutRedundantActionDamage(summary, damage);
+        if (conciseSummary) entry.summary = conciseSummary;
+        const benefitList = structuredBenefits?.parts?.[0]?.list;
+        if (benefitList?.items.length) entry.list = benefitList;
         if (action.componentId != null) {
           const reference: ActionReference = {
             name: action.name,
@@ -1896,7 +1892,36 @@ function significantSpellMaterial(description: string | null | undefined): strin
     : undefined;
 }
 
-/** Drop a scaling paragraph when it only restates damage dice already in metadata. */
+function higherLevelSpellRule(
+  html: string | null | undefined,
+  damage: DamageInfo | undefined,
+  spellLevel: number,
+): string | undefined {
+  if (html) {
+    for (const paragraph of html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+      if (!/^Using a Higher-Level Spell Slot\b/i.test(plainText(paragraph[0]))) continue;
+      return richText(paragraph[0]).replace(
+        /^(Using a Higher-Level Spell Slot\.)\s*/i,
+        '**$1** ',
+      );
+    }
+  }
+  const dice = /^\+(\S+) per slot level above\b/i.exec(damage?.scaling ?? '')?.[1];
+  return dice
+    ? `**Using a Higher-Level Spell Slot.** The damage increases by ${dice} for each spell slot level above ${spellLevel}.`
+    : undefined;
+}
+
+function withoutHigherLevelSpellRule(
+  html: string | null | undefined,
+): string | null | undefined {
+  if (!html) return html;
+  return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (paragraph) =>
+    /^Using a Higher-Level Spell Slot\b/i.test(plainText(paragraph)) ? ' ' : paragraph,
+  );
+}
+
+/** Drop a cantrip scaling paragraph when it only restates current damage metadata. */
 function withoutRedundantSpellDamageScaling(
   html: string | null | undefined,
   ownsScaling: boolean,
@@ -1904,7 +1929,7 @@ function withoutRedundantSpellDamageScaling(
   if (!html || !ownsScaling) return html;
   return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (paragraph) => {
     const text = plainText(paragraph);
-    return /^(?:Cantrip Upgrade|Using a Higher-Level Spell Slot)\.?\s+The damage increases by\b[^.]*\.?$/i.test(
+    return /^Cantrip Upgrade\.?\s+The damage increases by\b[^.]*\.?$/i.test(
       text,
     )
       ? ' '
@@ -1933,6 +1958,18 @@ function spellLevelOrdinal(level: number): string {
   if (level === 2) return '2nd';
   if (level === 3) return '3rd';
   return `${level}th`;
+}
+
+function perSlotDamageIncrease(html: string | null | undefined): string | undefined {
+  if (!html) return undefined;
+  for (const paragraph of html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const text = plainText(paragraph[0]);
+    if (!/^Using a Higher-Level Spell Slot\b/i.test(text)) continue;
+    return text.match(
+      /\bdamage increases by\s+(\d+d\d+)\s+for (?:each|every) (?:spell )?slot level above\b/i,
+    )?.[1];
+  }
+  return undefined;
 }
 
 /** Base damage dice + type + upcast scaling from a spell's modifiers. */
@@ -1969,14 +2006,13 @@ function spellDamage(def: RawSpellDefinition, characterLevel: number): DamageInf
     return damage;
   }
 
-  // A leveled spell notes the extra dice per slot level above its own.
-  const higher = [
-    ...asArray(def.atHigherLevels?.higherLevelDefinitions),
-    ...asArray(mod.atHigherLevels?.higherLevelDefinitions),
-  ].find((entry) => entry.dice?.diceString);
-  if (higher?.dice?.diceString) {
+  // Only call damage scaling "per slot level" when the rules text says it is.
+  // Some definitions contain absolute threshold dice (for example, 2d4 at
+  // level 5 and 3d4 at level 7), which must not be presented as increments.
+  const increase = perSlotDamageIncrease(def.description);
+  if (increase) {
     damage.scaling =
-      `+${higher.dice.diceString} per slot level above ${spellLevelOrdinal(def.level ?? 1)}`;
+      `+${increase} per slot level above ${spellLevelOrdinal(def.level ?? 1)}`;
   }
   return damage;
 }
@@ -2033,6 +2069,12 @@ function resolveSpells(
   level: number,
   resolvePlaceholders: PlaceholderResolver,
 ): SpellEntry[] {
+  const disguiseFeatIds = new Set<number>();
+  for (const feat of asArray(raw.feats)) {
+    if (isDisguiseFeat(feat) && feat.definition?.id != null) {
+      disguiseFeatIds.add(feat.definition.id);
+    }
+  }
   const classLevelByComponent = classLevelsByComponent(raw);
   const castingClassByComponent = castingClassNamesByComponent(raw);
   const featureNames = new Map<number, string>();
@@ -2068,7 +2110,10 @@ function resolveSpells(
   const byName = new Map<string, SpellEntry>();
   const add = (spell: RawSpell) => {
     const def = spell.definition;
-    if (def?.name == null) return;
+    if (
+      def?.name == null ||
+      (spell.componentId != null && disguiseFeatIds.has(spell.componentId))
+    ) return;
     const hasCompanion = hasCompanionStatBlock(def.description || def.snippet, def.name);
     const pool = limitedUseToPool(spell.limitedUse, level);
     const featureUse = pool ? { source: sourceFor(spell.componentId), pool } : undefined;
@@ -2112,6 +2157,8 @@ function resolveSpells(
     if (def.requiresAttackRoll) entry.attack = true;
     const damage = spellDamage(def, level);
     if (damage) entry.damage = damage;
+    const upcast = higherLevelSpellRule(def.description, damage, def.level ?? 0);
+    if (upcast) entry.upcast = upcast;
     if (spell.prepared) entry.prepared = true;
     const spellResolver = (text: string) =>
       resolvePlaceholders(text, {
@@ -2125,7 +2172,9 @@ function resolveSpells(
             : castingClassByComponent.get(spell.componentId),
       });
     const description = withoutRedundantSpellDamageScaling(
-      withoutCompanionStatBlocks(def.description, def.name),
+      withoutHigherLevelSpellRule(
+        withoutCompanionStatBlocks(def.description, def.name),
+      ),
       Boolean(
         damage &&
           (((def.level ?? 0) === 0 && def.scaleType === 'characterlevel') || damage.scaling),
@@ -2425,11 +2474,16 @@ function stripFeatMetadata(html: string | null | undefined): string | null | und
 function featureProficiencies(
   raw: RawCharacter,
   componentId: number | undefined,
-): { text: string; related: SectionKey[] } | undefined {
+): {
+  text: string;
+  related: SectionKey[];
+  grants: { label: string; items: string[] }[];
+} | undefined {
   if (componentId == null) return undefined;
   const names: string[] = [];
   const related = new Set<SectionKey>();
   const skillKeys = new Set(SKILLS.map((skill) => skill.key));
+  const grouped = new Map<string, string[]>();
   for (const modifiers of Object.values(raw.modifiers ?? {})) {
     for (const mod of asArray<RawModifier>(modifiers)) {
       if (
@@ -2441,11 +2495,60 @@ function featureProficiencies(
       const subType = mod.subType ?? '';
       if (subType.endsWith('-saving-throws')) continue;
       const name = mod.friendlySubtypeName?.trim();
-      if (name && !names.includes(name)) names.push(name);
+      if (name && !names.includes(name)) {
+        names.push(name);
+        const label =
+          mod.type === 'language'
+            ? 'Languages'
+            : skillKeys.has(subType)
+              ? 'Skills'
+              : subType.includes('armor') || subType === 'shields'
+                ? 'Armor'
+                : subType.includes('weapon')
+                  ? 'Weapons'
+                  : 'Tools';
+        const items = grouped.get(label) ?? [];
+        items.push(name);
+        grouped.set(label, items);
+      }
       related.add(skillKeys.has(subType) ? 'skills' : 'proficiencies');
     }
   }
-  return names.length ? { text: names.join(', '), related: [...related] } : undefined;
+  return names.length
+    ? {
+        text: names.join(', '),
+        related: [...related],
+        grants: [...grouped].map(([label, items]) => ({ label, items })),
+      }
+    : undefined;
+}
+
+function firstFeatureSentence(
+  text: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): string {
+  if (!text) return '';
+  const firstParagraph = /<p\b[^>]*>([\s\S]*?)<\/p>/i.exec(text)?.[1] ?? text;
+  const resolved = plainText(resolvePlaceholders(firstParagraph));
+  return /^.*?[.!?](?=\s|$)/.exec(resolved)?.[0] ?? resolved;
+}
+
+function concreteProficiencySummary(
+  featureName: string | undefined,
+  proficiencyText: string,
+  description: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): string {
+  if (!featureName || featureName.trim().toLowerCase() !== proficiencyText.toLowerCase()) {
+    return proficiencyText;
+  }
+  const sentence = firstFeatureSentence(description, resolvePlaceholders);
+  const escapedName = featureName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const withoutName = sentence
+    .replace(new RegExp(`^You know ${escapedName},?\\s*`, 'i'), '')
+    .trim();
+  if (!withoutName || withoutName === sentence) return sentence || proficiencyText;
+  return `${withoutName[0].toUpperCase()}${withoutName.slice(1)}`;
 }
 
 /** Dedicated sections represented by a feature's pure modifier effects. */
@@ -2590,10 +2693,13 @@ function leadingLabel(inner: string): { label: string; rest: string } | undefine
   const nested = inner.match(
     /^\s*<(strong|b|em|i)\b[^>]*>\s*<(strong|b|em|i)\b[^>]*>(.+?)<\/\2>\s*<\/\1>\s*/i,
   );
+  const openEmphasis = inner.match(
+    /^\s*<(em|i)\b[^>]*>\s*<(strong|b)\b[^>]*>(.+?)<\/\2>\s*/i,
+  );
   const marker =
     nested && [nested[1], nested[2]].some((tag) => /^(?:strong|b)$/i.test(tag))
       ? nested
-      : inner.match(/^\s*<(strong|b)\b[^>]*>(.+?)<\/\1>\s*/i);
+      : openEmphasis ?? inner.match(/^\s*<(strong|b)\b[^>]*>(.+?)<\/\1>\s*/i);
   if (!marker) return undefined;
   const labelHtml = marker.length >= 4 ? marker[3] : marker[2];
   const label = plainText(labelHtml).replace(/[.:]\s*$/, '').trim();
@@ -2775,6 +2881,7 @@ interface RuleSource {
   name: string;
   html: string;
   classLevel?: number;
+  kind: 'feature' | 'spell';
 }
 
 function activeRuleSources(raw: RawCharacter): RuleSource[] {
@@ -2785,12 +2892,13 @@ function activeRuleSources(raw: RawCharacter): RuleSource[] {
     name: string | null | undefined,
     html: string | null | undefined,
     classLevel?: number,
+    kind: RuleSource['kind'] = 'feature',
   ) => {
     if (!name || !html) return;
     const key = id == null ? `${name}|${html}` : String(id);
     if (seen.has(key)) return;
     seen.add(key);
-    sources.push({ id, name, html, classLevel });
+    sources.push({ id, name, html, classLevel, kind });
   };
   for (const cls of asArray(raw.classes)) {
     const grants = asArray(cls.classFeatures).filter(
@@ -2844,7 +2952,7 @@ function activeRuleSources(raw: RawCharacter): RuleSource[] {
   // with a coincidentally matching numeric id.
   const addSpell = (spell: RawSpell) => {
     const def = spell.definition;
-    add(undefined, def?.name, def?.description || def?.snippet);
+    add(undefined, def?.name, def?.description || def?.snippet, undefined, 'spell');
   };
   for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(addSpell);
   if (raw.spells) {
@@ -2853,11 +2961,260 @@ function activeRuleSources(raw: RawCharacter): RuleSource[] {
   return sources;
 }
 
+interface CreatureFeatureSource {
+  id?: number;
+  name: string;
+}
+
+function creatureFeatureRank(name: string): number {
+  if (/ability score improvement/i.test(name)) return 1000;
+  if (/^\d+\s*:/.test(name)) return 500;
+  if (/improvement/i.test(name)) return 100;
+  if (/^wild shape$/i.test(name)) return 0;
+  if (/circle forms/i.test(name)) return 20;
+  return 10;
+}
+
+/** Owning feature for each D&D Beyond Extras creature group. */
+function creatureFeatureSources(raw: RawCharacter): Map<number, CreatureFeatureSource> {
+  const candidates = new Map<number, CreatureFeatureSource[]>();
+  const add = (
+    definition:
+      | {
+          id?: number;
+          name?: string;
+          requiredLevel?: number;
+          creatureRules?: { creatureGroupId?: number | null }[] | null;
+        }
+      | null
+      | undefined,
+    classLevel: number,
+  ) => {
+    if (
+      !definition?.name ||
+      (definition.requiredLevel != null && definition.requiredLevel > classLevel)
+    ) {
+      return;
+    }
+    for (const rule of asArray(definition.creatureRules)) {
+      if (rule.creatureGroupId == null) continue;
+      const sources = candidates.get(rule.creatureGroupId) ?? [];
+      sources.push({ id: definition.id, name: definition.name });
+      candidates.set(rule.creatureGroupId, sources);
+    }
+  };
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.classFeatures)) add(feature.definition, cls.level);
+    for (const feature of asArray(cls.definition?.classFeatures)) add(feature, cls.level);
+  }
+  return new Map(
+    [...candidates].map(([groupId, sources]) => [
+      groupId,
+      [...sources].sort(
+        (left, right) =>
+          creatureFeatureRank(left.name) - creatureFeatureRank(right.name) ||
+          left.name.length - right.name.length,
+      )[0],
+    ]),
+  );
+}
+
+const CREATURE_ALIGNMENTS: Readonly<Record<number, string>> = {
+  1: 'Lawful Good',
+  2: 'Neutral Good',
+  3: 'Chaotic Good',
+  4: 'Lawful Neutral',
+  5: 'Neutral',
+  6: 'Chaotic Neutral',
+  7: 'Lawful Evil',
+  8: 'Neutral Evil',
+  9: 'Chaotic Evil',
+  10: 'Unaligned',
+};
+
+const CREATURE_MOVEMENTS: Readonly<Record<number, string>> = {
+  1: '',
+  2: 'Burrow',
+  3: 'Climb',
+  4: 'Fly',
+  5: 'Swim',
+};
+
+function signedNumber(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value}`;
+}
+
+function creatureChallengeRating(id: number | null | undefined): string | undefined {
+  if (id == null) return undefined;
+  if (id === 1) return '0';
+  if (id === 2) return '1/8';
+  if (id === 3) return '1/4';
+  if (id === 4) return '1/2';
+  return id >= 5 ? String(id - 4) : undefined;
+}
+
+function creatureDetails(
+  details: CompanionEntry['details'],
+  html: string | null | undefined,
+  section: string,
+): void {
+  if (!html) return;
+  const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)];
+  if (!paragraphs.length) {
+    const text = plainText(html);
+    if (text) details.push({ section, label: '', text });
+    return;
+  }
+  for (const paragraph of paragraphs) {
+    const labeled = leadingLabel(paragraph[1]);
+    if (labeled) details.push({ section, label: labeled.label, text: labeled.rest });
+    else {
+      const text = plainText(paragraph[1]);
+      if (text) details.push({ section, label: '', text });
+    }
+  }
+}
+
+function parseSelectedCreature(
+  creature: RawCreature,
+  source: string,
+): CompanionEntry | undefined {
+  const definition = creature.definition;
+  const name = creature.name?.trim() || definition?.name?.trim();
+  if (!definition || !name) return undefined;
+
+  const size = definition.sizeId == null ? undefined : CREATURE_SIZES[definition.sizeId];
+  const type = definition.typeId == null ? undefined : CREATURE_TYPES[definition.typeId];
+  const alignment =
+    definition.alignmentId == null ? undefined : CREATURE_ALIGNMENTS[definition.alignmentId];
+  const creatureKind = [size, type].filter(Boolean).join(' ');
+  const meta = `${creatureKind}${alignment ? `${creatureKind ? ', ' : ''}${alignment}` : ''}`;
+  const speeds = asArray(definition.movements).flatMap((movement) => {
+    if (movement.speed == null || movement.speed <= 0) return [];
+    const label = CREATURE_MOVEMENTS[movement.movementId ?? 0];
+    return [`${label ? `${label} ` : ''}${movement.speed} ft.${movement.notes ? ` ${movement.notes}` : ''}`];
+  });
+  const hitPointDice = definition.hitPointDice?.diceString?.trim();
+  const hitPoints =
+    definition.averageHitPoints == null
+      ? undefined
+      : `${definition.averageHitPoints}${hitPointDice ? ` (${hitPointDice})` : ''}`;
+  const saves = new Map(
+    asArray(definition.savingThrows).flatMap((save) =>
+      save.statId == null || (save.bonus ?? save.value) == null
+        ? []
+        : [[save.statId, save.bonus ?? save.value!] as const],
+    ),
+  );
+  const abilities: CompanionEntry['abilities'] = asArray(definition.stats).flatMap((stat) => {
+    if (stat.statId == null || stat.value == null) return [];
+    const ability = ABILITIES.find((entry) => entry.id === stat.statId);
+    if (!ability) return [];
+    const save = saves.get(stat.statId);
+    return [{
+      key: ability.key.toUpperCase(),
+      score: String(stat.value),
+      modifier: signedNumber(abilityModifier(stat.value)),
+      ...(save == null ? {} : { save: signedNumber(save) }),
+    }];
+  });
+
+  const details: CompanionEntry['details'] = [];
+  if (creature.description?.trim()) {
+    details.push({ section: 'Details', label: '', text: plainText(creature.description) });
+  }
+  creatureDetails(details, definition.specialTraitsDescription, 'Traits');
+  creatureDetails(details, definition.actionsDescription, 'Actions');
+  creatureDetails(details, definition.bonusActionsDescription, 'Bonus Actions');
+  creatureDetails(details, definition.reactionsDescription, 'Reactions');
+  creatureDetails(details, definition.legendaryActionsDescription, 'Legendary Actions');
+  creatureDetails(details, definition.mythicActionsDescription, 'Mythic Actions');
+  creatureDetails(details, definition.characteristicsDescription, 'Characteristics');
+  const language = plainText(
+    [definition.languageDescription, definition.languageNote].filter(Boolean).join(' '),
+  );
+  if (language) details.unshift({ section: 'Statistics', label: 'Languages', text: language });
+  if (definition.passivePerception != null) {
+    details.unshift({
+      section: 'Statistics',
+      label: 'Senses',
+      text: `Passive Perception ${definition.passivePerception}`,
+    });
+  }
+
+  return {
+    name,
+    source,
+    ...(meta ? { meta } : {}),
+    ...(creatureChallengeRating(definition.challengeRatingId)
+      ? { challengeRating: creatureChallengeRating(definition.challengeRatingId) }
+      : {}),
+    ...(definition.armorClass == null
+      ? {}
+      : {
+          armorClass: `${definition.armorClass}${definition.armorClassDescription?.trim() ? ` ${definition.armorClassDescription.trim()}` : ''}`,
+        }),
+    ...(hitPoints ? { hitPoints } : {}),
+    ...(speeds.length ? { speed: speeds.join('; ') } : {}),
+    abilities,
+    details,
+  };
+}
+
+function companionCategory(source: string, kind: RuleSource['kind'] | 'extra'): string {
+  if (kind === 'spell') return 'Summons';
+  if (/wild shape/i.test(source)) return 'Wild Shapes';
+  if (/familiar|wild companion/i.test(source)) return 'Familiars';
+  if (/(?:beast|primal|ranger'?s?).*companion|companion.*beast/i.test(source)) {
+    return 'Beast Companions';
+  }
+  if (/companion|defender/i.test(source)) return 'Companions';
+  return kind === 'extra' ? 'Extras' : 'Companions';
+}
+
+interface ExtraCreatureFallback {
+  name: string;
+  category: string;
+  rank: number;
+}
+
+function fallbackExtraCreatureSource(sources: RuleSource[]): ExtraCreatureFallback | undefined {
+  const candidates = sources.flatMap((source): ExtraCreatureFallback[] => {
+    const name = source.name;
+    const text = `${name} ${plainText(source.html)}`;
+    if (/^find familiar$/i.test(name)) return [{ name, category: 'Familiars', rank: 0 }];
+    if (/familiar|wild companion/i.test(name)) {
+      return [{ name, category: 'Familiars', rank: 1 }];
+    }
+    if (/find familiar/i.test(text)) return [{ name, category: 'Familiars', rank: 2 }];
+    if (/(?:beast|primal|ranger'?s?).*companion|companion.*beast/i.test(text)) {
+      return [{ name, category: 'Beast Companions', rank: 3 }];
+    }
+    if (/companion|defender/i.test(name)) {
+      return [{ name, category: 'Companions', rank: 4 }];
+    }
+    return [];
+  });
+  if (!candidates.length) return undefined;
+  const categories = new Set(candidates.map((candidate) => candidate.category));
+  if (categories.size !== 1) return undefined;
+  return candidates.sort((left, right) => left.rank - right.rank || left.name.length - right.name.length)[0];
+}
+
+function companionSectionTitle(categories: Set<string>): string {
+  const priority = ['Summons', 'Wild Shapes', 'Familiars', 'Beast Companions', 'Companions', 'Extras'];
+  const titles = [...categories].sort((left, right) => priority.indexOf(left) - priority.indexOf(right));
+  if (!titles.length) return 'Companions';
+  if (titles.length <= 2) return titles.join(' & ');
+  return 'Creatures';
+}
+
 function resolveRuleArtifacts(
   raw: RawCharacter,
   resolvePlaceholders: PlaceholderResolver,
 ): {
   companions: CompanionEntry[];
+  companionTitle: string;
   ruleTables: RuleTable[];
   companionFeatureIds: Set<number>;
   tableFeatureIds: Set<number>;
@@ -2865,10 +3222,12 @@ function resolveRuleArtifacts(
   const companions: CompanionEntry[] = [];
   const ruleTables: RuleTable[] = [];
   const companionFeatureIds = new Set<number>();
+  const companionCategories = new Set<string>();
   const tableFeatureIds = new Set<number>();
   const companionKeys = new Set<string>();
   const tableKeys = new Set<string>();
-  for (const source of activeRuleSources(raw)) {
+  const ruleSources = activeRuleSources(raw);
+  for (const source of ruleSources) {
     const html = resolvePlaceholders(source.html, { classLevel: source.classLevel });
     for (const block of statBlockHtml(html)) {
       const companion = parseCompanion(block.html, source.name);
@@ -2877,6 +3236,7 @@ function resolveRuleArtifacts(
       if (companionKeys.has(key)) continue;
       companionKeys.add(key);
       companions.push(companion);
+      companionCategories.add(companionCategory(source.name, source.kind));
       if (source.id != null) companionFeatureIds.add(source.id);
     }
     for (const table of parseRollTables(html, source.name)) {
@@ -2887,7 +3247,31 @@ function resolveRuleArtifacts(
       if (source.id != null) tableFeatureIds.add(source.id);
     }
   }
-  return { companions, ruleTables, companionFeatureIds, tableFeatureIds };
+  const featureSources = creatureFeatureSources(raw);
+  const fallbackSource = fallbackExtraCreatureSource(ruleSources);
+  for (const creature of asArray(raw.creatures)) {
+    const owner = creature.groupId == null ? undefined : featureSources.get(creature.groupId);
+    const source = owner?.name ?? fallbackSource?.name ?? 'Extra';
+    const companion = parseSelectedCreature(creature, source);
+    if (!companion) continue;
+    const key = `${source}|${companion.name}`;
+    if (companionKeys.has(key)) continue;
+    companionKeys.add(key);
+    companions.push(companion);
+    companionCategories.add(
+      owner
+        ? companionCategory(source, 'extra')
+        : fallbackSource?.category ?? companionCategory(source, 'extra'),
+    );
+    if (owner?.id != null) companionFeatureIds.add(owner.id);
+  }
+  return {
+    companions,
+    companionTitle: companionSectionTitle(companionCategories),
+    ruleTables,
+    companionFeatureIds,
+    tableFeatureIds,
+  };
 }
 
 /**
@@ -3097,9 +3481,33 @@ function stripRepeatableNote(text: string): string {
 
 interface FeatureContent {
   summary?: string;
+  grants?: { label: string; items: string[] }[];
   reference?: SectionKey;
   related?: SectionKey[];
   parts?: FeaturePart[];
+}
+
+function structuredFeatureBenefits(
+  text: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): FeatureContent | undefined {
+  if (!text || !/following benefits/i.test(text) || !text.includes('•')) return undefined;
+  const chunks = plainText(resolvePlaceholders(text))
+    .split(/\s*•\s*/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+  if (chunks.length < 3) return undefined;
+  const [summary, ...benefits] = chunks;
+  return {
+    summary,
+    parts: [
+      {
+        label: '',
+        text: '',
+        list: { items: benefits.map((benefit) => ({ text: benefit })) },
+      },
+    ],
+  };
 }
 
 /** Features and traits grouped by source, each with its resource + sub-parts. */
@@ -3211,6 +3619,8 @@ function resolveFeatures(
     description: string | null | undefined,
     featureResolver: (text: string) => string = resolvePlaceholders,
   ): FeatureContent => {
+    const structuredBenefits = structuredFeatureBenefits(snippet, featureResolver);
+    if (structuredBenefits) return structuredBenefits;
     const { intro, parts } = parseFeatureParts(description || snippet, featureResolver);
     if (parts.length === 0) {
       const summary = summarize(snippet || intro || description, 400, featureResolver);
@@ -3245,6 +3655,7 @@ function resolveFeatures(
     if (resource) item.resource = resource;
     const grantedSpells = id != null ? spellNamesByComponent.get(id) : undefined;
     if (grantedSpells?.length) item.grantedSpells = grantedSpells;
+    if (content.grants?.length) item.grants = content.grants;
     // Drop table references (the printed sheet has no rules tables) and the
     // "Repeatable — you can take this feat more than once" boilerplate.
     let summary = content.summary
@@ -3339,13 +3750,17 @@ function resolveFeatures(
       // Spellcasting/Pact Magic is fully owned by the Spells card: stats, slots,
       // focus, and spell rows all live there rather than repeating progression rules.
       if (rawName && SPELLCASTING_FEATURE.test(rawName)) {
-        content = { reference: 'spells' };
+        const summary = firstFeatureSentence(description || snippet, featureResolver);
+        content = summary ? { summary } : {};
       }
     }
 
     // A feat that grants proficiencies (Skilled and the like) shows the actual
     // skills/tools chosen, not the generic "any combination of your choice" text.
     const proficiencies = featureProficiencies(raw, id);
+    const selfNamedProficiency =
+      rawName != null &&
+      proficiencies?.text.trim().toLowerCase() === rawName.trim().toLowerCase();
     if (proficiencies) {
       const proficiencyPartIndex = content.parts?.findIndex((part) =>
         /^(?:Tool |Skill )?Proficienc(?:y|ies)$/i.test(part.label),
@@ -3357,8 +3772,18 @@ function resolveFeatures(
           text: proficiencies.text,
         };
         content = { ...content, parts };
+      } else if (selfNamedProficiency) {
+        content = { ...content, summary: undefined, grants: proficiencies.grants };
       } else {
-        content = { ...content, summary: proficiencies.text };
+        content = {
+          ...content,
+          summary: concreteProficiencySummary(
+            rawName,
+            proficiencies.text,
+            description || snippet,
+            featureResolver,
+          ),
+        };
       }
     }
 
@@ -3392,7 +3817,7 @@ function resolveFeatures(
     ];
     const related = new Set<SectionKey>([
       ...(content.related ?? []),
-      ...(proficiencies?.related ?? []),
+      ...(selfNamedProficiency ? [] : (proficiencies?.related ?? [])),
       ...modifierRelatedSections(raw, id),
     ]);
     if (artifactIds.some((artifactId) => companionFeatureIds.has(artifactId))) {
@@ -3415,8 +3840,16 @@ function resolveFeatures(
 
     // A whole feature that is itself an Actions-card activation just points there
     // — its full text (benefits and all) lives on the action.
-    if (name && isDetailedActionFeature(id, name)) {
-      return { name, content: { reference: 'actions', related: content.related } };
+    const hasStructuredBenefits = content.parts?.some((part) => part.list?.items.length);
+    if (name && !hasStructuredBenefits && isDetailedActionFeature(id, name)) {
+      const related = content.related?.filter((section) => section !== 'companions');
+      return {
+        name,
+        content: {
+          reference: 'actions',
+          ...(related?.length ? { related } : {}),
+        },
+      };
     }
 
     return { name, content };
@@ -3771,23 +4204,27 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const skills = resolveSkills(raw, abilities, level);
   const senses = resolveSenses(raw, skills);
   const defences = resolveDefences(raw);
+  const proficiencies = resolveProficiencies(raw);
   const inventory = resolveInventory(raw);
   const attacks = resolveAttacks(raw, abilities, level);
+  const {
+    companions,
+    companionTitle,
+    ruleTables,
+    companionFeatureIds,
+    tableFeatureIds,
+  } = resolveRuleArtifacts(raw, resolvePlaceholders);
   const { actions, resourceComponentIds, actionReferencesByComponent } = resolveActions(
     raw,
     abilities,
     level,
     grantedFeatureIds(raw),
+    companionFeatureIds,
     resolvePlaceholders,
   );
   const resources = resolveResourceMap(raw, level);
   const spellNamesByComponent = featureSpellNamesByComponent(raw);
-  const {
-    companions,
-    ruleTables,
-    companionFeatureIds,
-    tableFeatureIds,
-  } = resolveRuleArtifacts(raw, resolvePlaceholders);
+  const spells = resolveSpells(raw, level, resolvePlaceholders);
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
   for (const id of resourceComponentIds) resources.delete(id);
@@ -3818,12 +4255,16 @@ export function normalizeCharacter(raw: RawCharacter): Character {
       { alwaysPresent: true },
     ),
     toSection('senses', 'Senses', senses.length, { alwaysPresent: true }),
-    toSection('proficiencies', 'Proficiencies', countProficiencies(raw)),
+    toSection(
+      'proficiencies',
+      'Proficiencies',
+      Object.values(proficiencies).reduce((total, entries) => total + entries.length, 0),
+    ),
     toSection('attacks', 'Attacks', attacks.length),
     toSection('actions', 'Actions', actions.length),
-    toSection('spells', 'Spells', countSpells(raw)),
+    toSection('spells', 'Spells', spells.length),
     ...(companions.length
-      ? [toSection('companions', 'Companions', companionPartCount)]
+      ? [toSection('companions', companionTitle, companionPartCount)]
       : []),
     ...(ruleTables.length
       ? [
@@ -3851,10 +4292,10 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     defences,
     senses,
     skills,
-    proficiencies: resolveProficiencies(raw),
+    proficiencies,
     attacks,
     actions,
-    spells: resolveSpells(raw, level, resolvePlaceholders),
+    spells,
     companions,
     ruleTables,
     inventory,

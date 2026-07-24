@@ -26,6 +26,7 @@ describe('CompanionsCard', () => {
 
     expect(wrapper.get('[data-companion]').text()).toContain('Steel Defender');
     expect(wrapper.find('.companion__source').exists()).toBe(false);
+    expect(wrapper.find('.companion__source-sep').exists()).toBe(false);
     expect(wrapper.text()).toContain('Medium Construct, Neutral');
     expect(wrapper.text()).toContain('12 plus your Intelligence modifier');
     expect(wrapper.findAll('.companion__vitals dt').map((label) => label.text())).toEqual([
@@ -131,5 +132,26 @@ describe('CompanionsCard', () => {
     expect(wrapper.find('.companion__ability-save').exists()).toBe(false);
     expect(wrapper.findAll('.companion__section')).toHaveLength(1);
     expect(wrapper.find('.companion__detail strong').exists()).toBe(false);
+  });
+
+  it('separates the companion name from its granting spell', () => {
+    const wrapper = mount(CompanionsCard, {
+      props: {
+        companions: [
+          {
+            name: 'Bestial Spirit',
+            source: 'Summon Beast',
+            abilities: [],
+            details: [],
+          },
+        ],
+      },
+    });
+
+    const header = wrapper.get('.companion__header');
+    expect(header.get('.companion__name').text()).toBe('Bestial Spirit');
+    expect(header.get('.companion__source-sep').text()).toBe('|');
+    expect(header.get('.companion__source').text()).toBe('Summon Beast');
+    expect(header.text()).toBe('Bestial Spirit|Summon Beast');
   });
 });

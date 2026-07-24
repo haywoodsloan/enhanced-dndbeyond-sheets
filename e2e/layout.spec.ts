@@ -165,6 +165,220 @@ test.describe('sheet layout controls', () => {
     expect(await columnCount()).toBe(4);
   });
 
+  test('keeps fixed cards and the spell legend contained on A5 in both orientations', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+    const audit = () =>
+      page.evaluate(() => {
+        const gridColumnCount = getComputedStyle(
+          document.querySelector('.page__grid')!,
+        ).gridTemplateColumns.split(' ').length;
+        const fixedKeys = new Set([
+          'basics',
+          'attributes',
+          'skills',
+          'savingThrows',
+          'senses',
+          'proficiencies',
+          'wealth',
+        ]);
+        const cards = Array.from(
+          document.querySelectorAll<HTMLElement>('.page [data-section-key]'),
+        ).filter((card) => fixedKeys.has(card.dataset.sectionKey ?? ''));
+        return {
+          columns: gridColumnCount,
+          contained: cards.every((card) => {
+            const body = card.querySelector<HTMLElement>('.card__body');
+            if (!body) return false;
+            return (
+              body.scrollWidth <= body.clientWidth + 1 &&
+              body.scrollHeight <= body.clientHeight + 2
+            );
+          }),
+          conditionsContained: Array.from(
+            document.querySelectorAll<HTMLElement>('[data-section-key="basics"] .conditions__item'),
+          ).every((condition) => {
+            const card = condition.closest<HTMLElement>('[data-section-key="basics"]');
+            return card != null && condition.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1;
+          }),
+          spellLegendsContained: Array.from(
+            document.querySelectorAll<HTMLElement>('.card__spell-legend'),
+          ).every((legend) => {
+            const title = legend.parentElement;
+            if (!title) return false;
+            const legendRect = legend.getBoundingClientRect();
+            const titleRect = title.getBoundingClientRect();
+            return (
+              legendRect.left >= titleRect.left - 1 &&
+              legendRect.right <= titleRect.right + 1 &&
+              legendRect.top >= titleRect.top - 1 &&
+              legendRect.bottom <= titleRect.bottom + 1
+            );
+          }),
+          spellLegendGroupsIntact: Array.from(
+            document.querySelectorAll<HTMLElement>('.card__spell-legend-group'),
+          ).every((group) => {
+            const items = Array.from(
+              group.querySelectorAll<HTMLElement>('.card__spell-legend-item'),
+            );
+            return items.every(
+              (item) => Math.abs(item.getBoundingClientRect().top - items[0].getBoundingClientRect().top) < 2,
+            );
+          }),
+          spellLegendResponsiveRows: Array.from(
+            document.querySelectorAll<HTMLElement>('.card__spell-legend'),
+          ).every((legend) => {
+            const groups = Array.from(
+              legend.querySelectorAll<HTMLElement>('.card__spell-legend-group'),
+            );
+            const rowCenters: number[] = [];
+            for (const group of groups) {
+              const rect = group.getBoundingClientRect();
+              const center = (rect.top + rect.bottom) / 2;
+              if (!rowCenters.some((rowCenter) => Math.abs(rowCenter - center) < 4)) {
+                rowCenters.push(center);
+              }
+            }
+            const groupRows = rowCenters.length;
+            const visibleSeparators = Array.from(
+              legend.querySelectorAll<HTMLElement>('.card__spell-legend-sep'),
+            ).filter((separator) => getComputedStyle(separator).display !== 'none').length;
+            return gridColumnCount < 3
+              ? groupRows === 3 && visibleSeparators === 0
+              : groupRows === 1 && visibleSeparators === 2;
+          }),
+          spellLegendChildrenContained: Array.from(
+            document.querySelectorAll<HTMLElement>('.card__spell-legend'),
+          ).every((legend) => {
+            const legendRect = legend.getBoundingClientRect();
+            return Array.from(legend.children).every((child) => {
+              if (getComputedStyle(child).display === 'none') return true;
+              const rect = child.getBoundingClientRect();
+              return (
+                rect.left >= legendRect.left - 1 &&
+                rect.right <= legendRect.right + 1 &&
+                rect.top >= legendRect.top - 1 &&
+                rect.bottom <= legendRect.bottom + 1
+              );
+            });
+          }),
+          spellLegendSeparators: Array.from(
+            document.querySelectorAll<HTMLElement>('.card__spell-legend'),
+          ).every((legend) => {
+            const separators = Array.from(
+              legend.querySelectorAll<HTMLElement>('.card__spell-legend-sep'),
+            );
+            return separators.length === 2 && separators.every(
+              (separator) => separator.textContent === '|',
+            );
+          }),
+          spellTitlesUntruncated: Array.from(
+            document.querySelectorAll<HTMLElement>('[data-section-key^="spells"] .card__name'),
+          ).every((title) => title.scrollWidth <= title.clientWidth + 1),
+        };
+      });
+
+    await page
+      .locator('.settings__field', { hasText: 'Page type' })
+      .locator('.settings__control')
+      .click();
+    await page.getByRole('option', { name: /A5/ }).click();
+    await settle(page);
+    await page.waitForTimeout(300);
+
+    expect(await audit()).toEqual({
+      columns: 2,
+      contained: true,
+      conditionsContained: true,
+      spellLegendsContained: true,
+      spellLegendGroupsIntact: true,
+      spellLegendResponsiveRows: true,
+      spellLegendChildrenContained: true,
+      spellLegendSeparators: true,
+      spellTitlesUntruncated: true,
+    });
+
+    await page
+      .locator('.settings__field', { hasText: 'Orientation' })
+      .locator('.settings__control')
+      .click();
+    await page.getByRole('option', { name: 'Landscape' }).click();
+    await settle(page);
+    await page.waitForTimeout(300);
+
+    expect(await audit()).toEqual({
+      columns: 3,
+      contained: true,
+      conditionsContained: true,
+      spellLegendsContained: true,
+      spellLegendGroupsIntact: true,
+      spellLegendResponsiveRows: true,
+      spellLegendChildrenContained: true,
+      spellLegendSeparators: true,
+      spellTitlesUntruncated: true,
+    });
+  });
+
+  test('compact card columns do not inherit sibling row height', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+    const features = page.locator('.page [data-section-key="features"]');
+    const actions = page.locator('.page [data-section-key="actions"]');
+    await expect(features).toBeVisible();
+    await expect(actions).toBeVisible();
+
+    const measure = async (
+      card: typeof features,
+      options: { list: string; aligned: string; item: string },
+    ) => card.evaluate((element, selectors) => {
+      const lists = Array.from(element.querySelectorAll<HTMLElement>(selectors.list));
+      const gaps: number[] = [];
+      for (const list of lists) {
+        if (list.classList.contains(selectors.aligned)) continue;
+        const columns = new Map<number, DOMRect[]>();
+        for (const item of Array.from(list.querySelectorAll<HTMLElement>(selectors.item))) {
+          const rect = item.getBoundingClientRect();
+          const key = Math.round(rect.left);
+          const items = columns.get(key) ?? [];
+          items.push(rect);
+          columns.set(key, items);
+        }
+        for (const items of columns.values()) {
+          items.sort((left, right) => left.top - right.top);
+          for (let index = 1; index < items.length; index += 1) {
+            gaps.push(items[index].top - items[index - 1].bottom);
+          }
+        }
+      }
+      return {
+        usesCompactColumns: lists.some(
+          (list) => !list.classList.contains(selectors.aligned),
+        ),
+        maximumGap: gaps.length ? Math.max(...gaps) : 0,
+      };
+    }, options);
+
+    const featureResult = await measure(features, {
+      list: '.features__list',
+      aligned: 'features__list--row-aligned',
+      item: ':scope > [data-feature]',
+    });
+    const actionResult = await measure(actions, {
+      list: '.actions__list',
+      aligned: 'actions__list--row-aligned',
+      item: ':scope > [data-action]',
+    });
+
+    expect(featureResult.usesCompactColumns).toBe(true);
+    expect(featureResult.maximumGap).toBeLessThanOrEqual(7);
+    expect(actionResult.usesCompactColumns).toBe(true);
+    expect(actionResult.maximumGap).toBeLessThanOrEqual(7);
+  });
+
   test('a hidden section stays hidden across a reload', async ({ context, extensionId }) => {
     const page = await openSheet(context, extensionId);
     const key = 'wealth';
@@ -283,30 +497,53 @@ test.describe('sheet layout controls', () => {
     const continuation = page.locator('.page [data-section-key="spells~cont~1"]');
     await expect(continuation).toBeVisible();
 
-    for (const [index, card] of [base, continuation].entries()) {
+    for (const card of [base, continuation]) {
       const legend = card.locator('.card__title > .card__spell-legend');
       await expect(legend).toBeVisible();
-      await expect(legend.locator('.card__spell-legend-tag')).toHaveText(['C', 'R']);
+      await expect(legend.locator('.card__spell-legend-tag')).toHaveText([
+        'C',
+        'R',
+        'V',
+        'S',
+        'M',
+        'A',
+        'BA',
+      ]);
       await expect(legend.locator('.card__spell-legend-item > span')).toHaveText([
         'Concentration',
         'Ritual',
+        'Verbal',
+        'Somatic',
+        'Material',
+        'Action',
+        'Bonus Action',
       ]);
+      expect(
+        await legend.locator('.card__spell-legend-group').evaluateAll((groups) =>
+          groups.map((group) => group.getAttribute('aria-label')),
+        ),
+      ).toEqual(['Spell tags', 'Components', 'Casting time']);
+      await expect(legend.locator('.card__spell-legend-sep')).toHaveText(['|', '|']);
       const placement = await card.evaluate((element) => {
         const legend = element.querySelector<HTMLElement>('.card__spell-legend');
         const title = element.querySelector<HTMLElement>('.card__title');
-        if (!legend || !title) return { inTitle: false, oneRow: false, rightGap: Infinity };
+        if (!legend || !title) {
+          return { inTitle: false, contained: false, rightGap: Infinity };
+        }
         const legendRect = legend.getBoundingClientRect();
         const titleRect = title.getBoundingClientRect();
         return {
           inTitle: legend.parentElement === title,
-          oneRow: titleRect.height < 24,
+          contained:
+            legendRect.top >= titleRect.top - 1 &&
+            legendRect.bottom <= titleRect.bottom + 1,
           rightGap: titleRect.right - legendRect.right,
         };
       });
       expect(placement.inTitle).toBe(true);
-      expect(placement.oneRow).toBe(true);
+      expect(placement.contained).toBe(true);
       expect(placement.rightGap).toBeGreaterThanOrEqual(-1);
-      expect(placement.rightGap).toBeLessThan(index === 0 ? 78 : 2);
+      expect(placement.rightGap).toBeLessThan(2);
     }
   });
 
@@ -387,6 +624,9 @@ test.describe('sheet layout controls', () => {
         const grid = paper.querySelector<HTMLElement>('.page__grid');
         if (!grid) throw new Error('Printed page has no grid');
         const gridRect = grid.getBoundingClientRect();
+        const count = paper.querySelector<HTMLElement>('.page__count');
+        if (!count) throw new Error('Printed page has no page count');
+        const countRect = count.getBoundingClientRect();
         const style = getComputedStyle(paper);
         const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-section-key]'));
         return {
@@ -415,17 +655,27 @@ test.describe('sheet layout controls', () => {
               rect.bottom <= gridRect.bottom + 1
             );
           }),
+          countText: count.textContent?.trim(),
+          countLabel: count.getAttribute('aria-label'),
+          countInBottomMargin:
+            countRect.top >= gridRect.bottom - 1 &&
+            countRect.bottom <= pageRect.bottom + 1 &&
+            countRect.left >= gridRect.left - 1 &&
+            countRect.right <= gridRect.right + 1,
         };
       }),
     );
 
     expect(geometry.length).toBeGreaterThan(1);
-    for (const paper of geometry) {
+    for (const [index, paper] of geometry.entries()) {
       expect(paper.inset.top).toBeCloseTo(paper.padding.top, 1);
       expect(paper.inset.right).toBeCloseTo(paper.padding.right, 1);
       expect(paper.inset.bottom).toBeCloseTo(paper.padding.bottom, 1);
       expect(paper.inset.left).toBeCloseTo(paper.padding.left, 1);
       expect(paper.cardsContained).toBe(true);
+      expect(paper.countText).toBe(`${index + 1} of ${geometry.length}`);
+      expect(paper.countLabel).toBe(`Page ${index + 1} of ${geometry.length}`);
+      expect(paper.countInBottomMargin).toBe(true);
     }
     for (let index = 1; index < geometry.length; index += 1) {
       expect(geometry[index].top).toBeCloseTo(geometry[index - 1].bottom, 1);

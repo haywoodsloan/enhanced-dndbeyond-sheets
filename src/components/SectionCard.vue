@@ -60,6 +60,10 @@ const props = withDefaults(
      * always lands between whole items in the current layout. */
     sliceStart?: number;
     sliceEnd?: number;
+    /** Use row-aligned feature items when masonry has no safe page break. */
+    rowAlignedFeatures?: boolean;
+    /** Use row-aligned action items when masonry has no safe page break. */
+    rowAlignedActions?: boolean;
   }>(),
   { canCycleLayout: true, sliceOffset: 0 },
 );
@@ -101,6 +105,11 @@ const cardMeta = computed(() =>
   props.section.key === 'basics' && props.character
     ? [props.character.size, props.character.creatureType].filter(Boolean).join(' · ')
     : '',
+);
+const companionTitle = computed(
+  () =>
+    props.character?.sections.find((section) => section.key === 'companions')?.title ??
+    'Companions',
 );
 
 // A continuation card renders the SAME body as its base card, shifted up to show
@@ -167,10 +176,8 @@ const spellControl = computed<'expand' | 'collapse' | null>(() => {
 // Sits left of the layout button when one is present, else in the layout slot.
 const spellControlRight = computed(() => ((props.layoutCount ?? 1) > 1 ? '52px' : '28px'));
 const spellLegendMargin = computed(() => {
-  if (isContinuation.value) return '0px';
   if (props.hidden) return '28px';
-  if (spellControl.value) return `${Number.parseInt(spellControlRight.value, 10) + 24}px`;
-  return (props.layoutCount ?? 1) > 1 ? '52px' : '28px';
+  return '0px';
 });
 
 // Report the card's body geometry so the sheet can size a content-fit card's
@@ -185,7 +192,7 @@ const bodyRef = ref<HTMLElement | null>(null);
 // The per-item elements a card may break between when its content overflows
 // onto a continuation card (one selector across every content-fit card type).
 const BREAK_ITEMS =
-  '[data-spell],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-companion-part],[data-rule-row]';
+  '[data-spell],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part],[data-companion-part],[data-rule-row]';
 
 function measure() {
   if (props.hidden) return;
@@ -196,7 +203,25 @@ function measure() {
   const total = bodyRect.height;
   if (total <= 0) return;
   // Each break item's top/bottom edge, body-relative.
-  const rects = Array.from(body.querySelectorAll(BREAK_ITEMS)).map((el) => {
+  const breakItems = Array.from(body.querySelectorAll(BREAK_ITEMS)).filter(
+    (element) => {
+      if (element.hasAttribute('data-feature')) {
+        const rowAligned = element
+          .closest('.features__list')
+          ?.classList.contains('features__list--row-aligned');
+        return !rowAligned || !element.classList.contains('features__item--multipart');
+      }
+      if (element.hasAttribute('data-feature-part')) {
+        const feature = element.closest('[data-feature]');
+        return Boolean(
+          feature?.closest('.features__list')?.classList.contains('features__list--row-aligned') &&
+          feature.classList.contains('features__item--multipart'),
+        );
+      }
+      return true;
+    },
+  );
+  const rects = breakItems.map((el) => {
     const r = el.getBoundingClientRect();
     return { top: r.top - bodyRect.top, bottom: r.bottom - bodyRect.top };
   });
@@ -273,12 +298,15 @@ watch(
 <template>
   <Card
     class="card"
-    :class="{ 'card--hidden': hidden }"
+    :class="{ 'card--hidden': hidden, 'card--narrow': span.cols < 3 }"
     :style="cardStyle"
     :data-section-key="section.key"
   >
     <template #title>
-      <div class="card__title">
+      <div
+        class="card__title"
+        :class="{ 'card__title--spells': bodyKey === 'spells' }"
+      >
         <span class="card__heading">
           <span class="card__name">{{ cardTitle }}</span>
           <template v-if="cardSubtitle">
@@ -296,13 +324,47 @@ watch(
           :style="{ '--spell-legend-margin': spellLegendMargin }"
           aria-label="Spell tags"
         >
-          <span class="card__spell-legend-item">
-            <b class="card__spell-legend-tag">C</b>
-            <span>Concentration</span>
+          <span class="card__spell-legend-group" aria-label="Spell tags">
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag">C</b>
+              <span>Concentration</span>
+            </span>
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag">R</b>
+              <span>Ritual</span>
+            </span>
           </span>
-          <span class="card__spell-legend-item">
-            <b class="card__spell-legend-tag">R</b>
-            <span>Ritual</span>
+          <span class="card__spell-legend-sep" aria-hidden="true">|</span>
+          <span
+            class="card__spell-legend-group card__spell-legend-group--plain"
+            aria-label="Components"
+          >
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag card__spell-legend-tag--plain">V</b>
+              <span>Verbal</span>
+            </span>
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag card__spell-legend-tag--plain">S</b>
+              <span>Somatic</span>
+            </span>
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag card__spell-legend-tag--plain">M</b>
+              <span>Material</span>
+            </span>
+          </span>
+          <span class="card__spell-legend-sep" aria-hidden="true">|</span>
+          <span
+            class="card__spell-legend-group card__spell-legend-group--plain"
+            aria-label="Casting time"
+          >
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag card__spell-legend-tag--plain">A</b>
+              <span>Action</span>
+            </span>
+            <span class="card__spell-legend-item">
+              <b class="card__spell-legend-tag card__spell-legend-tag--plain">BA</b>
+              <span>Bonus Action</span>
+            </span>
           </span>
         </div>
       </div>
@@ -431,11 +493,14 @@ watch(
         <ActionsCard
           v-else-if="bodyKey === 'actions' && character"
           :actions="character.actions"
+          :companion-title="companionTitle"
+          :row-aligned="rowAlignedActions"
         />
         <SpellsCard
           v-else-if="bodyKey === 'spells' && character"
           :spells="character.spells"
           :spellcasting="character.spellcasting"
+          :companion-title="companionTitle"
         />
         <CompanionsCard
           v-else-if="bodyKey === 'companions' && character"
@@ -458,9 +523,11 @@ watch(
         <FeaturesCard
           v-else-if="bodyKey === 'features' && character"
           :features="character.features"
+          :companion-title="companionTitle"
+          :row-aligned="rowAlignedFeatures"
         />
         <NotesCard v-else-if="bodyKey === 'notes'" />
-        <SpellCard v-else-if="spell" :spell="spell" />
+        <SpellCard v-else-if="spell" :spell="spell" :companion-title="companionTitle" />
         <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
         <p v-else class="card__note">Details coming soon.</p>
       </div>
@@ -486,14 +553,52 @@ watch(
 }
 
 .card__spell-legend {
-  flex: none;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
-  gap: 10px;
+  align-items: baseline;
+  gap: 8px;
   margin-left: auto;
   margin-right: var(--spell-legend-margin, 0);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.25;
   color: var(--p-text-muted-color, #888);
+}
+
+.card__spell-legend-group {
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.card__spell-legend-sep {
+  flex: none;
+  color: var(--p-primary-300, #cbd5e1);
+}
+
+.card--narrow .card__spell-legend {
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  justify-items: start;
+  row-gap: 5px;
+}
+
+.card--narrow .card__spell-legend-group {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.card--narrow .card__spell-legend-group--plain {
+  box-sizing: border-box;
+  padding-left: 4px;
+}
+
+.card--narrow .card__spell-legend-sep {
+  display: none;
 }
 
 .card__spell-legend-item {
@@ -511,6 +616,12 @@ watch(
   color: var(--p-text-muted-color, #888);
   border: 1px solid var(--p-primary-200, #e4e4e7);
   border-radius: 3px;
+}
+
+.card__spell-legend-tag--plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
 }
 
 @media print {
@@ -724,6 +835,20 @@ watch(
   gap: 8px;
   font-size: 15px;
   color: var(--p-primary-color);
+}
+
+.card__title--spells {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.card__title--spells .card__heading {
+  flex: none;
+}
+
+.card__title--spells .card__name {
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* The Basics card puts name, race/class, and size/type on one row. */

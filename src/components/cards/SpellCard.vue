@@ -3,9 +3,13 @@ import { computed } from 'vue';
 import type { SpellEntry } from '@/services/dndbeyond/model';
 import { spellSchoolStyle } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
+import InlineScalingText from '@/components/InlineScalingText.vue';
 import RichText from '@/components/RichText.vue';
 
-const props = defineProps<{ spell: SpellEntry }>();
+const props = withDefaults(
+  defineProps<{ spell: SpellEntry; companionTitle?: string }>(),
+  { companionTitle: 'Companions' },
+);
 
 const school = computed(() => spellSchoolStyle(props.spell.school));
 const levelLabel = computed(() => (props.spell.level === 0 ? '0' : String(props.spell.level)));
@@ -52,7 +56,7 @@ const rows = computed(() => {
         data-spell-card-part
       >
         <dt class="spell-card__key">{{ label }}</dt>
-        <dd class="spell-card__value">{{ value }}</dd>
+        <dd class="spell-card__value"><InlineScalingText :text="value" /></dd>
       </div>
     </dl>
     <span
@@ -60,12 +64,18 @@ const rows = computed(() => {
       class="spell-card__reference"
       data-spell-card-part
     >
-      See Companions
+      See {{ companionTitle }}
     </span>
     <RichText
       v-if="spell.summary"
       :text="spell.summary"
       class="spell-card__summary"
+      data-spell-card-part
+    />
+    <RichText
+      v-if="spell.upcast"
+      :text="spell.upcast"
+      class="spell-card__upcast"
       data-spell-card-part
     />
   </div>
@@ -129,7 +139,8 @@ const rows = computed(() => {
 }
 
 .spell-card__reference,
-.spell-card__summary {
+.spell-card__summary,
+.spell-card__upcast {
   display: block;
   margin-top: 5px;
   font-size: 11px;

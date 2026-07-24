@@ -86,3 +86,16 @@ export function sliceContent(breaks: number[], total: number, maxHeight: number)
   }
   return slices;
 }
+
+/** Whether an alternate row-aligned layout is required because at least one
+ * whole-item slice is taller than a printable page. Safe multi-page content
+ * with usable boundaries can retain compact masonry columns. */
+export function needsRowAlignedContinuation(
+  breaks: number[],
+  total: number,
+  maxHeight: number,
+): boolean {
+  return sliceContent(breaks, total, maxHeight).some(
+    (slice) => slice.height > maxHeight + 0.5,
+  );
+}

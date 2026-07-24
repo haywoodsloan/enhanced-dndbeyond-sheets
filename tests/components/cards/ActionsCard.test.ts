@@ -102,4 +102,45 @@ describe('ActionsCard', () => {
     // An action without a summary shows no blurb line.
     expect(items[1].find('.actions__summary').exists()).toBe(false);
   });
+
+  it('points an action to its dynamically titled creature card', () => {
+    const wrapper = mount(ActionsCard, {
+      props: {
+        companionTitle: 'Summons & Wild Shapes',
+        actions: [
+          { name: 'Wild Shape', category: 'bonus', related: ['companions'] },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.actions__reference').text()).toBe(
+      '(see Summons & Wild Shapes)',
+    );
+  });
+
+  it('renders structured action benefits as a semantic list', () => {
+    const wrapper = mount(ActionsCard, {
+      props: {
+        actions: [
+          {
+            name: 'Wild Shape: Circle Forms',
+            category: 'bonus',
+            summary: 'You gain the following benefits:',
+            list: {
+              items: [
+                { text: 'The max CR for the form is 3.' },
+                { text: 'You gain 27 Temporary HP.' },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.get('.actions__summary').text()).toBe('You gain the following benefits:');
+    expect(wrapper.findAll('[data-action-list] li').map((item) => item.text())).toEqual([
+      'The max CR for the form is 3.',
+      'You gain 27 Temporary HP.',
+    ]);
+  });
 });

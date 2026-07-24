@@ -10,6 +10,15 @@ export interface SectionSpan {
 /** Number of grid columns and the gap between tracks, in px. */
 export const GRID_COLUMNS = 3;
 export const GRID_GAP = 12;
+const MIN_GRID_COLUMN_WIDTH = 200;
+const SHORT_ROW_SECTIONS: ReadonlySet<CardKey> = new Set<CardKey>([
+  'attributes',
+  'skills',
+  'savingThrows',
+  'senses',
+  'proficiencies',
+  'wealth',
+]);
 
 /**
  * Default card footprint per section on the grid. Rows are quantized so cards
@@ -179,6 +188,31 @@ export function sectionSpan(
   return SECTION_SPAN[key];
 }
 
+/** Fit a curated span to the live page grid. Narrow portrait grids need extra
+ * height for the full condition checklist and the two-column skill list. */
+export function fitSectionSpanToGrid(
+  key: CardKey,
+  span: SectionSpan,
+  columns: number,
+  rowsPerPage: number,
+  rowUnit = Number.POSITIVE_INFINITY,
+  columnWidth = Number.POSITIVE_INFINITY,
+): SectionSpan {
+  const liveColumns = Math.max(1, Math.floor(columns));
+  const fittedColumns = Math.min(span.cols, liveColumns);
+  const spanWidth = fittedColumns * columnWidth + (fittedColumns - 1) * GRID_GAP;
+  const needsNarrowPortraitRoom =
+    liveColumns < GRID_COLUMNS && (key === 'basics' || key === 'skills');
+  const needsShortRowRoom = rowUnit < 210 && SHORT_ROW_SECTIONS.has(key);
+  const needsBasicsRoom = key === 'basics' && (spanWidth < 680 || rowUnit < 220);
+  const minimumRows =
+    needsNarrowPortraitRoom || needsShortRowRoom || needsBasicsRoom ? 2 : 1;
+  return {
+    cols: fittedColumns,
+    rows: Math.min(Math.max(1, rowsPerPage), Math.max(span.rows, minimumRows)),
+  };
+}
+
 /**
  * The layout option index the toggle should advance to: the next option after
  * `current` (wrapping) whose card FITS the page — its height ≤ `rowsPerPage` at
@@ -269,7 +303,18 @@ export function inventoryListColumns(count: number, span: SectionSpan): number {
  * How many row-units fit on one page so the rows:columns ratio best matches the
  * print area's height:width, clamped to a sensible single digit.
  */
-export function gridRowsPerPage(printWidth: number, printHeight: number): number {
-  const rows = Math.round((GRID_COLUMNS * printHeight) / printWidth);
+export function gridColumnsForPage(printWidth: number): number {
+  const columns = Math.floor(
+    (printWidth + GRID_GAP) / (MIN_GRID_COLUMN_WIDTH + GRID_GAP),
+  );
+  return Math.min(GRID_COLUMNS, Math.max(1, columns));
+}
+
+export function gridRowsPerPage(
+  printWidth: number,
+  printHeight: number,
+  columns = GRID_COLUMNS,
+): number {
+  const rows = Math.round((columns * printHeight) / printWidth);
   return Math.min(9, Math.max(1, rows));
 }

@@ -143,6 +143,10 @@ export interface CharacterAction {
   range?: string;
   /** A one-line blurb of what the action does. */
   summary?: string;
+  /** Structured benefits or options rendered beneath the action summary. */
+  list?: StructuredList;
+  /** Supporting cards containing selectable forms or other related detail. */
+  related?: SectionKey[];
 }
 
 /** Damage dice (and computed flat bonus) for an attack, action, or spell. */
@@ -208,6 +212,8 @@ export interface SpellEntry {
   prepared?: boolean;
   /** A one-line blurb of what the spell does. */
   summary?: string;
+  /** Full higher-level casting rule shown in the spell body. */
+  upcast?: string;
   /** Named options or rules sections rendered as a semantic list. */
   list?: StructuredList;
   /** Independent feature-granted cast pools (e.g. Augury via Gathered Whispers). */
@@ -318,6 +324,8 @@ export interface FeatureItem {
   summary?: string;
   /** Spells added or prepared by this feature; tracking remains on the Spells card. */
   grantedSpells?: string[];
+  /** Concrete languages/training granted by this feature, grouped for display. */
+  grants?: { label: string; items: string[] }[];
   /** Dedicated card that owns this feature's full mechanics. */
   reference?: SectionKey;
   /** Supporting cards containing structured companion/table details. */

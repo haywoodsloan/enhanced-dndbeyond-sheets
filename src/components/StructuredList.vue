@@ -60,6 +60,10 @@ withDefaults(defineProps<{ list: StructuredList; bullets?: boolean }>(), {
   padding-left: 1px;
 }
 
+.structured-list ul:not(.structured-list__items--plain) li::marker {
+  content: '• ';
+}
+
 .structured-list li + li {
   margin-top: 2px;
 }

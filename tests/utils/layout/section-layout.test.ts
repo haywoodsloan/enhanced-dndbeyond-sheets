@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTENT_FIT_SECTIONS,
   canCycleLayout,
+  fitSectionSpanToGrid,
+  gridColumnsForPage,
   gridRowsPerPage,
   inventoryListColumns,
   nextViableLayoutIndex,
@@ -31,6 +33,48 @@ describe('sectionSpan', () => {
     expect(sectionSpan('spell:fire-bolt', 99, 2, 6)).toEqual({ cols: 1, rows: 2 });
     expect(sectionLayoutCount('spell:fire-bolt')).toBe(1);
     expect(canCycleLayout('spell:fire-bolt', 0, 1, 6)).toBe(false);
+  });
+});
+
+describe('fitSectionSpanToGrid', () => {
+  it('caps widths and gives narrow fixed cards enough vertical space', () => {
+    expect(fitSectionSpanToGrid('basics', { cols: 3, rows: 1 }, 2, 3)).toEqual({
+      cols: 2,
+      rows: 2,
+    });
+    expect(fitSectionSpanToGrid('skills', { cols: 3, rows: 1 }, 2, 3)).toEqual({
+      cols: 2,
+      rows: 2,
+    });
+    expect(fitSectionSpanToGrid('attributes', { cols: 2, rows: 1 }, 2, 3)).toEqual({
+      cols: 2,
+      rows: 1,
+    });
+  });
+
+  it('leaves wide-grid heights unchanged', () => {
+    expect(fitSectionSpanToGrid('basics', { cols: 3, rows: 1 }, 3, 4, 230, 232)).toEqual({
+      cols: 3,
+      rows: 1,
+    });
+  });
+
+  it('grows fixed-fill cards when physical rows or spans are too small', () => {
+    expect(fitSectionSpanToGrid('skills', { cols: 3, rows: 1 }, 3, 5, 190, 210)).toEqual({
+      cols: 3,
+      rows: 2,
+    });
+    expect(
+      fitSectionSpanToGrid('proficiencies', { cols: 2, rows: 1 }, 3, 5, 205, 210),
+    ).toEqual({ cols: 2, rows: 2 });
+    expect(fitSectionSpanToGrid('basics', { cols: 3, rows: 1 }, 3, 5, 230, 215)).toEqual({
+      cols: 3,
+      rows: 2,
+    });
+    expect(fitSectionSpanToGrid('basics', { cols: 3, rows: 1 }, 4, 3, 215, 220)).toEqual({
+      cols: 3,
+      rows: 2,
+    });
   });
 });
 
@@ -231,5 +275,18 @@ describe('gridRowsPerPage', () => {
     expect(gridRowsPerPage(500, 500)).toBe(3);
     // Extreme ratios are clamped to a single digit.
     expect(gridRowsPerPage(100, 1000)).toBe(9);
+  });
+
+  it('uses the live column count when matching the page aspect ratio', () => {
+    expect(gridRowsPerPage(460, 695, 2)).toBe(3);
+  });
+});
+
+describe('gridColumnsForPage', () => {
+  it('preserves readable physical columns on narrow paper', () => {
+    expect(gridColumnsForPage(720)).toBe(3);
+    expect(gridColumnsForPage(650)).toBe(3);
+    expect(gridColumnsForPage(460)).toBe(2);
+    expect(gridColumnsForPage(190)).toBe(1);
   });
 });

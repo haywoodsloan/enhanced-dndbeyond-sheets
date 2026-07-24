@@ -12,6 +12,8 @@ import {
   GRID_COLUMNS,
   GRID_GAP,
   CONTENT_FIT_SECTIONS,
+  fitSectionSpanToGrid,
+  gridColumnsForPage,
   gridRowsPerPage,
   nextViableLayoutIndex,
   rowsForHeight,
@@ -52,8 +54,10 @@ import {
 import SectionCard from '@/components/SectionCard.vue';
 import { isSpellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
 import {
+  continuationBaseKey,
   continuationKey,
   isContinuationKey,
+  needsRowAlignedContinuation,
   sliceContent,
   type CardMeasurement,
 } from '@/utils/layout/card-continuation';
@@ -229,19 +233,28 @@ const margin = computed(
 // The paper's width/height in mm, swapped when landscape is selected.
 const pageSize = computed(() => orientedSize(format.value, orientationId.value));
 
-// The grid tracks. Portrait uses GRID_COLUMNS columns with the row count derived
-// (from the PORTRAIT print area) to keep cells ~square; landscape TRANSPOSES them
-// — columns and rows swap — so the now-wider page gets more columns and fewer
-// rows (cells stay square because the page dimensions swapped too).
+// The grid tracks. Portrait uses up to GRID_COLUMNS columns while preserving a
+// readable physical cell width; landscape transposes the portrait grid so cells
+// stay roughly square. Narrow formats such as A5 therefore use 2×3 / 3×2 rather
+// than squeezing the Letter-sized 3-column layout onto half-sized paper.
+const portraitColumns = computed(() => {
+  const marginPx = mmToPx(margin.value.mm);
+  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
+  return gridColumnsForPage(printWidth);
+});
 const portraitRows = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
   const printWidth = mmToPx(format.value.width) - 2 * marginPx;
   const printHeight = mmToPx(format.value.height) - 2 * marginPx;
-  return gridRowsPerPage(printWidth, printHeight);
+  return gridRowsPerPage(printWidth, printHeight, portraitColumns.value);
 });
 const isLandscape = computed(() => orientationId.value === 'landscape');
-const gridColumns = computed(() => (isLandscape.value ? portraitRows.value : GRID_COLUMNS));
-const rowsPerPage = computed(() => (isLandscape.value ? GRID_COLUMNS : portraitRows.value));
+const gridColumns = computed(() =>
+  isLandscape.value ? portraitRows.value : portraitColumns.value,
+);
+const rowsPerPage = computed(() =>
+  isLandscape.value ? portraitColumns.value : portraitRows.value,
+);
 
 // Row height chosen so the grid's rows:columns ratio matches the print area's
 // height:width (margins removed) — i.e. roughly square cells.
@@ -285,6 +298,7 @@ const sheetRef = ref<HTMLElement | null>(null);
 // and slices an over-tall one onto continuation cards. Cards that fill their
 // height are ignored, so they keep their curated estimate.
 const measuredHeights = ref<Record<string, CardMeasurement>>({});
+const rowAlignedSections = ref<Set<CardKey>>(new Set());
 function onMeasure(key: CardKey, measurement: CardMeasurement) {
   // Only content-fit base cards size to their text: ignore continuation cards
   // (they mirror their base) and fill cards.
@@ -293,6 +307,23 @@ function onMeasure(key: CardKey, measurement: CardMeasurement) {
     (!isSpellCardKey(key) && !CONTENT_FIT_SECTIONS.has(key as SectionKey))
   ) {
     return;
+  }
+  if (
+    (key === 'features' || key === 'actions') &&
+    !rowAlignedSections.value.has(key)
+  ) {
+    const maximum = Math.max(1, pageBodyHeight(measurement.chrome));
+    const needsFallback = needsRowAlignedContinuation(
+      measurement.breaks,
+      measurement.total,
+      maximum,
+    );
+    if (needsFallback) {
+      rowAlignedSections.value = new Set([
+        ...rowAlignedSections.value,
+        key,
+      ]);
+    }
   }
   const prev = measuredHeights.value[key];
   if (
@@ -304,6 +335,20 @@ function onMeasure(key: CardKey, measurement: CardMeasurement) {
   }
   measuredHeights.value = { ...measuredHeights.value, [key]: measurement };
 }
+
+watch(
+  () => [
+    character.value?.id,
+    activeProfileId.value,
+    formatId.value,
+    orientationId.value,
+    marginId.value,
+    layoutIndices.value.features,
+  ],
+  () => {
+    rowAlignedSections.value = new Set();
+  },
+);
 
 // Extra body room (px) beyond the measured content when sizing a card, so its
 // last line isn't cut flush at the card edge (mirrors the old measurement pad).
@@ -347,7 +392,14 @@ const plannedCards = computed<PlannedCard[]>(() => {
   const cards: PlannedCard[] = [];
   for (const section of orderedSections.value) {
     const layoutIndex = layoutIndices.value[section.key] ?? 0;
-    const estimate = sectionSpan(section.key, section.count, layoutIndex, perPage);
+    const estimate = fitSectionSpanToGrid(
+      section.key,
+      sectionSpan(section.key, section.count, layoutIndex, perPage),
+      gridColumns.value,
+      perPage,
+      rowUnit.value,
+      cellSize.value.width - GRID_GAP,
+    );
     const measured = measuredHeights.value[section.key];
     // No measurement (fill cards, pre-measure, and tests without
     // a layout engine): keep the curated count-based estimate as a single card.
@@ -564,13 +616,17 @@ const layoutChanging = ref(false);
 function overflowsAtCols(section: CharacterSection, cols: number): boolean {
   const measured = measuredHeights.value[section.key];
   if (!measured || cols <= 0) return false;
-  const currentCols = sectionSpan(
-    section.key,
-    section.count,
-    layoutIndices.value[section.key] ?? 0,
-    rowsPerPage.value,
-  ).cols;
-  const estContent = (measured.total * currentCols) / cols;
+  const currentCols = Math.min(
+    sectionSpan(
+      section.key,
+      section.count,
+      layoutIndices.value[section.key] ?? 0,
+      rowsPerPage.value,
+    ).cols,
+    gridColumns.value,
+  );
+  const effectiveCols = Math.min(cols, gridColumns.value);
+  const estContent = (measured.total * currentCols) / effectiveCols;
   return estContent > Math.max(1, pageBodyHeight(measured.chrome));
 }
 
@@ -586,7 +642,10 @@ function cardNextLayout(section: CharacterSection): number {
     const total = sectionLayoutCount(key);
     for (let step = 1; step < total; step += 1) {
       const candidate = (current + step) % total;
-      const cols = sectionSpan(key, section.count, candidate, rowsPerPage.value).cols;
+      const cols = Math.min(
+        sectionSpan(key, section.count, candidate, rowsPerPage.value).cols,
+        gridColumns.value,
+      );
       if (!overflowsAtCols(section, cols)) return candidate;
     }
     return current;
@@ -994,6 +1053,8 @@ onUnmounted(() => {
                 :slice-height="entry.sliceHeight"
                 :slice-start="entry.sliceStart"
                 :slice-end="entry.sliceEnd"
+                :row-aligned-features="rowAlignedSections.has(continuationBaseKey(entry.section.key))"
+                :row-aligned-actions="rowAlignedSections.has(continuationBaseKey(entry.section.key))"
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
@@ -1003,6 +1064,12 @@ onUnmounted(() => {
                 @measure="onMeasure"
               />
             </div>
+            <span
+              class="page__count"
+              :aria-label="`Page ${p + 1} of ${pages.length}`"
+            >
+              {{ p + 1 }} of {{ pages.length }}
+            </span>
           </section>
         </template>
       </main>
@@ -1383,12 +1450,22 @@ body {
    with its own one-page grid. Its padding IS the page margin, so the printed
    margin is exact and identical on every page (no fragmented-grid drift). */
 .page {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   height: var(--page-height);
   padding: var(--page-margin);
   background: var(--paper);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
+}
+
+.page__count {
+  position: absolute;
+  right: var(--page-margin);
+  bottom: calc(var(--page-margin) / 2 - 5px);
+  font: 12px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--p-text-muted-color, #888);
+  font-variant-numeric: tabular-nums;
 }
 
 .page:not(:last-child) {

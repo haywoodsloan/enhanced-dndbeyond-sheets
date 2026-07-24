@@ -34,9 +34,10 @@ function formatAbilityName(key: string): string {
       <div class="companion__intro" data-companion-part>
         <header class="companion__header">
           <span class="companion__name">{{ companion.name }}</span>
-          <span v-if="companion.source !== companion.name" class="companion__source">
-            {{ companion.source }}
-          </span>
+          <template v-if="companion.source !== companion.name">
+            <span class="companion__source-sep" aria-hidden="true">|</span>
+            <span class="companion__source">{{ companion.source }}</span>
+          </template>
           <span v-if="companion.meta" class="companion__meta">{{ companion.meta }}</span>
         </header>
 
@@ -130,6 +131,11 @@ function formatAbilityName(key: string): string {
 .companion__name {
   font-size: 15px;
   font-weight: 700;
+}
+
+.companion__source-sep {
+  font-weight: 300;
+  color: var(--p-primary-300, #cbd5e1);
 }
 
 .companion__source,

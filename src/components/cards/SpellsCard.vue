@@ -3,11 +3,19 @@ import { computed } from 'vue';
 import type { PactSlotPool, SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
+import InlineScalingText from '@/components/InlineScalingText.vue';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
 import StructuredList from '@/components/StructuredList.vue';
 
-const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
+const props = withDefaults(
+  defineProps<{
+    spells: SpellEntry[];
+    spellcasting?: Spellcasting;
+    companionTitle?: string;
+  }>(),
+  { companionTitle: 'Companions' },
+);
 
 /**
  * Spell levels to show: every level with spells or slots. Each carries its spell
@@ -125,31 +133,38 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
           class="spells__spell"
           data-spell
         >
-          <span class="spells__name">{{ spell.name }}</span>
-          <span v-if="spell.related?.includes('companions')" class="spells__reference">
-            (see Companions)
-          </span>
-          <span
-            v-for="tag in spellTags(spell)"
-            :key="tag.key"
-            class="spells__spell-tag"
-            :title="tag.title"
-            >{{ tag.label }}</span
-          >
-          <span
-            v-for="(use, useIndex) in spell.featureUses"
-            :key="`${use.source}-${useIndex}`"
-            class="spells__feature-use"
-            data-spell-use
-          >
-            <span class="spells__feature-source">{{ use.source }}:</span>
-            <ResourceBoxes :resource="use.pool" />
-          </span>
-          <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
+          <div class="spells__row">
+            <span class="spells__identity">
+              <span class="spells__name">{{ spell.name }}</span>
+              <span
+                v-for="tag in spellTags(spell)"
+                :key="tag.key"
+                class="spells__spell-tag"
+                :title="tag.title"
+                >{{ tag.label }}</span
+              >
+              <span
+                v-for="(use, useIndex) in spell.featureUses"
+                :key="`${use.source}-${useIndex}`"
+                class="spells__feature-use"
+                data-spell-use
+              >
+                <span class="spells__feature-source">{{ use.source }}:</span>
+                <ResourceBoxes :resource="use.pool" />
+              </span>
+              <span v-if="spellMeta(spell)" class="spells__meta">
+                <InlineScalingText :text="spellMeta(spell)" />
+              </span>
+            </span>
+            <span v-if="spell.related?.includes('companions')" class="spells__reference">
+              (see {{ companionTitle }})
+            </span>
+          </div>
           <span v-if="spell.material" class="spells__material">
             <strong>Material:</strong> {{ spell.material }}
           </span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
+          <RichText v-if="spell.upcast" :text="spell.upcast" class="spells__upcast" />
           <StructuredList
             v-if="spell.list?.items.length"
             :list="spell.list"
@@ -267,9 +282,18 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
   color: var(--p-text-color, #1c1c1e);
 }
 
+.spells__row {
+  display: block;
+}
+
+.spells__identity {
+  display: inline;
+}
+
 .spells__reference {
-  margin-left: 5px;
+  margin-left: 6px;
   font-size: 12px;
+  white-space: nowrap;
   color: var(--p-text-muted-color, #888);
 }
 
@@ -311,6 +335,13 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 
 /* One-line blurb of the spell's effect, on its own line beneath the shorthand. */
 .spells__summary {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.spells__upcast {
   display: block;
   font-size: 12px;
   line-height: 1.3;

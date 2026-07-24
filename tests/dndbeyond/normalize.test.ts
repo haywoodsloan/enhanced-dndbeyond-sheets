@@ -460,6 +460,10 @@ describe('normalizeCharacter', () => {
       definition: {
         name,
         level,
+        description:
+          `<p>Base ${name} effect.</p>` +
+          `<p><strong><em>Using a Higher-Level Spell Slot.</em></strong> ` +
+          `The damage increases by 1d8 for each spell slot level above ${level}.</p>`,
         modifiers: [
           {
             type: 'damage',
@@ -486,6 +490,56 @@ describe('normalizeCharacter', () => {
     );
     expect(spells.find((entry) => entry.name === 'Heat Metal')?.damage?.scaling).toBe(
       '+1d8 per slot level above 2nd',
+    );
+    expect(spells.find((entry) => entry.name === 'Thunderwave')?.upcast).toBe(
+      '**Using a Higher-Level Spell Slot.** The damage increases by 1d8 for each spell slot level above 1.',
+    );
+    expect(spells.find((entry) => entry.name === 'Heat Metal')?.upcast).toBe(
+      '**Using a Higher-Level Spell Slot.** The damage increases by 1d8 for each spell slot level above 2.',
+    );
+    expect(spells.find((entry) => entry.name === 'Thunderwave')?.summary).toBe(
+      'Base Thunderwave effect.',
+    );
+  });
+
+  it('omits per-level shorthand for tiered upcast damage', () => {
+    const character = {
+      id: 1,
+      name: 'Tiered Upcasting',
+      spells: {
+        class: [
+          {
+            definition: {
+              name: 'Elemental Weapon',
+              level: 3,
+              description:
+                '<p>A weapon deals an extra 1d4 damage of the chosen type.</p>' +
+                '<p><strong><em>Using a Higher-Level Spell Slot.</em></strong> ' +
+                'If you use a level 5–6 spell slot, the extra damage increases to 2d4. ' +
+                'If you use a level 7+ spell slot, the extra damage increases to 3d4.</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'chosen type',
+                  die: { diceString: '1d4' },
+                  atHigherLevels: {
+                    higherLevelDefinitions: [
+                      { level: 5, dice: { diceString: '2d4' } },
+                      { level: 7, dice: { diceString: '3d4' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const elementalWeapon = normalizeCharacter(character).spells[0];
+    expect(elementalWeapon.damage).toEqual({ dice: '1d4', type: 'chosen type' });
+    expect(elementalWeapon.upcast).toBe(
+      '**Using a Higher-Level Spell Slot.** If you use a level 5–6 spell slot, the extra damage increases to 2d4. If you use a level 7+ spell slot, the extra damage increases to 3d4.',
     );
   });
 
@@ -725,6 +779,87 @@ describe('normalizeCharacter', () => {
     expect(proficiencies.armor.length).toBeGreaterThan(0);
   });
 
+  it('omits unresolved proficiency choice prompts from labels and section counts', () => {
+    const character = {
+      id: 1,
+      name: 'Incomplete Training',
+      modifiers: {
+        class: [
+          {
+            type: 'proficiency',
+            subType: 'choose-a-wizard-skill-proficiency',
+            friendlySubtypeName: 'Choose a Wizard Skill Proficiency ',
+          },
+          {
+            type: 'proficiency',
+            subType: 'smiths-tools',
+            friendlySubtypeName: ' Smith’s Tools ',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.proficiencies.tools).toEqual(['Smith’s Tools']);
+    expect(
+      normalized.sections.find((section) => section.key === 'proficiencies'),
+    ).toMatchObject({ count: 1, isEmpty: false });
+  });
+
+  it('shows Druidic language and spell benefits without a redundant Proficiencies link', () => {
+    const character = {
+      id: 1,
+      name: 'Druid',
+      classes: [
+        {
+          level: 2,
+          definition: {
+            name: 'Druid',
+            classFeatures: [
+              {
+                id: 100,
+                name: 'Druidic',
+                requiredLevel: 1,
+                description:
+                  '<p>You know Druidic, the secret language of Druids.</p>' +
+                  '<p>You can use it to leave hidden messages.</p>',
+              },
+            ],
+          },
+        },
+      ],
+      modifiers: {
+        class: [
+          {
+            type: 'language',
+            subType: 'druidic',
+            friendlySubtypeName: 'Druidic',
+            componentId: 100,
+          },
+        ],
+      },
+      spells: {
+        class: [
+          {
+            componentId: 100,
+            definition: { name: 'Speak with Animals', level: 1 },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const druidic = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Druidic');
+    expect(druidic).toMatchObject({
+      grants: [{ label: 'Languages', items: ['Druidic'] }],
+      grantedSpells: ['Speak with Animals'],
+    });
+    expect(druidic?.summary).toBeUndefined();
+    expect(druidic?.related).toBeUndefined();
+    expect(druidic?.reference).toBeUndefined();
+  });
+
   it('applies dynamic feature bonuses and their explicit minimums to skills', () => {
     const character = {
       id: 1,
@@ -891,23 +1026,46 @@ describe('normalizeCharacter', () => {
                 name: 'Circle Forms',
                 requiredLevel: 3,
                 snippet:
-                  'When you assume a Wild Shape form, you gain the following benefits: ' +
-                  'The max CR for the form is {{scalevalue}}. ' +
-                  "Until you leave the form, your AC is {{13+modifier:wis}} unless the Beast's AC is higher. " +
-                  'You gain {{3*classlevel}} Temporary HP.',
+                  'When you assume a Wild Shape form, you gain the following benefits:\n' +
+                  '• The max CR for the form is {{scalevalue}}.\n' +
+                  "• Until you leave the form, your AC is {{13+modifier:wis}} unless the Beast's AC is higher.\n" +
+                  '• You gain {{3*classlevel}} Temporary HP.',
               },
             },
           ],
         },
       ],
+      actions: {
+        class: [
+          {
+            name: 'Circle Forms',
+            componentId: 100,
+            activation: { activationType: 3 },
+            description: '<p>Assume a Wild Shape form.</p>',
+          },
+        ],
+      },
     } as unknown as RawCharacter;
 
     const circleForms = normalizeCharacter(character)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Circle Forms');
-    expect(circleForms?.summary).toContain('max CR for the form is 3');
-    expect(circleForms?.summary).toContain("your AC is 18 unless the Beast's AC is higher");
-    expect(circleForms?.summary).toContain('You gain 27 Temporary HP');
+    expect(circleForms?.summary).toBe(
+      'When you assume a Wild Shape form, you gain the following benefits:',
+    );
+    expect(circleForms?.parts).toEqual([
+      {
+        label: '',
+        text: '',
+        list: {
+          items: [
+            { text: 'The max CR for the form is 3.' },
+            { text: "Until you leave the form, your AC is 18 unless the Beast's AC is higher." },
+            { text: 'You gain 27 Temporary HP.' },
+          ],
+        },
+      },
+    ]);
   });
 
   it('resolves tiered class-level expressions at every breakpoint', () => {
@@ -1526,7 +1684,10 @@ describe('normalizeCharacter', () => {
     for (const heading of ['Approach', 'Drop', 'Flee', 'Grovel', 'Halt']) {
       expect(labels).toContain(heading);
     }
-    expect(labels).toContain('Using a Higher-Level Spell Slot');
+    expect(command?.upcast).toBe(
+      '**Using a Higher-Level Spell Slot.** You can affect one additional creature for each spell slot level above 1.',
+    );
+    expect(labels).not.toContain('Using a Higher-Level Spell Slot');
     expect(JSON.stringify(command?.list)).not.toContain('<');
   });
 
@@ -2124,7 +2285,7 @@ describe('normalizeCharacter', () => {
       },
     ]);
     expect(normalized.sections.find((section) => section.key === 'companions')).toMatchObject({
-      title: 'Companions',
+      title: 'Summons',
       isEmpty: false,
     });
     expect(normalized.spells.find((spell) => spell.name === 'Summon Beast')).toMatchObject({
@@ -2139,6 +2300,240 @@ describe('normalizeCharacter', () => {
     });
     expect(normalized.spells.find((spell) => spell.name === 'Summon Fey')?.summary).not.toContain(
       'Fey Blade',
+    );
+  });
+
+  it('includes selected Extras creatures and derives their feature-based title', () => {
+    const character = {
+      id: 1,
+      name: 'Shapeshifter',
+      classes: [
+        {
+          level: 9,
+          definition: {
+            name: 'Druid',
+            classFeatures: [
+              {
+                id: 100,
+                name: 'Wild Shape',
+                requiredLevel: 2,
+                creatureRules: [{ creatureGroupId: 13 }],
+              },
+              {
+                id: 101,
+                name: 'Ability Score Improvement',
+                requiredLevel: 8,
+                creatureRules: [{ creatureGroupId: 13 }],
+              },
+            ],
+          },
+        },
+      ],
+      creatures: [
+        {
+          id: 200,
+          groupId: 13,
+          isActive: false,
+          definition: {
+            name: 'Giant Seahorse',
+            alignmentId: 10,
+            sizeId: 5,
+            typeId: 2,
+            armorClass: 14,
+            averageHitPoints: 16,
+            hitPointDice: { diceString: '3d10' },
+            movements: [
+              { movementId: 1, speed: 5 },
+              { movementId: 5, speed: 40 },
+            ],
+            passivePerception: 11,
+            challengeRatingId: 4,
+            stats: [
+              { statId: 1, value: 15 },
+              { statId: 2, value: 12 },
+            ],
+            specialTraitsDescription:
+              '<p><strong><em>Water Breathing.</em></strong> The seahorse can breathe only underwater.</p>',
+            actionsDescription:
+              '<p><strong><em>Ram.</em></strong> Melee Attack Roll: +4, reach 5 ft.</p>',
+          },
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Wild Shape',
+            componentId: 100,
+            activation: { activationType: 3 },
+            description: '<p>Shape-shift into a selected Beast form.</p>',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.companions).toEqual([
+      {
+        name: 'Giant Seahorse',
+        source: 'Wild Shape',
+        meta: 'Large Beast, Unaligned',
+        challengeRating: '1/2',
+        armorClass: '14',
+        hitPoints: '16 (3d10)',
+        speed: '5 ft.; Swim 40 ft.',
+        abilities: [
+          { key: 'STR', score: '15', modifier: '+2' },
+          { key: 'DEX', score: '12', modifier: '+1' },
+        ],
+        details: [
+          { section: 'Statistics', label: 'Senses', text: 'Passive Perception 11' },
+          {
+            section: 'Traits',
+            label: 'Water Breathing',
+            text: 'The seahorse can breathe only underwater.',
+          },
+          {
+            section: 'Actions',
+            label: 'Ram',
+            text: 'Melee Attack Roll: +4, reach 5 ft.',
+          },
+        ],
+      },
+    ]);
+    expect(normalized.sections.find((section) => section.key === 'companions')).toMatchObject({
+      title: 'Wild Shapes',
+      isEmpty: false,
+    });
+    const wildShape = normalized.features
+      .flatMap((group) => group.items)
+      .find((feature) => feature.name === 'Wild Shape');
+    expect(wildShape).toMatchObject({ reference: 'actions' });
+    expect(wildShape?.related).toBeUndefined();
+    expect(normalized.actions.find((action) => action.name === 'Wild Shape')).toMatchObject({
+      related: ['companions'],
+    });
+  });
+
+  it('combines summon and Extras origins in the creature-card title', () => {
+    const character = {
+      id: 1,
+      name: 'Mixed Creatures',
+      classes: [
+        {
+          level: 3,
+          definition: {
+            name: 'Druid',
+            classFeatures: [
+              {
+                id: 100,
+                name: 'Wild Shape',
+                requiredLevel: 2,
+                creatureRules: [{ creatureGroupId: 13 }],
+              },
+            ],
+          },
+        },
+      ],
+      classSpells: [
+        {
+          spells: [
+            {
+              definition: {
+                name: 'Summon Beast',
+                level: 2,
+                description:
+                  '<div class="stat-block"><h4>Bestial Spirit</h4><p><strong>AC</strong> 11</p></div>',
+              },
+            },
+          ],
+        },
+      ],
+      creatures: [
+        {
+          groupId: 13,
+          definition: { name: 'Wolf', stats: [] },
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.companions.map((entry) => entry.name)).toEqual([
+      'Bestial Spirit',
+      'Wolf',
+    ]);
+    expect(normalized.sections.find((section) => section.key === 'companions')?.title).toBe(
+      'Summons & Wild Shapes',
+    );
+  });
+
+  it.each([
+    ['Find Familiar', 'Familiars'],
+    ['Primal Companion', 'Beast Companions'],
+    ['Steel Defender', 'Companions'],
+  ])('titles selected %s Extras as %s', (featureName, expectedTitle) => {
+    const normalized = normalizeCharacter({
+      id: 1,
+      name: featureName,
+      classes: [
+        {
+          level: 5,
+          definition: {
+            name: 'Test Class',
+            classFeatures: [
+              {
+                id: 100,
+                name: featureName,
+                requiredLevel: 1,
+                creatureRules: [{ creatureGroupId: 7 }],
+              },
+            ],
+          },
+        },
+      ],
+      creatures: [
+        {
+          groupId: 7,
+          definition: { name: 'Selected Creature', stats: [] },
+        },
+      ],
+    } as unknown as RawCharacter);
+
+    expect(normalized.companions).toHaveLength(1);
+    expect(normalized.companions[0].source).toBe(featureName);
+    expect(normalized.sections.find((section) => section.key === 'companions')?.title).toBe(
+      expectedTitle,
+    );
+  });
+
+  it('labels unmatched selected Extras from an unambiguous Find Familiar source', () => {
+    const normalized = normalizeCharacter({
+      id: 1,
+      name: 'Familiar Keeper',
+      classes: [],
+      classSpells: [
+        {
+          spells: [
+            {
+              definition: {
+                name: 'Find Familiar',
+                level: 1,
+                description: '<p>You gain the service of a familiar.</p>',
+              },
+            },
+          ],
+        },
+      ],
+      creatures: [
+        {
+          groupId: 999,
+          definition: { name: 'Owl', stats: [] },
+        },
+      ],
+    } as unknown as RawCharacter);
+
+    expect(normalized.companions[0]).toMatchObject({ name: 'Owl', source: 'Find Familiar' });
+    expect(normalized.sections.find((section) => section.key === 'companions')?.title).toBe(
+      'Familiars',
     );
   });
 
@@ -2206,14 +2601,15 @@ describe('normalizeCharacter', () => {
     expect(actions.get('Psychic Veil')?.summary).toBe('Become Invisible.');
   });
 
-  it('points the generic Spellcasting feature to its dedicated card', () => {
+  it('keeps only the general origin text for the generic Spellcasting feature', () => {
     const spellcasting = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Spellcasting');
     // Casting stats, slots, focus, and spell rows live on the Spells card.
     expect(spellcasting?.parts).toBeUndefined();
-    expect(spellcasting?.summary).toBeUndefined();
-    expect(spellcasting?.reference).toBe('spells');
+    expect(spellcasting?.summary).toMatch(/cast spells/i);
+    expect(spellcasting?.summary).not.toMatch(/spell slots|prepared spells|cantrips/i);
+    expect(spellcasting?.reference).toBeUndefined();
   });
 
   it('points a pure save-defense trait to Saves & Defences without duplicate prose', () => {
@@ -2453,6 +2849,37 @@ describe('normalizeCharacter', () => {
     ]);
   });
 
+  it('drops spells granted by disguise feats without hiding legitimate copies', () => {
+    const character = {
+      id: 1,
+      name: 'Hidden Grants',
+      feats: [
+        {
+          definition: {
+            id: 100,
+            name: 'Dark Bargain',
+            categories: [{ tagName: '__DISGUISE_FEAT' }],
+          },
+        },
+      ],
+      classSpells: [{ spells: [{ definition: { name: 'Polymorph', level: 4 } }] }],
+      spells: {
+        feat: [
+          {
+            definition: { name: 'Polymorph', level: 4 },
+            componentId: 100,
+            limitedUse: { maxUses: 1, resetType: 2 },
+          },
+          { definition: { name: 'Phantom Spell', level: 4 }, componentId: 100 },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    expect(normalizeCharacter(character).spells).toEqual([
+      { name: 'Polymorph', level: 4 },
+    ]);
+  });
+
   it('does not duplicate an action\'s limited-use checkboxes on its feature', () => {
     const { features, actions } = normalizeCharacter(raw);
     const classFeatures = features.find((group) => group.label === 'Class Features');
@@ -2521,7 +2948,8 @@ describe('normalizeCharacter', () => {
     expect(counts.attributes).toBe(6);
     expect(counts.skills).toBe(18);
     expect(counts.savingThrows).toBe(6);
-    expect(counts.spells).toBe(18);
+    expect(counts.spells).toBe(character.spells.length);
+    expect(counts.spells).toBe(16);
     expect(counts.inventory).toBe(24);
     // The count is the distinct features actually shown: deduped and minus
     // hidden traits, pure Speed/Darkvision duplicates, structural placeholders (ASI / the subclass choice /
@@ -2532,7 +2960,12 @@ describe('normalizeCharacter', () => {
     // now owned by the Basics title line.
     expect(counts.features).toBe(14);
     expect(counts.basics).toBe(0); // Noct has no active conditions
-    expect(counts.proficiencies).toBeGreaterThan(0);
+    expect(counts.proficiencies).toBe(
+      Object.values(character.proficiencies).reduce(
+        (total, entries) => total + entries.length,
+        0,
+      ),
+    );
     expect(counts.actions).toBeGreaterThan(0);
   });
 
@@ -2542,6 +2975,36 @@ describe('normalizeCharacter', () => {
     expect(categoryOf.get('Channel Divinity')).toBe('action');
     expect(categoryOf.get('Channel Divinity: Path to the Grave')).toBe('bonus');
     expect(categoryOf.get('Gathered Whispers: Unearthly Scream')).toBe('reaction');
+  });
+
+  it('does not duplicate variable-type action damage as an effect roll', () => {
+    const character = {
+      id: 1,
+      name: 'Primal Druid',
+      classes: [{ level: 9, definition: { name: 'Druid' } }],
+      actions: {
+        class: [
+          {
+            name: 'Primal Strike',
+            displayAsAttack: true,
+            dice: { diceString: '1d8' },
+            snippet:
+              'Deal an extra 1<strong>d8</strong> Cold, Fire, Lightning, or Thunder damage.',
+            activation: { activationType: 1 },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const primalStrike = normalizeCharacter(character).actions.find(
+      (action) => action.name === 'Primal Strike',
+    );
+    expect(primalStrike?.damage).toEqual({ dice: '1d8' });
+    expect(primalStrike?.roll).toBeUndefined();
+    expect(primalStrike?.summary).toContain(
+      'Cold, Fire, Lightning, or Thunder damage',
+    );
+    expect(primalStrike?.summary).not.toContain('1d8');
   });
 
   it('resolves equipped weapons as attacks with to-hit and damage', () => {

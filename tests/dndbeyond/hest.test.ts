@@ -306,9 +306,12 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(burningHands?.damage?.scaling).toBe('+1d6 per slot level above 1st');
     expect(burningHands?.summary).not.toMatch(/Higher-Level Spell Slot|increases by 1d6/i);
 
-    // Non-damage upcast mechanics remain in prose/list content.
+    // Non-damage upcast mechanics remain in the dedicated body content.
     const command = spells.find((spell) => spell.name === 'Command');
-    expect(JSON.stringify(command?.list)).toContain('Using a Higher-Level Spell Slot');
+    expect(command?.upcast).toBe(
+      '**Using a Higher-Level Spell Slot.** You can affect one additional creature for each spell slot level above 1.',
+    );
+    expect(JSON.stringify(command?.list)).not.toContain('Using a Higher-Level Spell Slot');
   });
 
   it('uses the active level-scaled class feature snippet', () => {

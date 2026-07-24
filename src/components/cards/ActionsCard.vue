@@ -1,11 +1,19 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model';
+import type { ActionCategory, CharacterAction, SectionKey } from '@/services/dndbeyond/model';
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import StructuredList from '@/components/StructuredList.vue';
 
-const props = defineProps<{ actions: CharacterAction[] }>();
+const props = withDefaults(
+  defineProps<{
+    actions: CharacterAction[];
+    companionTitle?: string;
+    rowAligned?: boolean;
+  }>(),
+  { companionTitle: 'Companions', rowAligned: false },
+);
 
 const CATEGORY_ORDER: { category: ActionCategory; label: string }[] = [
   { category: 'action', label: 'Action' },
@@ -28,6 +36,11 @@ function metaOf(action: CharacterAction): string {
     .filter(Boolean)
     .join(' · ');
 }
+
+function referenceLabel(section: SectionKey): string {
+  if (section === 'companions') return props.companionTitle;
+  return section;
+}
 </script>
 
 <template>
@@ -40,7 +53,10 @@ function metaOf(action: CharacterAction): string {
       data-card-group
     >
       <span class="actions__label">{{ group.label }}</span>
-      <ul class="actions__list">
+      <ul
+        class="actions__list"
+        :class="{ 'actions__list--row-aligned': rowAligned }"
+      >
         <li
           v-for="(action, index) in group.actions"
           :key="index"
@@ -51,8 +67,21 @@ function metaOf(action: CharacterAction): string {
             <span class="actions__name">{{ action.name }}</span>
             <ResourceBoxes v-if="action.resource" :resource="action.resource" />
             <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
+            <span
+              v-for="related in action.related"
+              :key="related"
+              class="actions__reference"
+            >
+              (see {{ referenceLabel(related) }})
+            </span>
           </span>
           <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />
+          <StructuredList
+            v-if="action.list?.items.length"
+            :list="action.list"
+            class="actions__list-detail"
+            data-action-list
+          />
         </li>
       </ul>
     </div>
@@ -86,17 +115,29 @@ function metaOf(action: CharacterAction): string {
   margin: 0;
   padding: 0;
   list-style: none;
-  column-width: 240px;
+}
+
+.actions__list:not(.actions__list--row-aligned) {
+  column-width: 220px;
   column-gap: 20px;
+}
+
+.actions__list--row-aligned {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  column-gap: 20px;
+  row-gap: 6px;
 }
 
 .actions__item {
   position: relative;
   padding-left: 14px;
-  margin-bottom: 6px;
   font-size: 14px;
-  /* Keep an action's name and its blurb together in one column. */
   break-inside: avoid;
+}
+
+.actions__list:not(.actions__list--row-aligned) .actions__item:not(:last-child) {
+  margin-bottom: 6px;
 }
 
 .actions__name {
@@ -126,9 +167,23 @@ function metaOf(action: CharacterAction): string {
   white-space: nowrap;
 }
 
+.actions__reference {
+  display: block;
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--p-text-muted-color, #888);
+}
+
 /* One-line blurb of what the action does, beneath its name. */
 .actions__summary {
   display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
+}
+
+.actions__list-detail {
+  margin-top: 1px;
   font-size: 12px;
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);

@@ -3,6 +3,7 @@ import {
   continuationBaseKey,
   continuationKey,
   isContinuationKey,
+  needsRowAlignedContinuation,
   sliceContent,
 } from '@/utils/layout/card-continuation';
 
@@ -67,5 +68,16 @@ describe('sliceContent', () => {
 
   it('falls back to a single slice when there are no break points', () => {
     expect(sliceContent([], 600, 250)).toEqual([{ start: 0, end: 0, offset: 0, height: 600 }]);
+  });
+});
+
+describe('needsRowAlignedContinuation', () => {
+  it('keeps compact columns when safe boundaries split every page-sized slice', () => {
+    expect(needsRowAlignedContinuation([400, 800, 1200], 1200, 500)).toBe(false);
+  });
+
+  it('requests fallback when a whole unsplittable region exceeds a page', () => {
+    expect(needsRowAlignedContinuation([400, 1000], 1000, 500)).toBe(true);
+    expect(needsRowAlignedContinuation([], 700, 500)).toBe(true);
   });
 });

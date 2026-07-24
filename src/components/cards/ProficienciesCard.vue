@@ -197,6 +197,7 @@ watch(
 
 .profs__items {
   color: #1c1c1e;
+  overflow-wrap: anywhere;
 }
 
 /* Stacked (multi-column) format: a category heading with one item per line. */

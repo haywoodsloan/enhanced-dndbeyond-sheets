@@ -25,6 +25,7 @@ describe('SpellsCard', () => {
   it('points summon spells to extracted companion details', () => {
     const wrapper = mount(SpellsCard, {
       props: {
+        companionTitle: 'Summons',
         spells: [
           {
             name: 'Summon Beast',
@@ -36,7 +37,10 @@ describe('SpellsCard', () => {
       },
     });
 
-    expect(wrapper.get('[data-spell]').text()).toContain('(see Companions)');
+    const row = wrapper.get('[data-spell] .spells__row');
+    expect(row.get('.spells__identity').text()).toContain('Summon Beast');
+    expect(row.get('.spells__reference').text()).toBe('(see Summons)');
+    expect(row.element.lastElementChild?.classList.contains('spells__reference')).toBe(true);
   });
 
   it('shows costly or consumed spell materials', () => {
@@ -159,6 +163,8 @@ describe('SpellsCard', () => {
             range: '30 ft.',
             concentration: true,
             duration: '1 minute',
+            upcast:
+              '**Using a Higher-Level Spell Slot.** The damage increases by 1d8 for each spell slot level above 1.',
             damage: {
               dice: '2d8',
               type: 'Thunder',
@@ -186,8 +192,10 @@ describe('SpellsCard', () => {
     expect(spells[2].text()).toContain('C');
     expect(spells[2].text()).toContain('1 minute');
     expect(spells[2].text()).not.toContain('Concentration');
-    expect(spells[2].text()).toContain(
-      '2d8 Thunder (+1d8 per slot level above 1st)',
+    expect(spells[2].text()).toContain('2d8 Thunder (+1d8 per ↑ level)');
+    expect(spells[2].get('.inline-scaling-text__arrow').text()).toBe('↑');
+    expect(spells[2].find('.spells__upcast').text()).toBe(
+      'Using a Higher-Level Spell Slot. The damage increases by 1d8 for each spell slot level above 1.',
     );
   });
 

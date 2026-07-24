@@ -68,11 +68,35 @@ describe('SectionCard', () => {
       expect(legend.findAll('.card__spell-legend-tag').map((tag) => tag.text())).toEqual([
         'C',
         'R',
+        'V',
+        'S',
+        'M',
+        'A',
+        'BA',
+      ]);
+      expect(
+        legend.findAll('.card__spell-legend-group').map((group) =>
+          group.findAll('.card__spell-legend-item > span').map((label) => label.text()),
+        ),
+      ).toEqual([
+        ['Concentration', 'Ritual'],
+        ['Verbal', 'Somatic', 'Material'],
+        ['Action', 'Bonus Action'],
       ]);
       const items = legend.findAll('.card__spell-legend-item');
-      expect(items).toHaveLength(2);
-      expect(items[0].findAll('span').map((label) => label.text())).toEqual(['Concentration']);
-      expect(items[1].findAll('span').map((label) => label.text())).toEqual(['Ritual']);
+      expect(items).toHaveLength(7);
+      expect(legend.findAll('.card__spell-legend-sep').map((sep) => sep.text())).toEqual([
+        '|',
+        '|',
+      ]);
+      expect(
+        legend.findAll('.card__spell-legend-tag--plain').map((tag) => tag.text()),
+      ).toEqual(['V', 'S', 'M', 'A', 'BA']);
+      expect(
+        legend
+          .findAll('.card__spell-legend-tag:not(.card__spell-legend-tag--plain)')
+          .map((tag) => tag.text()),
+      ).toEqual(['C', 'R']);
     }
   });
 
@@ -324,6 +348,94 @@ describe('SectionCard', () => {
     expect(Array.isArray(geometry.breaks)).toBe(true);
 
     wrapper.unmount();
+    gbcr.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses feature parts instead of their parent as continuation break units', async () => {
+    const rect = (top: number, bottom: number) => ({
+      top,
+      bottom,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const gbcr = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList?.contains('card__body')) return rect(0, 300);
+        if (this.hasAttribute?.('data-feature-part')) {
+          return this.textContent?.includes('First Part') ? rect(20, 100) : rect(100, 200);
+        }
+        if (this.hasAttribute?.('data-feature')) {
+          return this.querySelector('[data-feature-part]') ? rect(0, 220) : rect(220, 260);
+        }
+        return rect(0, 0);
+      });
+    class FakeResizeObserver {
+      constructor(_callback: () => void) {}
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+
+    const character = makeCharacter({
+      features: [
+        {
+          label: 'Class Features',
+          items: [
+            {
+              name: 'Multipart Feature',
+              parts: [
+                { label: 'First Part', text: 'First detail.' },
+                { label: 'Second Part', text: 'Second detail.' },
+              ],
+            },
+            { name: 'Simple Feature' },
+          ],
+        },
+      ],
+    });
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'features', title: 'Features & Traits', count: 2, isEmpty: false },
+        span: { cols: 3, rows: 3 },
+        character,
+        rowAlignedFeatures: true,
+      },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const measured = wrapper.emitted('measure');
+    const geometry = measured?.[measured.length - 1]?.[1] as
+      | { breaks: number[] }
+      | undefined;
+    expect(geometry?.breaks).toEqual([100, 200, 260]);
+
+    wrapper.unmount();
+
+    const compactWrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'features', title: 'Features & Traits', count: 2, isEmpty: false },
+        span: { cols: 3, rows: 3 },
+        character,
+      },
+    });
+    await flushPromises();
+    await nextTick();
+
+    const compactMeasurements = compactWrapper.emitted('measure');
+    const compactGeometry = compactMeasurements?.[compactMeasurements.length - 1]?.[1] as
+      | { breaks: number[] }
+      | undefined;
+    expect(compactGeometry?.breaks).toEqual([220, 260]);
+
+    compactWrapper.unmount();
     gbcr.mockRestore();
     vi.unstubAllGlobals();
   });

@@ -54,6 +54,11 @@ export interface RawClassFeature {
   snippet?: string | null;
   description?: string | null;
   levelScales?: RawLevelScale[] | null;
+  creatureRules?: RawCreatureRule[] | null;
+}
+
+export interface RawCreatureRule {
+  creatureGroupId?: number | null;
 }
 
 export interface RawLevelScale {
@@ -74,6 +79,7 @@ export interface RawGrantedFeature {
     snippet?: string | null;
     description?: string | null;
     levelScales?: RawLevelScale[] | null;
+    creatureRules?: RawCreatureRule[] | null;
   };
 }
 
@@ -158,6 +164,49 @@ export interface RawDice {
   diceString?: string | null;
 }
 
+export interface RawCreature {
+  id?: number;
+  name?: string | null;
+  description?: string | null;
+  groupId?: number | null;
+  isActive?: boolean | null;
+  removedHitPoints?: number | null;
+  temporaryHitPoints?: number | null;
+  definition?: {
+    id?: number;
+    name?: string | null;
+    alignmentId?: number | null;
+    sizeId?: number | null;
+    typeId?: number | null;
+    armorClass?: number | null;
+    armorClassDescription?: string | null;
+    averageHitPoints?: number | null;
+    hitPointDice?: RawDice | null;
+    movements?: {
+      movementId?: number | null;
+      speed?: number | null;
+      notes?: string | null;
+    }[] | null;
+    passivePerception?: number | null;
+    challengeRatingId?: number | null;
+    stats?: { statId?: number | null; value?: number | null }[] | null;
+    savingThrows?: {
+      statId?: number | null;
+      bonus?: number | null;
+      value?: number | null;
+    }[] | null;
+    specialTraitsDescription?: string | null;
+    actionsDescription?: string | null;
+    bonusActionsDescription?: string | null;
+    reactionsDescription?: string | null;
+    legendaryActionsDescription?: string | null;
+    mythicActionsDescription?: string | null;
+    characteristicsDescription?: string | null;
+    languageDescription?: string | null;
+    languageNote?: string | null;
+  } | null;
+}
+
 /** A named weapon property (Finesse, Light, Thrown, Versatile, …). */
 export interface RawWeaponProperty {
   id?: number;
@@ -216,7 +265,7 @@ export interface RawSpellDefinition {
   saveDcAbilityId?: number | null;
   /** Effect modifiers; the damage ones carry a `die`. */
   modifiers?: RawModifier[] | null;
-  /** Upcast scaling: dice added per slot level above the spell's own. */
+  /** Higher-level dice; entries may be per-level increments or absolute thresholds. */
   atHigherLevels?: { higherLevelDefinitions?: { dice?: RawDice | null }[] | null } | null;
   /** "characterlevel" (cantrip), "spellscale"/"spelllevel" (upcast), or null. */
   scaleType?: string | null;
@@ -492,6 +541,8 @@ export interface RawCharacter {
   background?: RawBackground | null;
   inventory?: RawInventoryItem[];
   classSpells?: RawClassSpellGroup[];
+  /** Creatures selected in D&D Beyond's Extras manager. */
+  creatures?: RawCreature[] | null;
   spells?: RawSourceMap<RawSpell> | null;
   actions?: RawSourceMap<RawAction> | null;
   feats?: RawFeat[];
