@@ -61,10 +61,10 @@ import type {
   StructuredList,
   WeaponProperty,
 } from './model';
+import { sectionLabel } from '@/utils/character/section-label';
 
 /** Fixed counts: 6 saving throws and 18 skills in 5e. */
 const SAVE_COUNT = 6;
-const SKILL_COUNT = 18;
 
 function asArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -79,12 +79,13 @@ function resolveAvatarUrl(raw: RawCharacter): string | undefined {
   if (!url) return undefined;
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return undefined;
     if (parsed.searchParams.has('fit')) parsed.searchParams.set('fit', 'bounds');
     if (parsed.searchParams.has('width')) parsed.searchParams.set('width', '400');
     if (parsed.searchParams.has('height')) parsed.searchParams.set('height', '400');
     return parsed.toString();
   } catch {
-    return url;
+    return undefined;
   }
 }
 
@@ -1087,17 +1088,6 @@ function castingClasses(raw: RawCharacter) {
   return asArray(raw.classes).filter(
     (cls) => cls.definition?.canCastSpells || cls.subclassDefinition?.canCastSpells,
   );
-}
-
-/** The character's primary spellcasting ability id, if any class casts. */
-function spellcastingAbilityId(raw: RawCharacter): number | undefined {
-  for (const cls of castingClasses(raw)) {
-    const id =
-      cls.subclassDefinition?.spellCastingAbilityId ??
-      cls.definition?.spellCastingAbilityId;
-    if (id != null) return id;
-  }
-  return undefined;
 }
 
 function castingAbilityId(cls: RawCharacter['classes'][number]): number | undefined {
@@ -4188,7 +4178,9 @@ function resolveSenses(raw: RawCharacter, skills: Skill[]): SenseEntry[] {
  * Convert a raw D&D Beyond character payload into the internal `Character`
  * model. Section counts reflect presence of content; exact per-entry rendering
  * is handled in a later phase. The core stat sections (basics, attributes,
- * skills, saves) are always shown; the rest auto-hide when empty.
+ * skills, saves) are always shown; the rest auto-hide when empty. The ordered
+ * phases, source joins, and payload migration procedure are documented in
+ * `docs/NORMALIZATION.md`.
  */
 export function normalizeCharacter(raw: RawCharacter): Character {
   const classes = summarizeClasses(raw);
@@ -4244,25 +4236,25 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   );
 
   const sections: CharacterSection[] = [
-    toSection('portrait', 'Portrait', 0, { alwaysPresent: true }),
-    toSection('basics', 'Basics', asArray(raw.conditions).length, { alwaysPresent: true }),
-    toSection('attributes', 'Attributes', asArray(raw.stats).length, { alwaysPresent: true }),
-    toSection('skills', 'Skills', skills.length, { alwaysPresent: true }),
+    toSection('portrait', sectionLabel('portrait'), 0, { alwaysPresent: true }),
+    toSection('basics', sectionLabel('basics'), asArray(raw.conditions).length, { alwaysPresent: true }),
+    toSection('attributes', sectionLabel('attributes'), asArray(raw.stats).length, { alwaysPresent: true }),
+    toSection('skills', sectionLabel('skills'), skills.length, { alwaysPresent: true }),
     toSection(
       'savingThrows',
-      'Saves & Defences',
+      sectionLabel('savingThrows'),
       Math.max(SAVE_COUNT, defenceLayoutUnits(defences)),
       { alwaysPresent: true },
     ),
-    toSection('senses', 'Senses', senses.length, { alwaysPresent: true }),
+    toSection('senses', sectionLabel('senses'), senses.length, { alwaysPresent: true }),
     toSection(
       'proficiencies',
-      'Proficiencies',
+      sectionLabel('proficiencies'),
       Object.values(proficiencies).reduce((total, entries) => total + entries.length, 0),
     ),
-    toSection('attacks', 'Attacks', attacks.length),
-    toSection('actions', 'Actions', actions.length),
-    toSection('spells', 'Spells', spells.length),
+    toSection('attacks', sectionLabel('attacks'), attacks.length),
+    toSection('actions', sectionLabel('actions'), actions.length),
+    toSection('spells', sectionLabel('spells'), spells.length),
     ...(companions.length
       ? [toSection('companions', companionTitle, companionPartCount)]
       : []),
@@ -4270,15 +4262,15 @@ export function normalizeCharacter(raw: RawCharacter): Character {
       ? [
           toSection(
             'tables',
-            'Tables',
+            sectionLabel('tables'),
             ruleTables.reduce((total, table) => total + table.rows.length, 0),
           ),
         ]
       : []),
-    toSection('inventory', 'Inventory', inventory.length),
-    toSection('wealth', 'Wealth', 0, { alwaysPresent: hasWealth(raw) }),
-    toSection('features', 'Features & Traits', featureCount),
-    toSection('notes', 'Notes', 0, { alwaysPresent: true }),
+    toSection('inventory', sectionLabel('inventory'), inventory.length),
+    toSection('wealth', sectionLabel('wealth'), 0, { alwaysPresent: hasWealth(raw) }),
+    toSection('features', sectionLabel('features'), featureCount),
+    toSection('notes', sectionLabel('notes'), 0, { alwaysPresent: true }),
   ];
 
   const character: Character = {

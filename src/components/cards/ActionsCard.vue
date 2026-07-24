@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import type { ActionCategory, CharacterAction, SectionKey } from '@/services/dndbeyond/model';
+import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model';
 import { formatDamage } from '@/utils/character/format';
+import { sectionLabel } from '@/utils/character/section-label';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
 import StructuredList from '@/components/StructuredList.vue';
@@ -37,10 +38,6 @@ function metaOf(action: CharacterAction): string {
     .join(' · ');
 }
 
-function referenceLabel(section: SectionKey): string {
-  if (section === 'companions') return props.companionTitle;
-  return section;
-}
 </script>
 
 <template>
@@ -72,7 +69,7 @@ function referenceLabel(section: SectionKey): string {
               :key="related"
               class="actions__reference"
             >
-              (see {{ referenceLabel(related) }})
+              (see {{ sectionLabel(related, companionTitle) }})
             </span>
           </span>
           <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />

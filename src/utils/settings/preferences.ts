@@ -8,6 +8,7 @@
  * its own `storage.session`).
  */
 import type { SectionKey } from '@/services/dndbeyond/model';
+import { debugLog } from '@/utils/debug';
 
 /** Read/write handle for a single stored preference value. */
 export interface Preference<T> {
@@ -32,7 +33,8 @@ async function read<T>(key: string, fallback: T): Promise<T> {
     if (Array.isArray(fallback) && !Array.isArray(value)) return fallback;
     if (migrated) void write(key, value);
     return value;
-  } catch {
+  } catch (error) {
+    debugLog('settings', 'preference read failed', { key, error });
     return fallback;
   }
 }
@@ -43,8 +45,9 @@ async function write<T>(key: string, value: T): Promise<void> {
     // stored as an array — a proxied array can otherwise serialize to an object.
     const plain = JSON.parse(JSON.stringify(value)) as T;
     await browser.storage.sync.set({ [key]: plain });
-  } catch {
-    // Storage unavailable / sync quota hit — preferences are best-effort.
+  } catch (error) {
+    // Storage unavailable / sync quota hit — preferences remain best-effort.
+    debugLog('settings', 'preference write failed', { key, error });
   }
 }
 

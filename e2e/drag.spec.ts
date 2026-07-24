@@ -2,6 +2,19 @@ import { expect, openSheet, test } from './fixtures';
 import { cardBox, dragCardTo, keyAt, moved, settle, topLeftCell } from './helpers';
 
 test.describe('card drag placement', () => {
+  test('moves a focused card with the keyboard', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+    const start = await cardBox(page, 'portrait');
+    const handle = page.locator('[data-section-key="portrait"] .card__drag-handle');
+
+    await handle.focus();
+    await expect(handle).toBeFocused();
+    await expect(handle).toHaveAttribute('aria-label', /use arrow keys/i);
+    await handle.press('ArrowDown');
+
+    await expect.poll(async () => moved(await cardBox(page, 'portrait'), start)).toBeGreaterThan(8);
+  });
+
   test('dragging a card onto another pushes the other out of the way', async ({
     context,
     extensionId,

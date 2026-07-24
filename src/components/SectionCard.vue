@@ -370,12 +370,13 @@ watch(
       </div>
     </template>
     <template #content>
-      <span
+      <button
         v-if="!hidden && !isContinuation"
-        v-tooltip.bottom="{ value: 'Drag to reorder', showDelay: 500 }"
+        type="button"
+        v-tooltip.bottom="{ value: 'Drag or use arrow keys to move', showDelay: 500 }"
         class="card__drag-handle"
-        aria-hidden="true"
-      ></span>
+        :aria-label="`Move ${section.title} card; use arrow keys`"
+      ></button>
       <button
         v-if="spellControl"
         type="button"
@@ -640,6 +641,8 @@ watch(
   z-index: 3;
   width: 40px;
   height: 9px;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   background: var(--p-primary-300, #b8b8bd);
   opacity: 0;
@@ -661,8 +664,14 @@ watch(
   background: var(--p-primary-100, #e5e5e5);
 }
 
-.card:hover .card__drag-handle {
+.card:hover .card__drag-handle,
+.card__drag-handle:focus-visible {
   opacity: 0.9;
+}
+
+.card__drag-handle:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
 }
 
 .card__drag-handle:active {

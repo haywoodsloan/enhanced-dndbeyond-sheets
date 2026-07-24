@@ -25,7 +25,9 @@ onMounted(async () => {
 
 <template>
   <main class="popup">
-    <p v-if="showPrompt">Please open a D&amp;D Beyond character and try again.</p>
+    <p v-if="showPrompt">
+      Open a D&amp;D Beyond character page, then select Beyond+ again.
+    </p>
   </main>
 </template>
 

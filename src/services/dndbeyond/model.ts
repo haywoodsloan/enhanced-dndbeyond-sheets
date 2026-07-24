@@ -1,7 +1,8 @@
 /**
  * Internal, normalized character model used throughout the extension. This is
  * decoupled from D&D Beyond's raw API shape (see `api-types.ts`) so the rest of
- * the app depends on a stable structure.
+ * the app depends on a stable structure. Treat this as the compatibility
+ * boundary described in `docs/NORMALIZATION.md` during source migrations.
  */
 import type { AbilityKey, ProficiencyLevel } from '@/utils/character/dnd5e';
 /** The character-sheet sections this extension knows how to lay out. */

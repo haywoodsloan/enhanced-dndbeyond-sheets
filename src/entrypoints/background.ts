@@ -1,4 +1,8 @@
-import { extractAuthorization, setAuthToken } from '@/services/dndbeyond/auth-token';
+import {
+  AUTH_TOKEN_KEY,
+  extractAuthorization,
+  setAuthToken,
+} from '@/services/dndbeyond/auth-token';
 import { parseCharacterId } from '@/utils/url/character-url';
 import { enhancedSheetUrl } from '@/utils/url/sheet-url';
 import { debugLog } from '@/utils/debug';
@@ -20,8 +24,8 @@ export default defineBackground(() => {
     });
   });
 
-  // DIAGNOSTIC: log every character-service request so we can watch the live
-  // traffic, and capture the `Authorization` header off it (deduping repeats).
+  // Capture the Authorization header from D&D Beyond's own character request,
+  // deduping repeats. Diagnostics never include token-derived metadata.
   browser.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
       const authorization = extractAuthorization(details.requestHeaders);
@@ -29,8 +33,6 @@ export default defineBackground(() => {
         method: details.method,
         url: details.url,
         hasAuthorization: authorization != null,
-        scheme: authorization ? authorization.split(' ')[0] : null,
-        length: authorization?.length ?? 0,
       });
       if (authorization && authorization !== lastCapturedAuthorization) {
         lastCapturedAuthorization = authorization;
@@ -43,6 +45,15 @@ export default defineBackground(() => {
     ['requestHeaders'],
   );
   debugLog('bg', 'webRequest listener registered');
+
+  // The sheet clears rejected credentials from its own extension context. Keep
+  // this background-context dedupe cache aligned so the same header can be
+  // captured again after invalidation.
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'session' || !(AUTH_TOKEN_KEY in changes)) return;
+    const next = changes[AUTH_TOKEN_KEY].newValue;
+    lastCapturedAuthorization = typeof next === 'string' ? next : null;
+  });
 
   browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId === CONTEXT_MENU_ID) {

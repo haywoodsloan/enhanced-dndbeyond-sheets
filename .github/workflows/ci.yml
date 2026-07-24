@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run compile
+      - run: npm run test:coverage
+      - run: npm run build
+        env:
+          WXT_PRIMEUI_LICENSE: ${{ secrets.PRIMEUI_LICENSE }}
+      - run: npm run build:firefox
+        env:
+          WXT_PRIMEUI_LICENSE: ${{ secrets.PRIMEUI_LICENSE }}
+      - run: npm audit --omit=dev
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          WXT_PRIMEUI_LICENSE: ${{ secrets.PRIMEUI_LICENSE }}

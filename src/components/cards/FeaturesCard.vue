@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import type { FeatureGroup, FeatureItem, SectionKey } from '@/services/dndbeyond/model';
+import type { FeatureGroup, FeatureItem } from '@/services/dndbeyond/model';
+import { sectionLabel } from '@/utils/character/section-label';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
 import StructuredList from '@/components/StructuredList.vue';
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     features: FeatureGroup[];
     companionTitle?: string;
@@ -12,21 +13,6 @@ const props = withDefaults(
   }>(),
   { companionTitle: 'Companions', rowAligned: false },
 );
-
-function referenceLabel(section: SectionKey): string {
-  if (section === 'basics') return 'Basics';
-  if (section === 'attributes') return 'Attributes';
-  if (section === 'skills') return 'Skills';
-  if (section === 'savingThrows') return 'Saves & Defences';
-  if (section === 'senses') return 'Senses';
-  if (section === 'proficiencies') return 'Proficiencies';
-  if (section === 'actions') return 'Actions';
-  if (section === 'attacks') return 'Attacks';
-  if (section === 'spells') return 'Spells';
-  if (section === 'companions') return props.companionTitle;
-  if (section === 'tables') return 'Tables';
-  return section;
-}
 
 function needsFullWidth(item: FeatureItem): boolean {
   const parts = item.parts ?? [];
@@ -61,14 +47,14 @@ function needsFullWidth(item: FeatureItem): boolean {
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
           <span v-if="item.reference" class="features__reference features__reference--item">
-            (see {{ referenceLabel(item.reference) }})
+            (see {{ sectionLabel(item.reference, companionTitle) }})
           </span>
           <span
             v-for="related in item.related"
             :key="related"
             class="features__reference features__reference--item"
           >
-            (see {{ referenceLabel(related) }})
+            (see {{ sectionLabel(related, companionTitle) }})
           </span>
           <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
           <span
@@ -93,7 +79,7 @@ function needsFullWidth(item: FeatureItem): boolean {
             <p class="features__part-line">
               <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
               <span v-if="part.reference" class="features__reference">
-                (see {{ referenceLabel(part.reference) }})
+                (see {{ sectionLabel(part.reference, companionTitle) }})
               </span>
               <span v-if="part.text">{{ part.text }}</span>
             </p>

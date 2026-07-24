@@ -66,6 +66,18 @@ describe('fetchCharacter', () => {
     expect(init.headers).toEqual({ Authorization: 'Bearer tok' });
   });
 
+  it('passes an abort signal to fetch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: 7, success: true, message: null, data: { id: 7 } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await fetchCharacter(7, { signal: controller.signal });
+
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+
   it('throws with the HTTP status when the response is not ok', async () => {
     vi.stubGlobal(
       'fetch',

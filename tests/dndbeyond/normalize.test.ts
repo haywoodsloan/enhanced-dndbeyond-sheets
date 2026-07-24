@@ -3216,13 +3216,16 @@ describe('normalizeCharacter', () => {
     expect(spells?.isEmpty).toBe(true);
   });
 
-  it('leaves a non-parseable avatar url unchanged', () => {
-    const character = normalizeCharacter({
-      ...raw,
-      decorations: { ...raw.decorations, avatarUrl: 'http://[bad' },
-    } as RawCharacter);
-    expect(character.avatarUrl).toBe('http://[bad');
-  });
+  it.each(['http://[bad', 'http://example.com/avatar.png', 'data:image/png;base64,abc'])(
+    'drops an unsafe avatar url: %s',
+    (avatarUrl) => {
+      const character = normalizeCharacter({
+        ...raw,
+        decorations: { ...raw.decorations, avatarUrl },
+      } as RawCharacter);
+      expect(character.avatarUrl).toBeUndefined();
+    },
+  );
 
   it('drops conditions with an unknown id', () => {
     const character = normalizeCharacter({

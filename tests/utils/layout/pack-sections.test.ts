@@ -8,6 +8,7 @@ import {
   placementPage,
   placementStyle,
   type CardFootprint,
+  type CardPlacement,
 } from '@/utils/layout/pack-sections';
 
 const fp = (cols: number, rows: number): CardFootprint => ({ cols, rows });
@@ -466,5 +467,19 @@ describe('dropSplitsContinuation', () => {
     const keys = ['spells', 'spells~cont~1'];
     const placements = [place(0, 0, 3, 4), place(4, 0, 3, 4)];
     expect(dropSplitsContinuation(keys, placements, 'spells', { row: 4, col: 0 }, 3)).toBe(false);
+  });
+
+  it('ignores an incomplete continuation placement pair', () => {
+    const keys = ['spells', 'spells~cont~1'];
+    const missingContinuation = [place(0, 0, 3, 4)];
+    const missingBase: CardPlacement[] = [];
+    missingBase[1] = place(4, 0, 3, 4);
+
+    expect(
+      dropSplitsContinuation(keys, missingContinuation, 'notes', { row: 4, col: 0 }, 3),
+    ).toBe(false);
+    expect(
+      dropSplitsContinuation(keys, missingBase, 'notes', { row: 4, col: 0 }, 3),
+    ).toBe(false);
   });
 });

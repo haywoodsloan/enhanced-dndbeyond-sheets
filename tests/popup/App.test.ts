@@ -21,7 +21,8 @@ describe('popup App', () => {
     const wrapper = mount(App);
     await flushPromises();
 
-    expect(wrapper.text()).toContain('Please open a D&D Beyond character');
+    expect(wrapper.text()).toContain('Open a D&D Beyond character page');
+    expect(wrapper.text()).toContain('select Beyond+ again');
     expect(create).not.toHaveBeenCalled();
   });
 
@@ -38,6 +39,6 @@ describe('popup App', () => {
     expect(create).toHaveBeenCalledTimes(1);
     const arg = create.mock.calls[0][0] as { url: string };
     expect(arg.url).toContain('characterId=166869100');
-    expect(wrapper.text()).not.toContain('Please open');
+    expect(wrapper.text()).not.toContain('Open a D&D Beyond character page');
   });
 });

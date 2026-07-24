@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
-import { getAuthToken } from '@/services/dndbeyond/auth-token';
+import { clearAuthToken, getAuthToken } from '@/services/dndbeyond/auth-token';
 
 /**
  * The background registers browser event listeners; fakeBrowser doesn't provide
@@ -65,6 +65,20 @@ describe('background', () => {
     onHeaders({ requestHeaders: headers }); // duplicate — deduped
     onHeaders({ requestHeaders: [] }); // no header — ignored
     expect(await getAuthToken()).toBe('Bearer secret');
+  });
+
+  it('recaptures the same header after another context clears it', async () => {
+    const details = {
+      requestHeaders: [{ name: 'Authorization', value: 'Bearer restored' }],
+    };
+    onHeaders(details);
+    await vi.waitFor(async () => expect(await getAuthToken()).toBe('Bearer restored'));
+
+    await clearAuthToken();
+    expect(await getAuthToken()).toBeNull();
+    onHeaders(details);
+
+    await vi.waitFor(async () => expect(await getAuthToken()).toBe('Bearer restored'));
   });
 
   it('opens the enhanced sheet only for its own menu item', async () => {

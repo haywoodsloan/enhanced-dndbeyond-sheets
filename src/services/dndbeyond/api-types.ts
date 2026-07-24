@@ -2,7 +2,8 @@
  * Types for the subset of D&D Beyond's character-service API response that this
  * extension consumes. These describe the RAW shape returned by the endpoint
  * `https://character-service.dndbeyond.com/character/v5/character/{id}` and are
- * intentionally partial — only fields the normalizer reads are modeled.
+ * intentionally partial — only fields the normalizer reads are modeled. See
+ * `docs/NORMALIZATION.md` before adapting these types to a new payload source.
  */
 
 /** Envelope returned by the character-service endpoint. */

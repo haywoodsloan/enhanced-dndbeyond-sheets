@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
-import Aura from '@primevue/themes/aura';
+import Aura from '@primeuix/themes/aura';
 import Tooltip from 'primevue/tooltip';
 import App from './App.vue';
 import { parseSheetCharacterId } from '@/utils/url/sheet-url';
@@ -13,8 +13,11 @@ debugLog('sheet', 'sheet page loaded', {
   characterId,
 });
 
+const primeUiLicense = import.meta.env.WXT_PRIMEUI_LICENSE?.trim();
+
 createApp(App, { characterId })
   .use(PrimeVue, {
+    license: primeUiLicense || undefined,
     // Always render the light theme: a print-friendly sheet should avoid the
     // ink-heavy dark surfaces the OS "dark mode" would otherwise trigger.
     theme: { preset: Aura, options: { darkModeSelector: false } },

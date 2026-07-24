@@ -36,6 +36,8 @@ export interface FetchCharacterOptions {
    * D&D Beyond session. Required for private characters; omit for public ones.
    */
   authorization?: string | null;
+  /** Cancels the request when the selected character changes or the view closes. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -50,19 +52,21 @@ export async function fetchCharacter(
   id: number | string,
   options: FetchCharacterOptions = {},
 ): Promise<RawCharacter> {
+  const url = characterServiceUrl(id);
   const headers: Record<string, string> = {};
   if (options.authorization) {
     headers.Authorization = options.authorization;
   }
 
   debugLog('sheet', 'fetchCharacter request', {
-    url: characterServiceUrl(id),
+    url,
     hasAuthorization: options.authorization != null,
   });
 
-  const response = await fetch(characterServiceUrl(id), {
+  const response = await fetch(url, {
     credentials: 'include',
     headers,
+    signal: options.signal,
   });
 
   debugLog('sheet', 'fetchCharacter response', {

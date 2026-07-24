@@ -263,8 +263,6 @@ function flowToNearestCell(
   perPage: number,
   cell: CellSize,
 ): { col: number; row: number } {
-  if (grid.isFree(homeRow, homeCol, w, h)) return { col: homeCol, row: homeRow };
-
   const forward = freeCellForwardOnPage(grid, homeCol, homeRow, w, h, perPage);
   const backward = freeCellBackwardOnPage(grid, homeCol, homeRow, w, h, perPage);
   if (forward && backward) {

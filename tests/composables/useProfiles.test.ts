@@ -196,4 +196,46 @@ describe('useProfiles', () => {
     expect(result.profiles.value).toHaveLength(2);
     expect(result.activeId.value).toBe('p2');
   });
+
+  it('falls back from an invalid stored active id', async () => {
+    await profilesPref.set({
+      activeId: 'missing',
+      profiles: [
+        { id: 'default', name: 'Default' },
+        { id: 'p2', name: 'Screen' },
+      ],
+    });
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+
+    expect(result.activeId.value).toBe('default');
+    result.activeId.value = 'missing';
+    expect(result.activeProfile.value.name).toBe('Default');
+  });
+
+  it('ignores no-op profile operations', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    await flushPromises();
+
+    result.rename('missing', 'Name');
+    result.rename('default', 'Default');
+    result.moveTo('default', 0);
+    result.switchTo('default');
+    expect(result.profiles.value).toEqual([{ id: 'default', name: 'Default' }]);
+
+    result.create('Second');
+    await flushPromises();
+    result.remove('default');
+    await flushPromises();
+    expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Second']);
+  });
+
+  it('does not persist changes made before initial storage has loaded', async () => {
+    const { result } = mountComposable(() => useProfiles());
+    result.create('Early');
+    await flushPromises();
+
+    const saved = await profilesPref.get({ activeId: 'default', profiles: [] });
+    expect(saved.profiles).toEqual([]);
+  });
 });

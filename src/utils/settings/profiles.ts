@@ -19,6 +19,7 @@ import {
   THEME_COLOR_KEY,
   scopedKey,
 } from './preferences';
+import { debugLog } from '@/utils/debug';
 
 /** A saved profile's metadata (its settings live under scoped keys). */
 export interface ProfileMeta {
@@ -81,8 +82,8 @@ export async function deleteProfileData(id: string): Promise<void> {
   try {
     await browser.storage.sync.remove(keys);
     await browser.storage.local.remove(keys);
-  } catch {
-    // Best-effort cleanup; ignore storage errors.
+  } catch (error) {
+    debugLog('settings', 'profile cleanup failed', { id, error });
   }
 }
 
@@ -102,7 +103,7 @@ export async function copyProfileData(fromId: string, toId: string): Promise<voi
       if (value !== undefined) writes[scopedKey(base, toId)] = value;
     }
     if (Object.keys(writes).length) await browser.storage.sync.set(writes);
-  } catch {
-    // Best-effort copy; ignore storage errors.
+  } catch (error) {
+    debugLog('settings', 'profile copy failed', { fromId, toId, error });
   }
 }

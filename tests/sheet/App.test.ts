@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
+import { fakeBrowser } from 'wxt/testing';
 import App from '@/entrypoints/sheet/App.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
@@ -49,6 +50,7 @@ const sampleCharacter = makeCharacter({
 
 describe('sheet App', () => {
   beforeEach(() => {
+    fakeBrowser.reset();
     mockedLoad.mockReset();
   });
 
@@ -70,6 +72,41 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Theme color');
   });
 
+  it('creates and names a layout profile inline', async () => {
+    const wrapper = mount(App, { props: { characterId: null } });
+    await flushPromises();
+
+    await wrapper.get('.profiles__new').trigger('click');
+    await flushPromises();
+    const input = wrapper.get('.profiles__rename-input');
+    await input.setValue('Print layout');
+    await input.trigger('keyup', { key: 'Enter' });
+    await flushPromises();
+
+    expect(wrapper.find('.profiles__rename-input').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Print layout');
+  });
+
+  it('cancels profile renaming and profile deletion', async () => {
+    const wrapper = mount(App, { props: { characterId: null } });
+    await flushPromises();
+    await wrapper.get('.profiles__new').trigger('click');
+    await flushPromises();
+    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Escape' });
+
+    const rename = wrapper.findAll('.profiles__rename').at(-1);
+    await rename!.trigger('click');
+    await wrapper.get('.profiles__rename-input').setValue('Discard me');
+    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Escape' });
+    expect(wrapper.text()).not.toContain('Discard me');
+
+    const remove = wrapper.findAll('.profiles__delete').at(-1);
+    await remove!.trigger('click');
+    expect(wrapper.text()).toContain('Delete');
+    await wrapper.get('.profiles__confirm-no').trigger('click');
+    expect(wrapper.findAll('.profiles__item')).toHaveLength(2);
+  });
+
   it('shows a loading state while the character loads', () => {
     mockedLoad.mockReturnValue(new Promise<Character>(() => {}));
     const wrapper = mount(App, { props: { characterId: 166869100 } });
@@ -81,7 +118,10 @@ describe('sheet App', () => {
     const wrapper = mount(App, { props: { characterId: 166869100 } });
     await flushPromises();
 
-    expect(mockedLoad).toHaveBeenCalledWith(166869100);
+    expect(mockedLoad).toHaveBeenCalledWith(
+      166869100,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(wrapper.text()).toContain('Noct');
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
@@ -116,6 +156,19 @@ describe('sheet App', () => {
 
     expect(wrapper.text()).toContain('Could not load character');
     expect(wrapper.text()).toContain('boom');
+    expect(wrapper.get('.sheet__retry').text()).toBe('Try again');
+  });
+
+  it('retries a failed character load', async () => {
+    mockedLoad.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 5 } });
+    await flushPromises();
+
+    await wrapper.get('.sheet__retry').trigger('click');
+    await flushPromises();
+
+    expect(mockedLoad).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).toContain('Noct');
   });
 
   it('prints the sheet from the Print button', () => {

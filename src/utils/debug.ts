@@ -1,11 +1,8 @@
 /**
- * Diagnostic logging with a single kill switch.
- *
- * While we build and debug the D&D Beyond auth/capture flow we log verbosely.
- * Flip `DEBUG` to `false` (or delete these calls) before shipping to silence
- * every diagnostic log from one place.
+ * Diagnostic logging for development builds. Vite replaces this flag at build
+ * time, so production bundles omit all console output from {@link debugLog}.
  */
-const DEBUG = true;
+const DEBUG = import.meta.env.DEV;
 
 const SENSITIVE_KEYS = new Set([
   'authorization',

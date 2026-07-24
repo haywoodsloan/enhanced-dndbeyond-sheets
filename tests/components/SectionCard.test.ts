@@ -18,6 +18,9 @@ describe('SectionCard', () => {
     expect(wrapper.text()).toContain('Spells');
     expect(wrapper.attributes('style')).toContain('grid-column: span 3');
     expect(wrapper.attributes('data-section-key')).toBe('spells');
+    const dragHandle = wrapper.get('.card__drag-handle');
+    expect(dragHandle.element.tagName).toBe('BUTTON');
+    expect(dragHandle.attributes('aria-label')).toBe('Move Spells card; use arrow keys');
   });
 
   it('expands the Spells card and collapses a spell card via the injected toggle', async () => {

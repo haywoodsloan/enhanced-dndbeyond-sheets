@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { computed, nextTick, onUnmounted, provide, ref, toRef, watch, watchEffect } from 'vue';
 import Select from 'primevue/select';
-import { palette, updatePrimaryPalette } from '@primevue/themes';
+import { palette, updatePrimaryPalette } from '@primeuix/themes';
 import { useCharacter } from '@/composables/useCharacter';
 import { useSectionLayout } from '@/composables/useSectionLayout';
 import { useCardDrag } from '@/composables/useCardDrag';
@@ -9,7 +9,6 @@ import { useGridFlip } from '@/composables/useGridFlip';
 import { useStoredRef } from '@/composables/useStoredRef';
 import { useProfiles } from '@/composables/useProfiles';
 import {
-  GRID_COLUMNS,
   GRID_GAP,
   CONTENT_FIT_SECTIONS,
   fitSectionSpanToGrid,
@@ -61,6 +60,7 @@ import {
   sliceContent,
   type CardMeasurement,
 } from '@/utils/layout/card-continuation';
+import { adjacentCardCell, type CardMoveDirection } from '@/utils/layout/move-card';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */
 const PAGE_GUTTER = 20;
@@ -83,7 +83,9 @@ interface PageEntry {
 
 const props = defineProps<{ characterId: number | null }>();
 
-const { character, status, error } = useCharacter(toRef(props, 'characterId'));
+const { character, status, error, reload: reloadCharacter } = useCharacter(
+  toRef(props, 'characterId'),
+);
 
 // Layout profiles: named snapshots of all the layout settings. The active id is
 // threaded into every settings source below so switching profiles swaps in a
@@ -559,11 +561,28 @@ function dragGeometry() {
   };
 }
 
-const { dragging } = useCardDrag(sheetRef, {
+function moveCard(key: CardKey, direction: CardMoveDirection) {
+  const index = plannedCards.value.findIndex((card) => card.key === key);
+  const placement = packed.value.placements[index];
+  const footprint = footprints.value[index];
+  if (!placement || !footprint) return;
+  const cell = adjacentCardCell(
+    placement,
+    footprint,
+    direction,
+    gridColumns.value,
+    rowsPerPage.value,
+    pageCount.value,
+  );
+  if (cell) placeCard(key, cell);
+}
+
+useCardDrag(sheetRef, {
   // Move the dragged card's cell to wherever the pointer is and stamp it newest,
   // so the packer seats it first: it takes that cell and any card already there
   // flows aside. Any spot on the grid is a valid drop.
   onPlace: (key, cell) => placeCard(key as CardKey, cell),
+  onMove: (key, direction) => moveCard(key as CardKey, direction),
   // Resolve the cell under the pointer, clamped so the card stays whole and
   // within the existing pages (no blank page from dropping past the last sheet).
   // Returns null when the card already sits there, so we don't churn its recency.
@@ -1026,13 +1045,25 @@ onUnmounted(() => {
           No character selected. Open this from a D&amp;D Beyond character page.
         </p>
 
-        <p v-else-if="status === 'idle' || status === 'loading'" class="sheet__message">
+        <p
+          v-else-if="status === 'idle' || status === 'loading'"
+          class="sheet__message"
+          role="status"
+          aria-live="polite"
+        >
           Loading character…
         </p>
 
-        <p v-else-if="status === 'error'" class="sheet__message" role="alert">
-          Could not load character: {{ error }}
-        </p>
+        <div v-else-if="status === 'error'" class="sheet__message" role="alert">
+          <p>Could not load character. {{ error }}</p>
+          <button
+            type="button"
+            class="settings__button sheet__retry"
+            @click="reloadCharacter"
+          >
+            Try again
+          </button>
+        </div>
 
         <template v-else-if="character">
           <!-- Each page is its own sheet-sized container holding a one-page-tall
@@ -1444,6 +1475,17 @@ body {
 .sheet__message {
   margin: 0;
   padding: var(--page-margin);
+}
+
+.sheet__message p {
+  margin: 0;
+}
+
+.sheet__retry {
+  width: fit-content;
+  margin-top: 12px;
+  background: var(--paper);
+  color: var(--p-text-color, #1c1c1e);
 }
 
 /* One WYSIWYG paper sheet per printed page: a real, self-contained container

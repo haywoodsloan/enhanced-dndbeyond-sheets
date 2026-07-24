@@ -1,4 +1,7 @@
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue';
+import type { CardMoveDirection } from '@/utils/layout/move-card';
+
+export type { CardMoveDirection } from '@/utils/layout/move-card';
 
 interface CardDragOptions {
   /** Place the dragged card (by section key) at a specific cell. */
@@ -9,6 +12,8 @@ interface CardDragOptions {
     pointer: { x: number; y: number },
     key: string,
   ) => { page: number; col: number; row: number } | null;
+  /** Move a focused card one grid cell for keyboard operation. */
+  onMove: (key: string, direction: CardMoveDirection) => void;
 }
 
 /** Distance (px) the pointer must travel before a grab becomes a drag. */
@@ -134,12 +139,33 @@ export function useCardDrag(grid: Ref<HTMLElement | null>, options: CardDragOpti
     document.addEventListener('pointercancel', onPointerUp, true);
   }
 
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const direction: CardMoveDirection | undefined = {
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+    }[event.key] as CardMoveDirection | undefined;
+    if (!direction) return;
+    const handle = (event.target as HTMLElement).closest?.('.card__drag-handle');
+    if (!handle) return;
+    const key = (handle.closest('.card') as HTMLElement | null)?.dataset.sectionKey;
+    if (!key) return;
+    event.preventDefault();
+    options.onMove(key, direction);
+  }
+
   watch(
     grid,
     (element, _previous, onCleanup) => {
       if (!element) return;
       element.addEventListener('pointerdown', onPointerDown);
-      onCleanup(() => element.removeEventListener('pointerdown', onPointerDown));
+      element.addEventListener('keydown', onKeyDown);
+      onCleanup(() => {
+        element.removeEventListener('pointerdown', onPointerDown);
+        element.removeEventListener('keydown', onKeyDown);
+      });
     },
     { immediate: true },
   );

@@ -4,6 +4,10 @@ import { CharacterFetchError, fetchCharacter } from './fetch-character';
 import { normalizeCharacter } from './normalize';
 import { debugLog } from '@/utils/debug';
 
+export interface LoadCharacterOptions {
+  signal?: AbortSignal;
+}
+
 /**
  * Load a character by id and normalize it into the internal model.
  *
@@ -12,11 +16,16 @@ import { debugLog } from '@/utils/debug';
  * characters succeed. A rejected token (401/403) is cleared so we never retain
  * or re-send a bad credential.
  */
-export async function loadCharacter(id: number | string): Promise<Character> {
+export async function loadCharacter(
+  id: number | string,
+  options: LoadCharacterOptions = {},
+): Promise<Character> {
   debugLog('sheet', 'loadCharacter start', { id });
   const authorization = await getAuthToken();
   try {
-    const character = normalizeCharacter(await fetchCharacter(id, { authorization }));
+    const character = normalizeCharacter(
+      await fetchCharacter(id, { authorization, signal: options.signal }),
+    );
     debugLog('sheet', 'loadCharacter done', {
       id,
       name: character.name,
