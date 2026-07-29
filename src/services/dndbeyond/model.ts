@@ -182,6 +182,8 @@ export interface WeaponProperty {
   name: string;
   /** Plain-text rules description, when the source provides one. */
   description?: string;
+  /** Whether this character selected this mastery for this specific weapon. */
+  mastered?: boolean;
 }
 
 /** A known or prepared spell. */
@@ -213,7 +215,7 @@ export interface SpellEntry {
   prepared?: boolean;
   /** A one-line blurb of what the spell does. */
   summary?: string;
-  /** Full higher-level casting rule shown in the spell body. */
+  /** Full higher-level slot or cantrip-upgrade rule shown at the end of the spell body. */
   upcast?: string;
   /** Named options or rules sections rendered as a semantic list. */
   list?: StructuredList;

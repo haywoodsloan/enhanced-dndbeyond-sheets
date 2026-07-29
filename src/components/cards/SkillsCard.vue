@@ -56,7 +56,7 @@ const columnGroups = computed(() => {
 }
 
 .skills__column:first-child {
-  padding-left: 0;
+  padding-left: 4px;
 }
 
 .skills__column:last-child {

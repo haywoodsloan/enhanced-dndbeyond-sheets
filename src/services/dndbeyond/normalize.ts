@@ -972,18 +972,98 @@ function makePlaceholderResolver(
     });
 }
 
+const WEAPON_MASTERY_PROPERTIES = new Set([
+  'Cleave',
+  'Graze',
+  'Nick',
+  'Push',
+  'Sap',
+  'Slow',
+  'Topple',
+  'Vex',
+]);
+
+interface WeaponMasterySelections {
+  propertyKeys: Set<string>;
+  actionNames: Set<string>;
+}
+
+function normalizedMasteryText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function weaponMasteryKey(property: string, weapon: string): string {
+  return `${normalizedMasteryText(property)}|${normalizedMasteryText(weapon)}`;
+}
+
+/** Weapon-specific mastery choices published as `Sap (Flail)`, etc. */
+function weaponMasterySelections(raw: RawCharacter): WeaponMasterySelections {
+  const propertyKeys = new Set<string>();
+  const actionNames = new Set<string>();
+  for (const modifiers of Object.values(raw.modifiers ?? {})) {
+    for (const modifier of asArray<RawModifier>(modifiers)) {
+      if (modifier.type !== 'weapon-mastery') continue;
+      const label = modifier.friendlySubtypeName?.trim();
+      const named = label ? /^(.+?)\s*\((.+)\)$/.exec(label) : null;
+      if (label) actionNames.add(normalizedMasteryText(label));
+      if (named) {
+        propertyKeys.add(weaponMasteryKey(named[1], named[2]));
+        continue;
+      }
+
+      const subType = modifier.subType?.toLowerCase() ?? '';
+      const property = [...WEAPON_MASTERY_PROPERTIES].find((name) =>
+        subType.startsWith(`${name.toLowerCase()}-`),
+      );
+      if (property) {
+        propertyKeys.add(
+          weaponMasteryKey(property, subType.slice(property.length + 1)),
+        );
+      }
+    }
+  }
+  return { propertyKeys, actionNames };
+}
+
+function isWeaponMasteryAction(
+  action: RawAction,
+  selections: WeaponMasterySelections,
+): boolean {
+  const name = action.name?.trim();
+  if (!name) return false;
+  if (selections.actionNames.has(normalizedMasteryText(name))) return true;
+
+  const property = /^(.+?)\s*\([^)]+\)$/.exec(name)?.[1]?.trim();
+  return Boolean(
+    property &&
+      WEAPON_MASTERY_PROPERTIES.has(property) &&
+      /\bmastery propert(?:y|ies)\b/i.test(`${action.snippet ?? ''} ${action.description ?? ''}`),
+  );
+}
+
 /** One weapon's attack line: to-hit + damage + range + property notes. */
 function weaponAttack(
   raw: RawCharacter,
   def: WeaponDef,
   modOf: (key: AbilityKey) => number,
   prof: number,
+  masteries: WeaponMasterySelections,
 ): Attack {
   const properties: WeaponProperty[] = asArray(def.properties)
-    .map((property) => ({
-      name: property.name ?? '',
-      ...(property.description ? { description: plainText(property.description) } : {}),
-    }))
+    .map((property) => {
+      const name = property.name ?? '';
+      return {
+        name,
+        ...(property.description ? { description: plainText(property.description) } : {}),
+        ...(WEAPON_MASTERY_PROPERTIES.has(name)
+          ? { mastered: masteries.propertyKeys.has(weaponMasteryKey(name, def.name ?? '')) }
+          : {}),
+      };
+    })
     .filter((property) => property.name);
   const ranged = def.attackType === RANGED_WEAPON;
   const finesse = properties.some((property) => property.name === 'Finesse');
@@ -1030,6 +1110,7 @@ function resolveAttacks(
   raw: RawCharacter,
   abilities: AbilityScore[],
   level: number,
+  masteries: WeaponMasterySelections,
 ): Attack[] {
   const prof = proficiencyBonus(level);
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
@@ -1046,7 +1127,10 @@ function resolveAttacks(
       save: attack.save ?? null,
       damage: attack.damage ?? null,
       range: attack.range ?? null,
-      properties: (attack.properties ?? []).map((property) => property.name),
+      properties: (attack.properties ?? []).map((property) => ({
+        name: property.name,
+        mastered: property.mastered ?? null,
+      })),
     });
   for (const item of asArray(raw.inventory)) {
     const def = item.definition;
@@ -1058,7 +1142,7 @@ function resolveAttacks(
     // the Inventory, matching what the site surfaces as attacks.
     if (!isWeapon && !flagged) continue;
     if (isWeapon && item.equipped !== true && !flagged) continue;
-    const attack = weaponAttack(raw, def, modOf, prof);
+    const attack = weaponAttack(raw, def, modOf, prof, masteries);
     const signature = signatureOf(attack);
     if (seen.has(signature)) continue;
     seen.add(signature);
@@ -1695,6 +1779,7 @@ function resolveActions(
   abilities: AbilityScore[],
   level: number,
   grantedIds: Set<number>,
+  weaponMasteries: WeaponMasterySelections,
   companionComponentIds: Set<number>,
   resolvePlaceholders: PlaceholderResolver,
 ): {
@@ -1721,6 +1806,7 @@ function resolveActions(
       for (const action of asArray<RawAction>(group)) {
         const category = actionCategory(action.activation?.activationType);
         if (!action.name || seen.has(action.name)) continue;
+        if (isWeaponMasteryAction(action, weaponMasteries)) continue;
         // Skip actions granted by a feature the character doesn't have (an
         // orphaned option, e.g. a subclass path that wasn't chosen).
         if (
@@ -1848,13 +1934,17 @@ function spellCastingTime(activation: RawSpellDefinition['activation']): string 
 }
 
 /** Range shorthand including any area of effect, e.g. "Self (15-ft. cone)". */
-function spellRangeLabel(range: RawSpellDefinition['range']): string {
+function spellRangeLabel(
+  range: RawSpellDefinition['range'],
+  scaledRangeValue?: number,
+): string {
   if (!range) return '';
   const origin = range.origin ?? '';
+  const rangeValue = scaledRangeValue ?? range.rangeValue;
   let base: string;
   if (origin === 'Self') base = 'Self';
   else if (origin === 'Touch') base = 'Touch';
-  else if (range.rangeValue) base = `${range.rangeValue} ft.`;
+  else if (rangeValue) base = `${rangeValue} ft.`;
   else base = origin;
   if (range.aoeValue) {
     const shape = typeof range.aoeType === 'string' ? ` ${range.aoeType.toLowerCase()}` : '';
@@ -1911,20 +2001,92 @@ function withoutHigherLevelSpellRule(
   );
 }
 
-/** Drop a cantrip scaling paragraph when it only restates current damage metadata. */
-function withoutRedundantSpellDamageScaling(
+const CANTRIP_TIER_PATTERNS = [
+  /(?:\blevels?\s+5\b|\b5th level\b|\b5\s*\()/i,
+  /(?:\blevels?\s+11\b|\b11th level\b|\b11\s*\()/i,
+  /(?:\blevels?\s+17\b|\b17th level\b|\b17\s*\()/i,
+];
+
+function isCantripUpgradeRuleText(text: string): boolean {
+  if (/^Cantrip Upgrade\b/i.test(text)) return true;
+  return (
+    CANTRIP_TIER_PATTERNS.every((pattern) => pattern.test(text)) &&
+    /\b(?:attack|beam|damage|die|range|roll)\b/i.test(text)
+  );
+}
+
+function cantripUpgradeText(
   html: string | null | undefined,
-  ownsScaling: boolean,
+): string | undefined {
+  if (!html) return undefined;
+  for (const paragraph of html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const text = plainText(paragraph[0]);
+    if (isCantripUpgradeRuleText(text)) return text;
+  }
+  return undefined;
+}
+
+function cantripUpgradeRule(
+  html: string | null | undefined,
+): string | undefined {
+  if (!html) return undefined;
+  for (const paragraph of html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const text = plainText(paragraph[0]);
+    if (!isCantripUpgradeRuleText(text)) continue;
+    const rich = richText(paragraph[0]);
+    const body = rich
+      .replace(/^\*\*Cantrip Upgrade\.?\*\*\s*/i, '')
+      .replace(/^Cantrip Upgrade\.?\s*/i, '');
+    return `**Cantrip Upgrade.**${body ? ` ${body}` : ''}`;
+  }
+  return undefined;
+}
+
+/** Remove a cantrip's upgrade paragraph after it becomes a dedicated end note. */
+function withoutCantripUpgradeRule(
+  html: string | null | undefined,
 ): string | null | undefined {
-  if (!html || !ownsScaling) return html;
-  return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (paragraph) => {
-    const text = plainText(paragraph);
-    return /^Cantrip Upgrade\.?\s+The damage increases by\b[^.]*\.?$/i.test(
-      text,
-    )
-      ? ' '
-      : paragraph;
-  });
+  if (!html) return html;
+  return html.replace(/<p\b[^>]*>[\s\S]*?<\/p>/gi, (paragraph) =>
+    isCantripUpgradeRuleText(plainText(paragraph)) ? ' ' : paragraph,
+  );
+}
+
+function currentCantripTierValue(
+  html: string | null | undefined,
+  characterLevel: number,
+): string | undefined {
+  const rule = cantripUpgradeText(html);
+  if (!rule) return undefined;
+  const tiers = [...rule.matchAll(
+    /(?:levels?\s+)?(\d+)(?:st|nd|rd|th)?(?:\s+level)?\s*\(\s*([^)]+?)\s*\)/gi,
+  )]
+    .map((match) => ({ level: Number(match[1]), value: match[2].trim() }))
+    .filter((tier) => tier.level <= characterLevel)
+    .sort((left, right) => right.level - left.level);
+  return tiers[0]?.value;
+}
+
+function currentCantripDamageDie(
+  html: string | null | undefined,
+  characterLevel: number,
+): string | undefined {
+  const rule = cantripUpgradeText(html);
+  if (!rule || !/\bdamage die changes?\b/i.test(rule)) return undefined;
+  const value = currentCantripTierValue(html, characterLevel);
+  if (!value || !/^\d*d\d+$/i.test(value)) return undefined;
+  return /^d/i.test(value) ? `1${value}` : value;
+}
+
+function currentCantripRange(
+  html: string | null | undefined,
+  characterLevel: number,
+): number | undefined {
+  const rule = cantripUpgradeText(html);
+  if (!rule || !/\brange doubles?\b/i.test(rule)) return undefined;
+  const value = currentCantripTierValue(html, characterLevel);
+  const distance = /^(\d+)\s*(?:feet|foot|ft\.?)/i.exec(value ?? '');
+  return distance ? Number(distance[1]) : undefined;
 }
 
 /** Duration value; concentration is represented separately on spell entries. */
@@ -1964,11 +2126,26 @@ function perSlotDamageIncrease(html: string | null | undefined): string | undefi
 
 /** Base damage dice + type + upcast scaling from a spell's modifiers. */
 function spellDamage(def: RawSpellDefinition, characterLevel: number): DamageInfo | undefined {
-  const damageMods = asArray(def.modifiers).filter(
-    (entry) => entry.type === 'damage' && entry.die?.diceString,
-  );
+  const allDamageMods = asArray(def.modifiers).filter((entry) => entry.type === 'damage');
+  const damageMods = allDamageMods.filter((entry) => entry.die?.diceString);
   const mod = damageMods[0];
   if (!mod?.die?.diceString) return undefined;
+  const allDamageTypes = [
+    ...new Set(allDamageMods.map((entry) => entry.friendlySubtypeName).filter(Boolean)),
+  ];
+  const representsDamageTypeChoice =
+    allDamageTypes.length > 1 &&
+    allDamageMods.every((entry) => entry.die?.diceString === mod.die?.diceString);
+  // One compact value cannot represent simultaneous cantrip components such as
+  // Booming Blade's hit damage and movement damage. Alternative damage types
+  // with identical dice (Sorcerous Burst) are one chosen roll and remain safe.
+  if (
+    (def.level ?? 0) === 0 &&
+    allDamageMods.length > 1 &&
+    !representsDamageTypeChoice
+  ) {
+    return undefined;
+  }
   const damage: DamageInfo = { dice: mod.die.diceString };
   const types = [
     ...new Set(damageMods.map((entry) => entry.friendlySubtypeName).filter(Boolean)),
@@ -1979,15 +2156,19 @@ function spellDamage(def: RawSpellDefinition, characterLevel: number): DamageInf
     damage.type = mod.friendlySubtypeName;
   }
 
-  // A cantrip scales with CHARACTER level: show its dice at the current level
-  // (no "increases with level" note — just the value it's at now).
+  // A cantrip scales with CHARACTER level: show its current dice in metadata;
+  // its complete 5/11/17 rule remains as a dedicated body note.
   if ((def.level ?? 0) === 0 && def.scaleType === 'characterlevel') {
+    const upgradeText = cantripUpgradeText(def.description);
+    const changedDamageDie = currentCantripDamageDie(def.description, characterLevel);
     const explicitTier = asArray(mod.atHigherLevels?.higherLevelDefinitions)
       .filter((entry) => (entry.level ?? Number.POSITIVE_INFINITY) <= characterLevel)
       .sort((a, b) => (b.level ?? 0) - (a.level ?? 0))[0];
     if (explicitTier?.dice?.diceString) {
       damage.dice = explicitTier.dice.diceString;
-    } else if (!/\b(?:additional (?:attack|beam)|damage die changes?)\b/i.test(def.description ?? '')) {
+    } else if (changedDamageDie) {
+      damage.dice = changedDamageDie;
+    } else if (!upgradeText || /\bdamage increases by\b/i.test(upgradeText)) {
       const multiplier = cantripDiceMultiplier(characterLevel);
       if (multiplier > 1 && mod.die.diceValue) {
         damage.dice = `${(mod.die.diceCount ?? 1) * multiplier}d${mod.die.diceValue}`;
@@ -2130,7 +2311,11 @@ function resolveSpells(
     if (def.school) entry.school = def.school;
     const castingTime = spellCastingTime(def.activation);
     if (castingTime) entry.castingTime = castingTime;
-    const range = spellRangeLabel(def.range);
+    const isCantrip = (def.level ?? 0) === 0;
+    const range = spellRangeLabel(
+      def.range,
+      isCantrip ? currentCantripRange(def.description, level) : undefined,
+    );
     if (range) entry.range = range;
     const components = spellComponents(def.components);
     if (components) entry.components = components;
@@ -2147,7 +2332,10 @@ function resolveSpells(
     if (def.requiresAttackRoll) entry.attack = true;
     const damage = spellDamage(def, level);
     if (damage) entry.damage = damage;
-    const upcast = higherLevelSpellRule(def.description, damage, def.level ?? 0);
+    const upcast =
+      isCantrip
+        ? cantripUpgradeRule(def.description || def.snippet)
+        : higherLevelSpellRule(def.description, damage, def.level ?? 0);
     if (upcast) entry.upcast = upcast;
     if (spell.prepared) entry.prepared = true;
     const spellResolver = (text: string) =>
@@ -2161,16 +2349,16 @@ function resolveSpells(
             ? undefined
             : castingClassByComponent.get(spell.componentId),
       });
-    const description = withoutRedundantSpellDamageScaling(
-      withoutHigherLevelSpellRule(
-        withoutCompanionStatBlocks(def.description, def.name),
-      ),
-      Boolean(
-        damage &&
-          (((def.level ?? 0) === 0 && def.scaleType === 'characterlevel') || damage.scaling),
-      ),
+    const descriptionWithoutHigherLevel = withoutHigherLevelSpellRule(
+      withoutCompanionStatBlocks(def.description, def.name),
     );
-    const snippet = withoutCompanionStatBlocks(def.snippet, def.name);
+    const description = isCantrip
+      ? withoutCantripUpgradeRule(descriptionWithoutHigherLevel)
+      : descriptionWithoutHigherLevel;
+    const snippetWithoutCompanion = withoutCompanionStatBlocks(def.snippet, def.name);
+    const snippet = isCantrip
+      ? withoutCantripUpgradeRule(snippetWithoutCompanion)
+      : snippetWithoutCompanion;
     const structured = spellStructuredContent(description, spellResolver);
     const summary = structured
       ? summarize(structured.intro || snippet, 400)
@@ -2466,12 +2654,10 @@ function featureProficiencies(
   componentId: number | undefined,
 ): {
   text: string;
-  related: SectionKey[];
   grants: { label: string; items: string[] }[];
 } | undefined {
   if (componentId == null) return undefined;
   const names: string[] = [];
-  const related = new Set<SectionKey>();
   const skillKeys = new Set(SKILLS.map((skill) => skill.key));
   const grouped = new Map<string, string[]>();
   for (const modifiers of Object.values(raw.modifiers ?? {})) {
@@ -2501,13 +2687,11 @@ function featureProficiencies(
         items.push(name);
         grouped.set(label, items);
       }
-      related.add(skillKeys.has(subType) ? 'skills' : 'proficiencies');
     }
   }
   return names.length
     ? {
         text: names.join(', '),
-        related: [...related],
         grants: [...grouped].map(([label, items]) => ({ label, items })),
       }
     : undefined;
@@ -3207,13 +3391,13 @@ function resolveRuleArtifacts(
   companionTitle: string;
   ruleTables: RuleTable[];
   companionFeatureIds: Set<number>;
-  tableFeatureIds: Set<number>;
+  tableTitlesByFeatureId: Map<number, string[]>;
 } {
   const companions: CompanionEntry[] = [];
   const ruleTables: RuleTable[] = [];
   const companionFeatureIds = new Set<number>();
   const companionCategories = new Set<string>();
-  const tableFeatureIds = new Set<number>();
+  const tableTitlesByFeatureId = new Map<number, string[]>();
   const companionKeys = new Set<string>();
   const tableKeys = new Set<string>();
   const ruleSources = activeRuleSources(raw);
@@ -3234,7 +3418,11 @@ function resolveRuleArtifacts(
       if (tableKeys.has(key)) continue;
       tableKeys.add(key);
       ruleTables.push(table);
-      if (source.id != null) tableFeatureIds.add(source.id);
+      if (source.id != null) {
+        const titles = tableTitlesByFeatureId.get(source.id) ?? [];
+        if (!titles.includes(table.title)) titles.push(table.title);
+        tableTitlesByFeatureId.set(source.id, titles);
+      }
     }
   }
   const featureSources = creatureFeatureSources(raw);
@@ -3260,7 +3448,7 @@ function resolveRuleArtifacts(
     companionTitle: companionSectionTitle(companionCategories),
     ruleTables,
     companionFeatureIds,
-    tableFeatureIds,
+    tableTitlesByFeatureId,
   };
 }
 
@@ -3395,18 +3583,29 @@ function spellStructuredContent(
 }
 
 /**
- * Drop whole sentences that reference a rules TABLE (e.g. "as shown in the
- * Cleric Features table", "the spells outlined in the Elven Lineages table") —
- * the printed sheet doesn't include those tables, so the reference is dead
- * weight. Matches the WORD "table"/"tables" (so "Repeatable" is safe) and splits
- * on the same sentence boundary the summarizer respects (a ./!/? before a
- * capital or paren, so "120 ft." isn't treated as a break).
+ * Drop whole sentences that reference a rules table absent from the sheet
+ * (e.g. a class progression table). Sentences naming an extracted table stay:
+ * they often explain how to use the rows shown on the Tables card. Matches the
+ * WORD "table"/"tables" (so "Repeatable" is safe) and splits on the same
+ * sentence boundary the summarizer respects (a ./!/? before a capital or
+ * paren, so "120 ft." isn't treated as a break).
  */
-function stripTableSentences(text: string): string {
+function stripTableSentences(text: string, availableTableTitles: string[] = []): string {
+  const referencesAvailableTable = (sentence: string): boolean =>
+    availableTableTitles.some((title) => {
+      const titlePattern = title
+        .trim()
+        .split(/\s+/)
+        .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('\\s+');
+      return new RegExp(`${titlePattern}\\s+tables?\\b`, 'i').test(sentence);
+    });
   return text
     .replace(/([.!?])\s+(?=[A-Z(])/g, '$1\u0000')
     .split('\u0000')
-    .filter((sentence) => !/\btables?\b/i.test(sentence))
+    .filter(
+      (sentence) => !/\btables?\b/i.test(sentence) || referencesAvailableTable(sentence),
+    )
     .join(' ')
     .trim();
 }
@@ -3474,6 +3673,7 @@ interface FeatureContent {
   grants?: { label: string; items: string[] }[];
   reference?: SectionKey;
   related?: SectionKey[];
+  tableTitles?: string[];
   parts?: FeaturePart[];
 }
 
@@ -3506,7 +3706,7 @@ function resolveFeatures(
   resources: Map<number, ResourcePool>,
   actionReferencesByComponent: Map<number, ActionReference[]>,
   companionFeatureIds: Set<number>,
-  tableFeatureIds: Set<number>,
+  tableTitlesByFeatureId: Map<number, string[]>,
   spellNamesByComponent: Map<number, string[]>,
   resolvePlaceholders: PlaceholderResolver,
 ): FeatureGroup[] {
@@ -3649,7 +3849,7 @@ function resolveFeatures(
     // Drop table references (the printed sheet has no rules tables) and the
     // "Repeatable — you can take this feat more than once" boilerplate.
     let summary = content.summary
-      ? stripRepeatableNote(stripTableSentences(content.summary))
+      ? stripRepeatableNote(stripTableSentences(content.summary, content.tableTitles))
       : '';
     // If dropping table-reference sentences removed EVERYTHING, the lone sentence
     // carried real info beside a table pointer — trim just the pointer instead of
@@ -3663,7 +3863,10 @@ function resolveFeatures(
     if (content.related?.length) item.related = content.related;
     if (content.parts?.length) {
       const parts = content.parts
-        .map((part) => ({ ...part, text: stripTableSentences(part.text) }))
+        .map((part) => ({
+          ...part,
+          text: stripTableSentences(part.text, content.tableTitles),
+        }))
         .filter((part) => part.label || part.text || part.reference || part.list?.items.length)
         .filter(
           (part) =>
@@ -3807,16 +4010,26 @@ function resolveFeatures(
     ];
     const related = new Set<SectionKey>([
       ...(content.related ?? []),
-      ...(selfNamedProficiency ? [] : (proficiencies?.related ?? [])),
       ...modifierRelatedSections(raw, id),
     ]);
     if (artifactIds.some((artifactId) => companionFeatureIds.has(artifactId))) {
       related.add('companions');
     }
-    if (artifactIds.some((artifactId) => tableFeatureIds.has(artifactId))) {
+    const tableTitles = [
+      ...new Set(
+        artifactIds.flatMap((artifactId) => tableTitlesByFeatureId.get(artifactId) ?? []),
+      ),
+    ];
+    if (tableTitles.length) {
       related.add('tables');
     }
-    if (related.size) content = { ...content, related: [...related] };
+    if (related.size || tableTitles.length) {
+      content = {
+        ...content,
+        ...(related.size ? { related: [...related] } : {}),
+        ...(tableTitles.length ? { tableTitles } : {}),
+      };
+    }
 
     // A pure save-advantage trait is fully represented in Saves & Defences.
     if (
@@ -4198,19 +4411,21 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   const defences = resolveDefences(raw);
   const proficiencies = resolveProficiencies(raw);
   const inventory = resolveInventory(raw);
-  const attacks = resolveAttacks(raw, abilities, level);
+  const weaponMasteries = weaponMasterySelections(raw);
+  const attacks = resolveAttacks(raw, abilities, level, weaponMasteries);
   const {
     companions,
     companionTitle,
     ruleTables,
     companionFeatureIds,
-    tableFeatureIds,
+    tableTitlesByFeatureId,
   } = resolveRuleArtifacts(raw, resolvePlaceholders);
   const { actions, resourceComponentIds, actionReferencesByComponent } = resolveActions(
     raw,
     abilities,
     level,
     grantedFeatureIds(raw),
+    weaponMasteries,
     companionFeatureIds,
     resolvePlaceholders,
   );
@@ -4225,7 +4440,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     resources,
     actionReferencesByComponent,
     companionFeatureIds,
-    tableFeatureIds,
+    tableTitlesByFeatureId,
     spellNamesByComponent,
     resolvePlaceholders,
   );

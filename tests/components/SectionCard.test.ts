@@ -304,6 +304,52 @@ describe('SectionCard', () => {
     expect(wrapper.find('.card__layout').exists()).toBe(false);
   });
 
+  it('reports an overflowing candidate from fit-probe mode', async () => {
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const scrollWidth = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const clientHeight = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 100 : 0;
+      });
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 108 : 0;
+      });
+
+    try {
+      const wrapper = mount(SectionCard, {
+        props: {
+          section: { key: 'proficiencies', title: 'Proficiencies', count: 12, isEmpty: false },
+          span: { cols: 1, rows: 1 },
+          character: makeCharacter(),
+          fitProbe: true,
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted('layoutFit')).toContainEqual([false]);
+      expect(wrapper.attributes('data-section-key')).toBeUndefined();
+      expect(wrapper.attributes('data-layout-probe')).toBe('proficiencies');
+      expect(wrapper.find('.card__layout').exists()).toBe(false);
+      expect(wrapper.find('.card__drag-handle').exists()).toBe(false);
+    } finally {
+      clientWidth.mockRestore();
+      scrollWidth.mockRestore();
+      clientHeight.mockRestore();
+      scrollHeight.mockRestore();
+    }
+  });
+
   it('measures its content height and emits it for the sheet to shrink to fit', async () => {
     // happy-dom has no layout, so feed geometry: the card body reads 120px tall
     // (its natural content height) with its top flush to the card top.

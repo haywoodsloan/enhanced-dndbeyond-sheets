@@ -49,6 +49,7 @@ function needsFullWidth(item: FeatureItem): boolean {
           <span v-if="item.reference" class="features__reference features__reference--item">
             (see {{ sectionLabel(item.reference, companionTitle) }})
           </span>
+          <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
           <span
             v-for="related in item.related"
             :key="related"
@@ -56,7 +57,6 @@ function needsFullWidth(item: FeatureItem): boolean {
           >
             (see {{ sectionLabel(related, companionTitle) }})
           </span>
-          <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
           <span
             v-for="grant in item.grants"
             :key="grant.label"

@@ -191,7 +191,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const skilled = items.find((item) => item.name === 'Skilled');
     // The generic "any combination of your choice" blurb is replaced by the picks.
     expect(skilled?.summary).toBe('Stealth, Perception, Insight');
-    expect(skilled?.related).toEqual(['skills']);
+    expect(skilled?.related).toBeUndefined();
     expect(skilled?.summary).not.toMatch(/of your choice/i);
     // The repeatable-feat boilerplate note is dropped.
     expect((skilled?.parts ?? []).some((part) => part.label === 'Repeatable')).toBe(
@@ -301,6 +301,9 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const fireBolt = spells.find((spell) => spell.name === 'Fire Bolt');
     expect(fireBolt?.damage?.dice).toBe('2d10');
     expect(fireBolt?.summary).not.toMatch(/Cantrip Upgrade|increases by 1d10/i);
+    expect(fireBolt?.upcast).toBe(
+      '**Cantrip Upgrade.** The damage increases by 1d10 when you reach levels 5 (2d10), 11 (3d10), and 17 (4d10).',
+    );
 
     const burningHands = spells.find((spell) => spell.name === 'Burning Hands');
     expect(burningHands?.damage?.scaling).toBe('+1d6 per slot level above 1st');

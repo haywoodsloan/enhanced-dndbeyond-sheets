@@ -8,12 +8,9 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionPath = resolve(rootDir, '.output/chrome-mv3');
 
 /** A real D&D Beyond character payload — the same "Noct" fixture the unit tests use. */
-const noctRaw = JSON.parse(
+export const noctRaw = JSON.parse(
   readFileSync(resolve(rootDir, 'tests/fixtures/noct.json'), 'utf-8'),
-) as { id: number };
-
-/** The fixture character's id, used in the sheet URL and the mocked response. */
-export const CHARACTER_ID = noctRaw.id;
+) as { id: number; customProficiencies?: { type: number; name: string }[] };
 
 /**
  * Playwright fixtures that load the built extension into a persistent Chromium
@@ -49,11 +46,15 @@ export const test = base.extend<{
 export const expect = test.expect;
 
 /**
- * Open the enhanced sheet for the fixture character with the D&D Beyond
- * character-service response mocked, so it renders deterministically with no
- * network or auth token. Resolves once the section cards are on screen.
+ * Open the enhanced sheet with the D&D Beyond character-service response
+ * mocked, so it renders deterministically with no network or auth token. Tests
+ * may override the default Noct payload. Resolves once section cards are shown.
  */
-export async function openSheet(context: BrowserContext, extensionId: string): Promise<Page> {
+export async function openSheet(
+  context: BrowserContext,
+  extensionId: string,
+  rawCharacter: typeof noctRaw = noctRaw,
+): Promise<Page> {
   const page = await context.newPage();
   await page.route('**/character-service.dndbeyond.com/**', (route) =>
     route.fulfill({
@@ -61,14 +62,16 @@ export async function openSheet(context: BrowserContext, extensionId: string): P
       contentType: 'application/json',
       headers: { 'access-control-allow-origin': '*' },
       body: JSON.stringify({
-        id: CHARACTER_ID,
+        id: rawCharacter.id,
         success: true,
         message: null,
-        data: noctRaw,
+        data: rawCharacter,
       }),
     }),
   );
-  await page.goto(`chrome-extension://${extensionId}/sheet.html?characterId=${CHARACTER_ID}`);
+  await page.goto(
+    `chrome-extension://${extensionId}/sheet.html?characterId=${rawCharacter.id}`,
+  );
   await page.locator('[data-section-key="attributes"]').waitFor();
   return page;
 }

@@ -14,7 +14,6 @@ import {
   fitSectionSpanToGrid,
   gridColumnsForPage,
   gridRowsPerPage,
-  nextViableLayoutIndex,
   rowsForHeight,
   sectionLayoutCount,
   sectionLayoutLabel,
@@ -301,6 +300,81 @@ const sheetRef = ref<HTMLElement | null>(null);
 // height are ignored, so they keep their curated estimate.
 const measuredHeights = ref<Record<string, CardMeasurement>>({});
 const rowAlignedSections = ref<Set<CardKey>>(new Set());
+
+interface LayoutFitProbe {
+  key: string;
+  section: CharacterSection;
+  layoutIndex: number;
+  span: SectionSpan;
+}
+
+const layoutFitResults = ref<Record<string, boolean>>({});
+const layoutProbeRevision = ref(0);
+
+watch(
+  character,
+  () => {
+    layoutProbeRevision.value += 1;
+    layoutFitResults.value = {};
+  },
+);
+
+function usesLayoutFitProbe(key: CardKey): boolean {
+  return (
+    !isContinuationKey(key) &&
+    !isSpellCardKey(key) &&
+    !CONTENT_FIT_SECTIONS.has(key as SectionKey) &&
+    sectionLayoutCount(key) > 1
+  );
+}
+
+function layoutFitKey(key: CardKey, layoutIndex: number): string {
+  return [
+    layoutProbeRevision.value,
+    formatId.value,
+    orientationId.value,
+    marginId.value,
+    key,
+    layoutIndex,
+  ].join(':');
+}
+
+const layoutFitProbes = computed<LayoutFitProbe[]>(() => {
+  if (!character.value) return [];
+  const probes: LayoutFitProbe[] = [];
+  for (const section of orderedSections.value) {
+    if (!usesLayoutFitProbe(section.key)) continue;
+    for (let layoutIndex = 0; layoutIndex < sectionLayoutCount(section.key); layoutIndex += 1) {
+      const rawSpan = sectionSpan(
+        section.key,
+        section.count,
+        layoutIndex,
+        rowsPerPage.value,
+      );
+      if (rawSpan.rows > rowsPerPage.value) continue;
+      probes.push({
+        key: layoutFitKey(section.key, layoutIndex),
+        section,
+        layoutIndex,
+        span: fitSectionSpanToGrid(
+          section.key,
+          rawSpan,
+          gridColumns.value,
+          rowsPerPage.value,
+          rowUnit.value,
+          cellSize.value.width - GRID_GAP,
+        ),
+      });
+    }
+  }
+  return probes;
+});
+
+function onLayoutFit(probe: LayoutFitProbe, fits: boolean) {
+  if (layoutFitResults.value[probe.key] === fits) return;
+  layoutFitResults.value = { ...layoutFitResults.value, [probe.key]: fits };
+}
+
 function onMeasure(key: CardKey, measurement: CardMeasurement) {
   // Only content-fit base cards size to their text: ignore continuation cards
   // (they mirror their base) and fill cards.
@@ -652,7 +726,8 @@ function overflowsAtCols(section: CharacterSection, cols: number): boolean {
 // The layout index the toggle advances to. For a measured content-fit card it's
 // overflow-aware: the next option (cycle order) whose content still fits a page,
 // treating overflow as a last resort — if no other option avoids it, stay put.
-// Other cards (fill cards, unmeasured) use the estimate-based page-fit rule.
+// Fixed-height cards use off-screen candidates at the real print dimensions;
+// unmeasured cards fall back to their curated page-span limits.
 function cardNextLayout(section: CharacterSection): number {
   const key = section.key;
   const current = layoutIndices.value[key] ?? 0;
@@ -669,7 +744,20 @@ function cardNextLayout(section: CharacterSection): number {
     }
     return current;
   }
-  return nextViableLayoutIndex(key, current, section.count, rowsPerPage.value);
+  const total = sectionLayoutCount(key);
+  for (let step = 1; step < total; step += 1) {
+    const candidate = (current + step) % total;
+    const span = sectionSpan(key, section.count, candidate, rowsPerPage.value);
+    if (span.rows > rowsPerPage.value) continue;
+    if (
+      usesLayoutFitProbe(key) &&
+      layoutFitResults.value[layoutFitKey(key, candidate)] !== true
+    ) {
+      continue;
+    }
+    return candidate;
+  }
+  return current;
 }
 
 // Whether the layout toggle can switch to a better-fitting option than the
@@ -1124,6 +1212,33 @@ onUnmounted(() => {
           />
         </div>
       </section>
+
+      <div
+        v-if="character && layoutFitProbes.length"
+        class="layout-probes"
+        :style="pageStyle"
+        aria-hidden="true"
+        inert
+      >
+        <div
+          class="layout-probes__grid"
+          :style="{ gridTemplateColumns: pageGridColumns, gridTemplateRows: pageGridRows }"
+        >
+          <SectionCard
+            v-for="probe in layoutFitProbes"
+            :key="probe.key"
+            :section="probe.section"
+            :span="probe.span"
+            :place="{
+              gridColumn: `1 / span ${probe.span.cols}`,
+              gridRow: `1 / span ${probe.span.rows}`,
+            }"
+            :character="character"
+            fit-probe
+            @layout-fit="onLayoutFit(probe, $event)"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -1429,6 +1544,30 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 24px;
+}
+
+/* Alternate fixed-card layouts are rendered off-screen at the exact printable
+   dimensions. Their real scroll geometry decides whether the layout control may
+   offer them; overlapping probes do not participate in visible page packing. */
+.layout-probes {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  box-sizing: border-box;
+  width: var(--page-width);
+  height: var(--page-height);
+  padding: var(--page-margin);
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.layout-probes__grid {
+  display: grid;
+  column-gap: var(--grid-gap, 12px);
+  row-gap: var(--grid-gap, 12px);
+  align-items: stretch;
+  height: 100%;
 }
 
 /* Parking area for hidden sections: sits on the desk below the pages so it

@@ -199,6 +199,35 @@ describe('SpellsCard', () => {
     );
   });
 
+  it('renders a cantrip damage-upgrade note after its effect summary', () => {
+    const wrapper = mount(SpellsCard, {
+      props: {
+        spells: [
+          {
+            name: 'Poison Spray',
+            level: 0,
+            damage: { dice: '2d12', type: 'Poison' },
+            summary:
+              'You spray toxic mist at a creature within range. On a hit, the target takes 1d12 Poison damage.',
+            upcast:
+              '**Cantrip Upgrade.** The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).',
+          },
+        ],
+      },
+    });
+
+    const spell = wrapper.get('[data-spell]');
+    const summary = spell.get('.spells__summary');
+    const upgrade = spell.get('.spells__upcast');
+    expect(spell.text()).toContain('2d12 Poison');
+    expect(upgrade.text()).toBe(
+      'Cantrip Upgrade. The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).',
+    );
+    expect(summary.element.compareDocumentPosition(upgrade.element)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it('shows concentration and ritual as separate boxes', () => {
     const wrapper = mount(SpellsCard, {
       props: {

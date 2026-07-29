@@ -33,8 +33,8 @@ import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } fr
 // card in the off-page tray: no fixed height, no drag handle, and the toggle
 // restores it to the printable pages instead of removing it. `layoutCount` /
 // `layoutLabel` drive the layout cycle button (shown when a card has >1 option);
-// `canCycleLayout` (false) disables it when every other layout would overflow a
-// page, so the toggle only offers layouts that still fit.
+// `canCycleLayout` (false) disables it when every other layout would overflow
+// its card or a page, so the toggle only offers layouts that still fit.
 const props = withDefaults(
   defineProps<{
     section: CharacterSection;
@@ -43,6 +43,9 @@ const props = withDefaults(
     place?: { gridColumn: string; gridRow: string };
     character?: Character | null;
     hidden?: boolean;
+    /** Render only for off-screen layout-fit measurement. Controls are omitted
+     * and the card reports whether its body fits its assigned footprint. */
+    fitProbe?: boolean;
     layoutCount?: number;
     layoutLabel?: string;
     /** False when no layout OTHER than the current one fits a page — the toggle
@@ -72,6 +75,7 @@ const emit = defineEmits<{
   hide: [key: CardKey];
   show: [key: CardKey];
   cycleLayout: [key: CardKey];
+  layoutFit: [fits: boolean];
   /** The card's measured body geometry, so the sheet can size a content-fit
    * card's footprint to its text and split it across continuation cards. */
   measure: [key: CardKey, measurement: CardMeasurement];
@@ -167,7 +171,7 @@ const spell = computed(() =>
 // and sits in the header control group next to the layout/hide buttons.
 const toggleSpellCards = inject(ToggleSpellCardsKey, undefined);
 const spellControl = computed<'expand' | 'collapse' | null>(() => {
-  if (props.hidden || isContinuation.value || !toggleSpellCards) return null;
+  if (props.hidden || props.fitProbe || isContinuation.value || !toggleSpellCards) return null;
   if (props.section.key === 'spells' && (props.character?.spells.length ?? 0) > 0) {
     return 'expand';
   }
@@ -189,6 +193,19 @@ const spellLegendMargin = computed(() => {
 // layout engine (happy-dom returns 0), so tests keep the estimate.
 const bodyRef = ref<HTMLElement | null>(null);
 
+function contentFits(body: HTMLElement): boolean {
+  // happy-dom has no layout engine. Preserve the estimate-based fallback there;
+  // real browsers always provide non-zero dimensions for an off-screen probe.
+  if (body.clientWidth <= 0 || body.clientHeight <= 0) return true;
+  const content = body.firstElementChild;
+  const elements = [body, ...(content instanceof HTMLElement ? [content] : [])];
+  return elements.every(
+    (element) =>
+      element.scrollWidth <= element.clientWidth + 1 &&
+      element.scrollHeight <= element.clientHeight + 1,
+  );
+}
+
 // The per-item elements a card may break between when its content overflows
 // onto a continuation card (one selector across every content-fit card type).
 const BREAK_ITEMS =
@@ -199,6 +216,10 @@ function measure() {
   const body = bodyRef.value;
   const card = body?.closest('.card');
   if (!body || !card) return;
+  if (props.fitProbe) {
+    emit('layoutFit', contentFits(body));
+    return;
+  }
   const bodyRect = body.getBoundingClientRect();
   const total = bodyRect.height;
   if (total <= 0) return;
@@ -271,6 +292,7 @@ function measure() {
 }
 
 let resizeObserver: ResizeObserver | null = null;
+let mutationObserver: MutationObserver | null = null;
 onMounted(() => {
   void nextTick(measure);
   // Re-measure once webfonts settle (they change text heights).
@@ -283,10 +305,18 @@ onMounted(() => {
     resizeObserver = new ResizeObserver(() => measure());
     resizeObserver.observe(body);
   }
+  // Adaptive card bodies can change their internal column count without
+  // resizing the fixed probe itself. Re-check after those DOM/class changes.
+  if (props.fitProbe && typeof MutationObserver !== 'undefined' && body) {
+    mutationObserver = new MutationObserver(() => void nextTick(measure));
+    mutationObserver.observe(body, { attributes: true, childList: true, subtree: true });
+  }
 });
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  mutationObserver?.disconnect();
+  mutationObserver = null;
 });
 // A layout toggle or count change alters the card's width or content, so re-fit.
 watch(
@@ -298,9 +328,15 @@ watch(
 <template>
   <Card
     class="card"
-    :class="{ 'card--hidden': hidden, 'card--narrow': span.cols < 3 }"
+    :class="{
+      'card--hidden': hidden,
+      'card--fit-probe': fitProbe,
+      'card--narrow': span.cols < 3,
+    }"
     :style="cardStyle"
-    :data-section-key="section.key"
+    :data-card-kind="bodyKey"
+    :data-section-key="fitProbe ? undefined : section.key"
+    :data-layout-probe="fitProbe ? section.key : undefined"
   >
     <template #title>
       <div
@@ -371,7 +407,7 @@ watch(
     </template>
     <template #content>
       <button
-        v-if="!hidden && !isContinuation"
+        v-if="!hidden && !fitProbe && !isContinuation"
         type="button"
         v-tooltip.bottom="{ value: 'Drag or use arrow keys to move', showDelay: 500 }"
         class="card__drag-handle"
@@ -410,20 +446,20 @@ watch(
         </svg>
       </button>
       <button
-        v-if="!hidden && !isContinuation && (layoutCount ?? 1) > 1"
+        v-if="!hidden && !fitProbe && !isContinuation && (layoutCount ?? 1) > 1"
         type="button"
         class="card__layout"
         :disabled="!canCycleLayout"
         v-tooltip.bottom="{
           value: canCycleLayout
             ? `Layout: ${layoutLabel}`
-            : `Layout: ${layoutLabel} — no other layout fits the page`,
+            : `Layout: ${layoutLabel} — no other layout fits without overflow`,
           showDelay: 500,
         }"
         :aria-label="
           canCycleLayout
             ? `Change layout (currently ${layoutLabel})`
-            : `Layout ${layoutLabel}; no other layout fits the page`
+            : `Layout ${layoutLabel}; no other layout fits without overflow`
         "
         @click="emit('cycleLayout', section.key)"
       >
@@ -434,7 +470,7 @@ watch(
         </svg>
       </button>
       <button
-        v-if="!isContinuation"
+        v-if="!fitProbe && !isContinuation"
         type="button"
         class="card__toggle"
         v-tooltip.bottom="{ value: hidden ? 'Show section' : 'Hide section', showDelay: 500 }"
@@ -728,9 +764,9 @@ watch(
   opacity: 1;
 }
 
-/* Disabled: every other layout would overflow a page, so the toggle can't
-   switch. Kept hidden-until-hover like the enabled control, but shown muted and
-   unclickable so it reads as "no other layout fits". */
+/* Disabled: every other layout would overflow its card or a page, so the toggle
+  can't switch. Kept hidden-until-hover like the enabled control, but shown
+  muted and unclickable so it reads as "no other layout fits". */
 .card__layout:disabled {
   cursor: default;
   color: var(--p-primary-300, #d4d4d8);
@@ -771,55 +807,55 @@ watch(
    inventory list, and wealth rows fill the card height (the image scales to fit
    without cropping; the other content distributes / stretches down the height
    instead of leaving space). */
-.card[data-section-key='portrait'],
-.card[data-section-key='skills'],
-.card[data-section-key='proficiencies'],
-.card[data-section-key='attributes'],
-.card[data-section-key='inventory'],
-.card[data-section-key='wealth'] {
+.card[data-card-kind='portrait'],
+.card[data-card-kind='skills'],
+.card[data-card-kind='proficiencies'],
+.card[data-card-kind='attributes'],
+.card[data-card-kind='inventory'],
+.card[data-card-kind='wealth'] {
   display: flex;
   flex-direction: column;
 }
 
-.card[data-section-key='portrait'] :deep(.p-card-body),
-.card[data-section-key='skills'] :deep(.p-card-body),
-.card[data-section-key='proficiencies'] :deep(.p-card-body),
-.card[data-section-key='attributes'] :deep(.p-card-body),
-.card[data-section-key='inventory'] :deep(.p-card-body),
-.card[data-section-key='wealth'] :deep(.p-card-body),
-.card[data-section-key='savingThrows'] :deep(.p-card-body),
-.card[data-section-key='senses'] :deep(.p-card-body),
-.card[data-section-key='notes'] :deep(.p-card-body) {
+.card[data-card-kind='portrait'] :deep(.p-card-body),
+.card[data-card-kind='skills'] :deep(.p-card-body),
+.card[data-card-kind='proficiencies'] :deep(.p-card-body),
+.card[data-card-kind='attributes'] :deep(.p-card-body),
+.card[data-card-kind='inventory'] :deep(.p-card-body),
+.card[data-card-kind='wealth'] :deep(.p-card-body),
+.card[data-card-kind='savingThrows'] :deep(.p-card-body),
+.card[data-card-kind='senses'] :deep(.p-card-body),
+.card[data-card-kind='notes'] :deep(.p-card-body) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.card[data-section-key='portrait'] :deep(.p-card-content),
-.card[data-section-key='skills'] :deep(.p-card-content),
-.card[data-section-key='proficiencies'] :deep(.p-card-content),
-.card[data-section-key='attributes'] :deep(.p-card-content),
-.card[data-section-key='inventory'] :deep(.p-card-content),
-.card[data-section-key='wealth'] :deep(.p-card-content),
-.card[data-section-key='savingThrows'] :deep(.p-card-content),
-.card[data-section-key='senses'] :deep(.p-card-content),
-.card[data-section-key='notes'] :deep(.p-card-content) {
+.card[data-card-kind='portrait'] :deep(.p-card-content),
+.card[data-card-kind='skills'] :deep(.p-card-content),
+.card[data-card-kind='proficiencies'] :deep(.p-card-content),
+.card[data-card-kind='attributes'] :deep(.p-card-content),
+.card[data-card-kind='inventory'] :deep(.p-card-content),
+.card[data-card-kind='wealth'] :deep(.p-card-content),
+.card[data-card-kind='savingThrows'] :deep(.p-card-content),
+.card[data-card-kind='senses'] :deep(.p-card-content),
+.card[data-card-kind='notes'] :deep(.p-card-content) {
   flex: 1;
   min-height: 0;
 }
 
 /* These "fill" cards size to the card (not their text), and their inner card
    uses height:100%, so the body wrapper must fill the content area too. */
-.card[data-section-key='portrait'] .card__body,
-.card[data-section-key='skills'] .card__body,
-.card[data-section-key='proficiencies'] .card__body,
-.card[data-section-key='attributes'] .card__body,
-.card[data-section-key='inventory'] .card__body,
-.card[data-section-key='wealth'] .card__body,
-.card[data-section-key='savingThrows'] .card__body,
-.card[data-section-key='senses'] .card__body,
-.card[data-section-key='notes'] .card__body {
+.card[data-card-kind='portrait'] .card__body,
+.card[data-card-kind='skills'] .card__body,
+.card[data-card-kind='proficiencies'] .card__body,
+.card[data-card-kind='attributes'] .card__body,
+.card[data-card-kind='inventory'] .card__body,
+.card[data-card-kind='wealth'] .card__body,
+.card[data-card-kind='savingThrows'] .card__body,
+.card[data-card-kind='senses'] .card__body,
+.card[data-card-kind='notes'] .card__body {
   height: 100%;
   min-height: 0;
   display: flex;
@@ -828,12 +864,12 @@ watch(
 
 /* The inventory's write-in rows run to the bottom edge, so trim the card's
    bottom padding to give them room for one more row. */
-.card[data-section-key='inventory'] :deep(.p-card-body) {
+.card[data-card-kind='inventory'] :deep(.p-card-body) {
   padding-bottom: 6px;
 }
 
 /* The image speaks for itself — no need for a "Portrait" heading. */
-.card[data-section-key='portrait'] :deep(.p-card-caption) {
+.card[data-card-kind='portrait'] :deep(.p-card-caption) {
   display: none;
 }
 

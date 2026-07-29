@@ -1258,6 +1258,7 @@ describe('normalizeCharacter', () => {
             'Many Beams',
             '<p>Deal damage.</p><p><strong>Cantrip Upgrade.</strong> Make one additional beam.</p>',
           ),
+          cantrip('Simple Bolt', '<p>Deal damage.</p>'),
         ],
       },
     } as unknown as RawCharacter;
@@ -1265,9 +1266,198 @@ describe('normalizeCharacter', () => {
     const spells = normalizeCharacter(character).spells;
     expect(spells.find((spell) => spell.name === 'Tiered Bolt')?.damage?.dice).toBe('1d12');
     expect(spells.find((spell) => spell.name === 'Many Beams')?.damage?.dice).toBe('1d10');
-    expect(spells.find((spell) => spell.name === 'Many Beams')?.summary).toContain(
+    expect(spells.find((spell) => spell.name === 'Many Beams')?.summary).not.toContain(
       'additional beam',
     );
+    expect(spells.find((spell) => spell.name === 'Many Beams')?.upcast).toBe(
+      '**Cantrip Upgrade.** Make one additional beam.',
+    );
+    expect(spells.find((spell) => spell.name === 'Simple Bolt')?.damage?.dice).toBe('2d10');
+  });
+
+  it('shows cantrip damage tiers as an end note after current damage metadata', () => {
+    const character = {
+      id: 1,
+      name: 'Cantrip Caster',
+      classes: [{ level: 5, definition: { name: 'Sorcerer' } }],
+      spells: {
+        class: [
+          {
+            definition: {
+              name: 'Poison Spray',
+              level: 0,
+              scaleType: 'characterlevel',
+              requiresAttackRoll: true,
+              description:
+                '<p>You spray toxic mist at a creature within range. Make a ranged spell attack against the target. On a hit, the target takes 1d12 Poison damage.</p>' +
+                '<p><strong><em>Cantrip Upgrade.</em></strong> The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Poison',
+                  die: { diceCount: 1, diceValue: 12, diceString: '1d12' },
+                  atHigherLevels: {
+                    higherLevelDefinitions: [
+                      { level: 5, dice: { diceString: '2d12' } },
+                      { level: 11, dice: { diceString: '3d12' } },
+                      { level: 17, dice: { diceString: '4d12' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const poisonSpray = normalizeCharacter(character).spells.find(
+      (spell) => spell.name === 'Poison Spray',
+    );
+    expect(poisonSpray?.damage).toMatchObject({ dice: '2d12', type: 'Poison' });
+    expect(poisonSpray?.summary).toContain('target takes 1d12 Poison damage');
+    expect(poisonSpray?.summary).not.toContain('Cantrip Upgrade');
+    expect(poisonSpray?.upcast).toBe(
+      '**Cantrip Upgrade.** The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).',
+    );
+  });
+
+  it('handles beam, die-size, range, alternate-die, and legacy cantrip upgrades', () => {
+    const character = {
+      id: 1,
+      name: 'Cantrip Edge Cases',
+      classes: [{ level: 11, definition: { name: 'Mage' } }],
+      spells: {
+        class: [
+          {
+            definition: {
+              name: 'Eldritch Blast',
+              level: 0,
+              scaleType: 'characterlevel',
+              description:
+                '<p>On a hit, the target takes 1d10 Force damage.</p>' +
+                '<p><strong>Cantrip Upgrade.</strong> The spell creates two beams at level 5, three beams at level 11, and four beams at level 17.</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Force',
+                  die: { diceCount: 1, diceValue: 10, diceString: '1d10' },
+                },
+              ],
+            },
+          },
+          {
+            definition: {
+              name: 'Shillelagh',
+              level: 0,
+              scaleType: 'characterlevel',
+              description:
+                '<p>The weapon damage die becomes a d8.</p>' +
+                '<p><strong>Cantrip Upgrade.</strong> The damage die changes when you reach levels 5 (d10), 11 (d12), and 17 (2d6).</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Bludgeoning',
+                  die: { diceCount: 1, diceValue: 8, diceString: '1d8' },
+                },
+              ],
+            },
+          },
+          {
+            definition: {
+              name: 'Spare the Dying',
+              level: 0,
+              scaleType: 'characterlevel',
+              range: { origin: 'Ranged', rangeValue: 15 },
+              description:
+                '<p>A creature becomes Stable.</p>' +
+                '<p><strong>Cantrip Upgrade.</strong> The range doubles when you reach levels 5 (30 feet), 11 (60 feet), and 17 (120 feet).</p>',
+            },
+          },
+          {
+            definition: {
+              name: 'Legacy Bolt',
+              level: 0,
+              scaleType: 'characterlevel',
+              description:
+                '<p>Deal 1d6 damage.</p>' +
+                '<p>This spell’s damage increases by 1d6 when you reach 5th level (2d6), 11th level (3d6), and 17th level (4d6).</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Force',
+                  die: { diceCount: 1, diceValue: 6, diceString: '1d6' },
+                },
+              ],
+            },
+          },
+          {
+            definition: {
+              name: 'Booming Blade',
+              level: 0,
+              scaleType: 'characterlevel',
+              description:
+                '<p>On a hit, the target suffers the weapon attack’s normal effects. If it moves, it takes 1d8 Thunder damage.</p>' +
+                '<p>This spell’s damage increases when you reach certain levels. At 5th level, the melee attack deals an extra 1d8 Thunder damage, and the movement damage increases to 2d8. Both damage rolls increase by 1d8 at 11th level (2d8 and 3d8) and again at 17th level (3d8 and 4d8).</p>',
+              modifiers: [
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Thunder',
+                  die: { diceString: null },
+                  atHigherLevels: {
+                    higherLevelDefinitions: [
+                      { level: 5, dice: { diceString: '1d8' } },
+                      { level: 11, dice: { diceString: '2d8' } },
+                    ],
+                  },
+                },
+                {
+                  type: 'damage',
+                  friendlySubtypeName: 'Thunder',
+                  die: { diceCount: 1, diceValue: 8, diceString: '1d8' },
+                  atHigherLevels: {
+                    higherLevelDefinitions: [
+                      { level: 5, dice: { diceString: '2d8' } },
+                      { level: 11, dice: { diceString: '3d8' } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const spells = new Map(
+      normalizeCharacter(character).spells.map((spell) => [spell.name, spell]),
+    );
+    expect(spells.get('Eldritch Blast')?.damage?.dice).toBe('1d10');
+    expect(spells.get('Eldritch Blast')?.upcast).toContain('three beams at level 11');
+    expect(spells.get('Shillelagh')?.damage?.dice).toBe('1d12');
+    expect(spells.get('Shillelagh')?.upcast).toContain('17 (2d6)');
+    expect(spells.get('Spare the Dying')?.range).toBe('60 ft.');
+    expect(spells.get('Spare the Dying')?.upcast).toContain('11 (60 feet)');
+    expect(spells.get('Legacy Bolt')?.damage?.dice).toBe('3d6');
+    expect(spells.get('Legacy Bolt')?.summary).toBe('Deal 1d6 damage.');
+    expect(spells.get('Legacy Bolt')?.upcast).toBe(
+      '**Cantrip Upgrade.** This spell’s damage increases by 1d6 when you reach 5th level (2d6), 11th level (3d6), and 17th level (4d6).',
+    );
+    expect(spells.get('Booming Blade')?.damage).toBeUndefined();
+    expect(spells.get('Booming Blade')?.summary).not.toContain('certain levels');
+    expect(spells.get('Booming Blade')?.upcast).toContain(
+      'Both damage rolls increase by 1d8 at 11th level',
+    );
+  });
+
+  it('keeps alternate cantrip damage tiers such as Toll the Dead', () => {
+    const tollTheDead = normalizeCharacter(raw).spells.find(
+      (spell) => spell.name === 'Toll the Dead',
+    );
+    expect(tollTheDead?.upcast).toBe(
+      '**Cantrip Upgrade.** The damage increases by one die when you reach levels 5 (2d8 or 2d12), 11 (3d8 or 3d12), and 17 (4d8 or 4d12).',
+    );
+    expect(tollTheDead?.summary).not.toContain('Cantrip Upgrade');
   });
 
   it('summarizes spellcasting: modifier, attack, save DC, and slots', () => {
@@ -2140,6 +2330,51 @@ describe('normalizeCharacter', () => {
     });
   });
 
+  it('keeps prose that explains how to use an extracted feature table', () => {
+    const character = {
+      id: 1,
+      name: 'Fey Wanderer',
+      classes: [
+        {
+          level: 3,
+          definition: {
+            name: 'Ranger',
+            classFeatures: [
+              {
+                id: 303,
+                name: 'Fey Wanderer Spells',
+                requiredLevel: 3,
+                description:
+                  '<p>You possess a preternatural blessing from a fey ally or a place of fey power. ' +
+                  'Choose your blessing from the Feywild Gifts table or determine it randomly.</p>' +
+                  '<p>You gain the spells listed in the Fey Wanderer Spells table.</p>' +
+                  '<h4>Feywild Gifts</h4>' +
+                  '<table><thead><tr><th>d6</th><th>Gift</th></tr></thead>' +
+                  '<tbody><tr><td>1</td><td>Illusory butterflies flutter around you.</td></tr>' +
+                  '<tr><td>2</td><td>Flowers bloom in your presence.</td></tr></tbody></table>' +
+                  '<h4>Fey Wanderer Spells</h4>' +
+                  '<table><thead><tr><th>Ranger Level</th><th>Spell</th></tr></thead>' +
+                  '<tbody><tr><td>3</td><td>Charm Person</td></tr></tbody></table>',
+              },
+            ],
+          },
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    const feature = normalized.features
+      .flatMap((group) => group.items)
+      .find((item) => item.name === 'Fey Wanderer Spells');
+
+    expect(normalized.ruleTables.map((table) => table.title)).toEqual(['Feywild Gifts']);
+    expect(feature?.related).toContain('tables');
+    expect(feature?.summary).toContain(
+      'Choose your blessing from the Feywild Gifts table or determine it randomly.',
+    );
+    expect(feature?.summary).not.toContain('Fey Wanderer Spells table');
+  });
+
   it('handles sparse stat blocks and caption or source-titled roll tables', () => {
     const character = {
       id: 1,
@@ -2629,8 +2864,8 @@ describe('normalizeCharacter', () => {
     );
     expect(racialTraits.find((item) => item.name === 'Keen Senses')).toMatchObject({
       summary: 'Perception',
-      related: ['skills'],
     });
+    expect(racialTraits.find((item) => item.name === 'Keen Senses')?.related).toBeUndefined();
   });
 
   it('summarizes ability-score features as just the bumps they grant', () => {
@@ -2782,6 +3017,7 @@ describe('normalizeCharacter', () => {
     expect(crafter?.parts?.find((part) => part.label === 'Tool Proficiency')?.text).toBe(
       "Calligrapher's Supplies, Cook's Utensils",
     );
+    expect(crafter?.related).toBeUndefined();
     const fastCrafting = crafter?.parts?.find((part) => part.label === 'Fast Crafting')?.text;
     expect(fastCrafting).toContain('When you finish a Long Rest, you can craft one piece of gear');
     expect(fastCrafting).toContain('The item lasts until your next Long Rest.');
@@ -3021,6 +3257,85 @@ describe('normalizeCharacter', () => {
     const unarmed = attacks.find((attack) => attack.name === 'Unarmed Strike');
     expect(unarmed?.toHit).toBe(4);
     expect(unarmed?.damage).toMatchObject({ dice: '', bonus: 3, type: 'Bludgeoning' });
+  });
+
+  it('marks selected weapon masteries and omits their redundant actions', () => {
+    const weapon = (id: number, name: string, mastery: string) => ({
+      id,
+      equipped: true,
+      definition: {
+        name,
+        filterType: 'Weapon',
+        damage: { diceString: '1d8' },
+        damageType: 'Bludgeoning',
+        attackType: 1,
+        range: 5,
+        properties: [
+          {
+            name: mastery,
+            description: `${mastery} mastery rules.`,
+          },
+        ],
+      },
+    });
+    const character = {
+      id: 1,
+      name: 'Weapon Master',
+      stats: [{ id: 1, name: null, value: 16 }],
+      classes: [
+        {
+          level: 1,
+          definition: {
+            name: 'Fighter',
+            classFeatures: [{ id: 100, name: 'Weapon Mastery', requiredLevel: 1 }],
+          },
+        },
+      ],
+      inventory: [weapon(1, 'Flail', 'Sap'), weapon(2, 'Longbow', 'Slow')],
+      modifiers: {
+        class: [
+          {
+            type: 'weapon-mastery',
+            subType: 'sap-flail',
+            friendlySubtypeName: 'Sap (Flail)',
+            componentId: 100,
+          },
+        ],
+      },
+      actions: {
+        class: [
+          {
+            name: 'Sap (Flail)',
+            componentId: 100,
+            componentTypeId: 12168134,
+            activation: { activationType: 1 },
+            description:
+              '<p>Your training lets you use the mastery property of Flails.</p>',
+          },
+          {
+            name: 'Second Wind',
+            componentId: 100,
+            componentTypeId: 12168134,
+            activation: { activationType: 2 },
+            description: '<p>Regain Hit Points.</p>',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(
+      normalized.attacks
+        .find((attack) => attack.name === 'Flail')
+        ?.properties?.find((property) => property.name === 'Sap')?.mastered,
+    ).toBe(true);
+    expect(
+      normalized.attacks
+        .find((attack) => attack.name === 'Longbow')
+        ?.properties?.find((property) => property.name === 'Slow')?.mastered,
+    ).toBe(false);
+    expect(normalized.actions.map((action) => action.name)).not.toContain('Sap (Flail)');
+    expect(normalized.actions.map((action) => action.name)).toContain('Second Wind');
   });
 
   it('applies magic weapon bonuses and specific weapon proficiency', () => {

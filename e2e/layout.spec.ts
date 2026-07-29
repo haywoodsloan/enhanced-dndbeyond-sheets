@@ -1,4 +1,4 @@
-import { expect, openSheet, test } from './fixtures';
+import { expect, noctRaw, openSheet, test } from './fixtures';
 import { cardBox, settle } from './helpers';
 
 test.describe('sheet layout controls', () => {
@@ -65,6 +65,34 @@ test.describe('sheet layout controls', () => {
     expect(Math.abs(after.x - before.x)).toBeLessThan(12);
   });
 
+  test('disables a fixed-card layout whose content would overflow', async ({
+    context,
+    extensionId,
+  }) => {
+    const character = structuredClone(noctRaw);
+    character.customProficiencies = [
+      { type: 2, name: "Cartographer's Tools" },
+      { type: 2, name: "Glassblower's Tools" },
+      { type: 2, name: "Navigator's Tools" },
+    ];
+    const page = await openSheet(context, extensionId, character);
+    const card = page.locator('.page [data-section-key="proficiencies"]');
+    const layout = page.locator(
+      '.page [data-section-key="proficiencies"] .card__layout',
+    );
+
+    await expect(layout).toBeDisabled();
+    await expect(layout).toHaveAttribute(
+      'aria-label',
+      'Layout Wide; no other layout fits without overflow',
+    );
+    expect(
+      await card.locator('.card__body').evaluate(
+        (body) => body.scrollHeight <= body.clientHeight + 1,
+      ),
+    ).toBe(true);
+  });
+
   test('changing the page format resizes the sheet', async ({ context, extensionId }) => {
     const page = await openSheet(context, extensionId);
     const pageWidth = () =>
@@ -127,6 +155,44 @@ test.describe('sheet layout controls', () => {
     expect(result.hpOnOneLine).toBe(true);
     expect(result.conditionsContained).toBe(true);
     expect(result.titleSingleLine).toBe(true);
+  });
+
+  test('keeps expertise rings inside the Skills card', async ({ context, extensionId }) => {
+    const page = await openSheet(context, extensionId);
+    const skills = page.locator('.page [data-section-key="skills"]');
+
+    const bounds = await skills.evaluate((card) => {
+      const body = card.querySelector<HTMLElement>('.card__body');
+      const marker = card.querySelector<HTMLElement>(
+        '.skills__column:first-child .skill__prof',
+      );
+      if (!body || !marker) return null;
+
+      marker.classList.add('skill__prof--expertise');
+      const bodyRect = body.getBoundingClientRect();
+      const markerRect = marker.getBoundingClientRect();
+      return {
+        clipLeft: bodyRect.left,
+        ringLeft: markerRect.left - 3.5,
+      };
+    });
+
+    expect(bounds).not.toBeNull();
+    expect(bounds!.ringLeft).toBeGreaterThanOrEqual(bounds!.clipLeft);
+  });
+
+  test('greys unavailable weapon masteries and omits their rules', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId);
+    const attacks = page.locator('.page [data-section-key="attacks"]');
+    const sap = attacks.locator('.attacks__note-item--unavailable', { hasText: 'Sap' });
+
+    await expect(sap).toBeVisible();
+    await expect(sap).toHaveCSS('color', 'rgb(181, 181, 189)');
+    await expect(attacks.locator('.attacks__legend dt', { hasText: /^Sap$/ })).toHaveCount(0);
+    await expect(attacks.locator('[data-mastery-note]')).toHaveCount(0);
   });
 
   test('switching to landscape swaps the sheet dimensions', async ({ context, extensionId }) => {

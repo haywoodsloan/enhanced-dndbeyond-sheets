@@ -257,6 +257,94 @@ describe('sheet App', () => {
     expect(inventoryToggle.disabled).toBe(false);
   });
 
+  it('disables a fixed-card layout option when its measured content overflows', async () => {
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const scrollWidth = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const clientHeight = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 100 : 0;
+      });
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.classList.contains('card__body')) return 0;
+        const probe = this.closest<HTMLElement>('[data-layout-probe="proficiencies"]');
+        return probe?.getAttribute('style')?.includes('span 1') ? 108 : 100;
+      });
+
+    try {
+      mockedLoad.mockResolvedValue(sampleCharacter);
+      const wrapper = mount(App, { props: { characterId: 166869100 } });
+      await flushPromises();
+      await nextTick();
+
+      const toggle = wrapper.get(
+        '.page [data-section-key="proficiencies"] .card__layout',
+      ).element as HTMLButtonElement;
+      expect(toggle.disabled).toBe(true);
+      expect(toggle.getAttribute('aria-label')).toContain(
+        'no other layout fits without overflow',
+      );
+    } finally {
+      clientWidth.mockRestore();
+      scrollWidth.mockRestore();
+      clientHeight.mockRestore();
+      scrollHeight.mockRestore();
+    }
+  });
+
+  it('does not automatically switch layouts based on fit-probe results', async () => {
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const scrollWidth = vi
+      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 200 : 0;
+      });
+    const clientHeight = vi
+      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('card__body') ? 100 : 0;
+      });
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        if (!this.classList.contains('card__body')) return 0;
+        const probe = this.closest<HTMLElement>('[data-layout-probe="proficiencies"]');
+        return probe?.getAttribute('style')?.includes('span 2') ? 108 : 100;
+      });
+
+    try {
+      mockedLoad.mockResolvedValue(sampleCharacter);
+      const wrapper = mount(App, { props: { characterId: 166869100 } });
+      await flushPromises();
+      await nextTick();
+
+      const card = wrapper.get('.page [data-section-key="proficiencies"]');
+      expect(card.attributes('style')).toContain('span 2');
+      expect(card.get('.card__layout').attributes('aria-label')).toBe(
+        'Change layout (currently Wide)',
+      );
+    } finally {
+      clientWidth.mockRestore();
+      scrollWidth.mockRestore();
+      clientHeight.mockRestore();
+      scrollHeight.mockRestore();
+    }
+  });
+
   it('shrinks a content-fit card to its measured content height', async () => {
     // Feed geometry so every card body reads just 40px tall (flush to the card
     // top): the content-fit cards (attacks/actions/spells/features) then report a

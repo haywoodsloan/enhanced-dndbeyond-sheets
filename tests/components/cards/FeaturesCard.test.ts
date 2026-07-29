@@ -175,7 +175,11 @@ describe('FeaturesCard', () => {
               { name: 'Weapon Training', reference: 'attacks' },
               { name: 'Mystic Arcanum', reference: 'spells' },
               { name: 'Steel Defender', related: ['companions'] },
-              { name: 'Experimental Elixir', related: ['tables'] },
+              {
+                name: 'Experimental Elixir',
+                summary: 'Roll to determine the elixir effect.',
+                related: ['tables'],
+              },
               { name: 'Vital Training', reference: 'basics' },
             ],
           },
@@ -188,6 +192,9 @@ describe('FeaturesCard', () => {
     expect(items[1].text()).toContain('(see Spells)');
     expect(items[2].text()).toContain('(see Wild Shapes)');
     expect(items[3].text()).toContain('(see Tables)');
+    expect(items[3].text().indexOf('Roll to determine the elixir effect.')).toBeLessThan(
+      items[3].text().indexOf('(see Tables)'),
+    );
     expect(items[4].text()).toContain('(see Basics)');
   });
 
