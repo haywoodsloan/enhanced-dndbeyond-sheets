@@ -294,6 +294,8 @@ describe('SpellsCard', () => {
           {
             name: 'Augury',
             level: 1,
+            castingTime: '1m',
+            range: 'Self',
             featureUses: [
               {
                 source: 'Gathered Whispers',
@@ -318,6 +320,11 @@ describe('SpellsCard', () => {
     expect(uses[1].text()).toContain('Second Sight:');
     expect(uses[1].findAll('.resource__box')).toHaveLength(2);
     expect(uses[1].text()).toContain('short rest');
+    const meta = spells[0].get('.spells__meta');
+    expect(meta.text()).toContain('1m · Self');
+    expect(meta.element.compareDocumentPosition(uses[0].element)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     // A spell without a feature grant shows no tracker.
     expect(spells[1].find('[data-spell-use]').exists()).toBe(false);
   });

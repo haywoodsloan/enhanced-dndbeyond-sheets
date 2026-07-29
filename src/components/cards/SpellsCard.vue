@@ -143,6 +143,9 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
                 :title="tag.title"
                 >{{ tag.label }}</span
               >
+              <span v-if="spellMeta(spell)" class="spells__meta">
+                <InlineScalingText :text="spellMeta(spell)" />
+              </span>
               <span
                 v-for="(use, useIndex) in spell.featureUses"
                 :key="`${use.source}-${useIndex}`"
@@ -151,9 +154,6 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
               >
                 <span class="spells__feature-source">{{ use.source }}:</span>
                 <ResourceBoxes :resource="use.pool" />
-              </span>
-              <span v-if="spellMeta(spell)" class="spells__meta">
-                <InlineScalingText :text="spellMeta(spell)" />
               </span>
             </span>
             <span v-if="spell.related?.includes('companions')" class="spells__reference">

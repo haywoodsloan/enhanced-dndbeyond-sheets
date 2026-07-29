@@ -291,6 +291,9 @@ export interface RawFeatCategory {
 }
 
 export interface RawFeat {
+  /** Feature, trait, or background that granted this feat. */
+  componentId?: number | null;
+  componentTypeId?: number | null;
   definition?: {
     id?: number;
     name?: string;

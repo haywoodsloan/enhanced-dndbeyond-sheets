@@ -1537,6 +1537,33 @@ function grantedFeatureIds(raw: RawCharacter): Set<number> {
   return ids;
 }
 
+/** Display name of each active feature/trait/feat/selected option by id. */
+function grantedFeatureNamesById(raw: RawCharacter): Map<number, string> {
+  const names = new Map<number, string>();
+  const add = (definition: { id?: number; name?: string | null } | null | undefined) => {
+    if (definition?.id != null && definition.name) names.set(definition.id, definition.name);
+  };
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.definition?.classFeatures)) add(feature);
+    for (const feature of asArray(cls.classFeatures)) add(feature.definition);
+  }
+  for (const trait of asArray(raw.race?.racialTraits)) add(trait.definition);
+  for (const feat of asArray(raw.feats)) add(feat.definition);
+  if (raw.options) {
+    const groups = [
+      raw.options.race,
+      raw.options.class,
+      raw.options.feat,
+      raw.options.background,
+      raw.options.item,
+    ];
+    for (const group of groups) {
+      for (const option of asArray(group)) add(option.definition);
+    }
+  }
+  return names;
+}
+
 /** Owning class level for class features and any selected options nested under
  * them. This keeps `{{classlevel}}` correct on multiclass characters. */
 function classLevelsByComponent(raw: RawCharacter): Map<number, number> {
@@ -1693,7 +1720,7 @@ function hasEffectList(description: string | null | undefined): boolean {
  * ("An event in your past left an indelible mark on you…").
  */
 function dropLeadInFlavor(text: string): string {
-  const trigger = /\bAs an? (?:Bonus Action|Reaction|Free Action|Magic Action|Action)\b/i.exec(text);
+  const trigger = /\bAs an? (?:Bonus Action|Reaction|Free Action|Magic Action|Action)\b/.exec(text);
   return trigger && trigger.index > 0 ? text.slice(trigger.index) : text;
 }
 
@@ -1709,7 +1736,7 @@ function dropUsesSentence(text: string): string {
     previous = result;
     result = result
       .replace(
-        /\s*(?:You can use (?:this|it)\b[^.!?]*|Once used,[^.!?]*|You regain\b[^.!?]*)\b(?:Short Rest|Long Rest|Short or Long Rest)\.?\s*$/i,
+        /\s*(?:You can use (?:this|it)\b[^.!?]*|Once used,[^.!?]*|Once you use\b[^.!?]*|You regain\b[^.!?]*)\b(?:Short Rest|Long Rest|Short or Long Rest)\.?\s*$/i,
         '',
       )
       .trim();
@@ -1794,6 +1821,7 @@ function resolveActions(
   const classLevelByComponent = classLevelsByComponent(raw);
   const castingAbilityByComponent = castingAbilitiesByComponent(raw);
   const castingClassByComponent = castingClassNamesByComponent(raw);
+  const featureNameById = grantedFeatureNamesById(raw);
 
   const actions: CharacterAction[] = [];
   const resourceComponentIds = new Set<number>();
@@ -1883,10 +1911,26 @@ function resolveActions(
             scaleValue: action.dice?.diceString ?? action.value ?? undefined,
           });
         const detail = actionDetail(action.snippet, action.description, actionResolver);
-        const structuredBenefits = structuredFeatureBenefits(action.snippet, actionResolver);
-        const summary =
-          structuredBenefits?.summary ??
-          (resource ? dropUsesSentence(dropAlternateRecoverySentences(detail)) : detail);
+        const structuredBenefits =
+          structuredFeatureBenefits(action.description, actionResolver, true) ??
+          structuredFeatureBenefits(action.snippet, actionResolver, true) ??
+          structuredNamedActionBenefits(
+            action.name,
+            action.componentId == null ? action.name : featureNameById.get(action.componentId),
+            action.description,
+            actionResolver,
+          );
+        if (structuredBenefits?.summary) {
+          structuredBenefits.summary = summarize(
+            dropLeadInFlavor(structuredBenefits.summary),
+            400,
+          );
+        }
+        const summary = structuredBenefits
+          ? (structuredBenefits.summary ?? '')
+          : resource
+            ? dropUsesSentence(dropAlternateRecoverySentences(detail))
+            : detail;
         const conciseSummary = withoutRedundantActionDamage(summary, damage);
         if (conciseSummary) entry.summary = conciseSummary;
         const benefitList = structuredBenefits?.parts?.[0]?.list;
@@ -2204,11 +2248,23 @@ function selectedOptionParents(raw: RawCharacter): Map<number, number> {
   return parents;
 }
 
-/** Spell names attributed to their granting component and every selected-option
+interface FeatureGrantedSpell {
+  name: string;
+  level: number;
+}
+
+function featurePartSpellLevel(label: string): number | undefined {
+  if (/\bcantrips?\b/i.test(label)) return 0;
+  const level = /\blevel\s+(\d+)\s+spells?\b/i.exec(label)?.[1]
+    ?? /\b(\d+)(?:st|nd|rd|th)[ -]level\s+spells?\b/i.exec(label)?.[1];
+  return level == null ? undefined : Number(level);
+}
+
+/** Spells attributed to their granting component and every selected-option
  * ancestor. This lets a displayed feature list its active spells even when the
  * spell points at a nested choice rather than the feature itself. */
-function featureSpellNamesByComponent(raw: RawCharacter): Map<number, string[]> {
-  const namesByComponent = new Map<number, Set<string>>();
+function featureSpellsByComponent(raw: RawCharacter): Map<number, FeatureGrantedSpell[]> {
+  const spellsByComponent = new Map<number, Map<string, FeatureGrantedSpell>>();
   const optionParents = selectedOptionParents(raw);
   const add = (spell: RawSpell) => {
     const name = spell.definition?.name;
@@ -2217,9 +2273,9 @@ function featureSpellNamesByComponent(raw: RawCharacter): Map<number, string[]> 
     const visited = new Set<number>();
     while (!visited.has(componentId)) {
       visited.add(componentId);
-      const names = namesByComponent.get(componentId);
-      if (names) names.add(name);
-      else namesByComponent.set(componentId, new Set([name]));
+      const spells = spellsByComponent.get(componentId) ?? new Map();
+      spells.set(name, { name, level: spell.definition?.level ?? 0 });
+      spellsByComponent.set(componentId, spells);
       const parent = optionParents.get(componentId);
       if (parent == null) break;
       componentId = parent;
@@ -2230,7 +2286,10 @@ function featureSpellNamesByComponent(raw: RawCharacter): Map<number, string[]> 
     for (const group of Object.values(raw.spells)) asArray<RawSpell>(group).forEach(add);
   }
   return new Map(
-    [...namesByComponent].map(([componentId, names]) => [componentId, [...names]]),
+    [...spellsByComponent].map(([componentId, spells]) => [
+      componentId,
+      [...spells.values()],
+    ]),
   );
 }
 
@@ -2695,6 +2754,46 @@ function featureProficiencies(
         grants: [...grouped].map(([label, items]) => ({ label, items })),
       }
     : undefined;
+}
+
+/** Concrete feat selected through a feat-granting feature such as Versatile. */
+function featureGrantedFeatNames(
+  raw: RawCharacter,
+  componentId: number | undefined,
+): string[] {
+  if (componentId == null) return [];
+  const choiceGroups = [
+    raw.choices?.race,
+    raw.choices?.class,
+    raw.choices?.background,
+    raw.choices?.feat,
+  ];
+  const selectedIds = new Set(
+    choiceGroups
+      .flatMap((choices) => asArray(choices))
+      .filter((choice) => choice.componentId === componentId && choice.optionValue != null)
+      .map((choice) => choice.optionValue!),
+  );
+  const names: string[] = [];
+  for (const feat of asArray(raw.feats)) {
+    const definition = feat.definition;
+    if (
+      !definition?.name ||
+      isDisguiseFeat(feat) ||
+      (feat.componentId !== componentId &&
+        (definition.id == null || !selectedIds.has(definition.id)))
+    ) {
+      continue;
+    }
+    pushUnique(names, definition.name);
+  }
+  return names;
+}
+
+function isGenericFeatChoice(text: string | null | undefined): boolean {
+  return /\byou gain\b[^.!?]*\bfeat\b[^.!?]*\b(?:of your choice|you choose)\b/i.test(
+    plainText(text ?? ''),
+  );
 }
 
 function firstFeatureSentence(
@@ -3680,16 +3779,66 @@ interface FeatureContent {
 function structuredFeatureBenefits(
   text: string | null | undefined,
   resolvePlaceholders: (text: string) => string,
+  allowExplicitActionChoices = false,
 ): FeatureContent | undefined {
-  if (!text || !/following benefits/i.test(text) || !text.includes('•')) return undefined;
-  const chunks = plainText(resolvePlaceholders(text))
-    .split(/\s*•\s*/)
-    .map((chunk) => chunk.trim())
-    .filter(Boolean);
-  if (chunks.length < 3) return undefined;
-  const [summary, ...benefits] = chunks;
+  if (!text) return undefined;
+  const resolved = resolvePlaceholders(text);
+  if (!allowExplicitActionChoices && !/following benefits/i.test(resolved)) {
+    return undefined;
+  }
+  const htmlList = /<(ul|ol)\b[^>]*>([\s\S]*?)<\/\1>/i.exec(resolved);
+  if (htmlList) {
+    const benefits = [...htmlList[2].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+      .map((match) => plainText(match[1]))
+      .filter(Boolean);
+    const summary = plainText(resolved.slice(0, htmlList.index));
+    const trailing = plainText(resolved.slice(htmlList.index + htmlList[0].length));
+    const hasMeaningfulTrailingText = Boolean(dropUsesSentence(trailing));
+    if (
+      benefits.length >= 2 &&
+      !hasMeaningfulTrailingText &&
+      (summary || allowExplicitActionChoices)
+    ) {
+      return {
+        ...(summary ? { summary } : {}),
+        parts: [
+          {
+            label: '',
+            text: '',
+            list: { items: benefits.map((benefit) => ({ text: benefit })) },
+          },
+        ],
+      };
+    }
+  }
+  let summary = '';
+  let benefits: string[] = [];
+  if (resolved.includes('•')) {
+    const plain = plainText(resolved);
+    const chunks = plain
+      .split(/\s*•\s*/)
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+    if (/^•/.test(plain.trim())) benefits = chunks;
+    else if (chunks.length >= 3) [summary, ...benefits] = chunks;
+  } else {
+    const lines = resolved
+      .split(/\r?\n/)
+      .map((line) => plainText(line))
+      .filter(Boolean);
+    const firstNumbered = lines.findIndex((line) => /^\d+[.)]\s+/.test(line));
+    if (
+      firstNumbered >= 0 &&
+      lines.length - firstNumbered >= 2 &&
+      lines.slice(firstNumbered).every((line) => /^\d+[.)]\s+/.test(line))
+    ) {
+      summary = lines.slice(0, firstNumbered).join(' ');
+      benefits = lines.slice(firstNumbered).map((line) => line.replace(/^\d+[.)]\s+/, ''));
+    }
+  }
+  if ((!summary && !allowExplicitActionChoices) || benefits.length < 2) return undefined;
   return {
-    summary,
+    ...(summary ? { summary } : {}),
     parts: [
       {
         label: '',
@@ -3700,6 +3849,42 @@ function structuredFeatureBenefits(
   };
 }
 
+function structuredNamedActionBenefits(
+  actionName: string,
+  featureName: string | undefined,
+  description: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): FeatureContent | undefined {
+  if (!featureName || !description) return undefined;
+  const action = actionName.trim().toLowerCase();
+  const owner = featureName.trim().toLowerCase();
+  // A selected option action (for example, "Sneak Attack: Trip" owned by
+  // Cunning Strike) should keep only its curated snippet. A whole-feature action
+  // either shares the owner's name or carries it after a category prefix.
+  if (action !== owner && !action.endsWith(`: ${owner}`)) return undefined;
+
+  const { intro, parts } = parseFeatureParts(
+    stripFeatMetadata(description),
+    resolvePlaceholders,
+  );
+  if (parts.filter((part) => part.label).length < 2) return undefined;
+
+  const items: StructuredList['items'] = [];
+  for (const part of parts) {
+    const text = dropUsesSentence(part.text);
+    if (part.label) {
+      items.push({ label: part.label, text });
+    } else if (text && items.length) {
+      items[items.length - 1].text = `${items[items.length - 1].text} ${text}`.trim();
+    }
+  }
+  if (!intro || items.length < 2) return undefined;
+  return {
+    summary: intro,
+    parts: [{ label: '', text: '', list: { items } }],
+  };
+}
+
 /** Features and traits grouped by source, each with its resource + sub-parts. */
 function resolveFeatures(
   raw: RawCharacter,
@@ -3707,7 +3892,7 @@ function resolveFeatures(
   actionReferencesByComponent: Map<number, ActionReference[]>,
   companionFeatureIds: Set<number>,
   tableTitlesByFeatureId: Map<number, string[]>,
-  spellNamesByComponent: Map<number, string[]>,
+  spellsByComponent: Map<number, FeatureGrantedSpell[]>,
   resolvePlaceholders: PlaceholderResolver,
 ): FeatureGroup[] {
   const optionByComponent = selectedOptionsByComponent(raw, resolvePlaceholders);
@@ -3843,8 +4028,21 @@ function resolveFeatures(
     const item: FeatureItem = { name };
     const resource = id != null ? resources.get(id) : undefined;
     if (resource) item.resource = resource;
-    const grantedSpells = id != null ? spellNamesByComponent.get(id) : undefined;
-    if (grantedSpells?.length) item.grantedSpells = grantedSpells;
+    const grantedSpellEntries = id != null ? spellsByComponent.get(id) : undefined;
+    const grantedSpells = grantedSpellEntries?.map((spell) => spell.name);
+    const assignedSpells = new Set<string>();
+    const partsWithSpells = content.parts?.map((part) => {
+      const level = featurePartSpellLevel(part.label);
+      if (level == null) return part;
+      const spells = grantedSpellEntries
+        ?.filter((spell) => spell.level === level && !assignedSpells.has(spell.name))
+        .map((spell) => spell.name);
+      if (!spells?.length) return part;
+      spells.forEach((spell) => assignedSpells.add(spell));
+      return { ...part, grantedSpells: spells };
+    });
+    const unassignedSpells = grantedSpells?.filter((spell) => !assignedSpells.has(spell));
+    if (unassignedSpells?.length) item.grantedSpells = unassignedSpells;
     if (content.grants?.length) item.grants = content.grants;
     // Drop table references (the printed sheet has no rules tables) and the
     // "Repeatable — you can take this feat more than once" boilerplate.
@@ -3861,13 +4059,20 @@ function resolveFeatures(
     if (summary) item.summary = summary;
     if (content.reference) item.reference = content.reference;
     if (content.related?.length) item.related = content.related;
-    if (content.parts?.length) {
-      const parts = content.parts
+    if (partsWithSpells?.length) {
+      const parts = partsWithSpells
         .map((part) => ({
           ...part,
           text: stripTableSentences(part.text, content.tableTitles),
         }))
-        .filter((part) => part.label || part.text || part.reference || part.list?.items.length)
+        .filter(
+          (part) =>
+            part.label ||
+            part.text ||
+            part.reference ||
+            part.list?.items.length ||
+            part.grantedSpells?.length,
+        )
         .filter(
           (part) =>
             !/^\s*repeatable\b/i.test(part.label ?? '') &&
@@ -3946,6 +4151,15 @@ function resolveFeatures(
         const summary = firstFeatureSentence(description || snippet, featureResolver);
         content = summary ? { summary } : {};
       }
+    }
+
+    const grantedFeatNames = featureGrantedFeatNames(raw, id);
+    if (
+      grantedFeatNames.length &&
+      isGenericFeatChoice(description || snippet) &&
+      !content.parts?.length
+    ) {
+      content = { ...content, summary: grantedFeatNames.join(', ') };
     }
 
     // A feat that grants proficiencies (Skilled and the like) shows the actual
@@ -4430,7 +4644,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     resolvePlaceholders,
   );
   const resources = resolveResourceMap(raw, level);
-  const spellNamesByComponent = featureSpellNamesByComponent(raw);
+  const spellsByComponent = featureSpellsByComponent(raw);
   const spells = resolveSpells(raw, level, resolvePlaceholders);
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
@@ -4441,7 +4655,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     actionReferencesByComponent,
     companionFeatureIds,
     tableTitlesByFeatureId,
-    spellNamesByComponent,
+    spellsByComponent,
     resolvePlaceholders,
   );
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);

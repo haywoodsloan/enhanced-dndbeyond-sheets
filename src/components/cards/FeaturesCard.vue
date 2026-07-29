@@ -21,6 +21,11 @@ function needsFullWidth(item: FeatureItem): boolean {
     parts.some((part) => Boolean(part.label || part.text || part.reference))
   );
 }
+
+function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string {
+  if (/cantrips?/i.test(part.label)) return 'Cantrips';
+  return part.grantedSpells?.length === 1 ? 'Spell' : 'Spells';
+}
 </script>
 
 <template>
@@ -83,6 +88,14 @@ function needsFullWidth(item: FeatureItem): boolean {
               </span>
               <span v-if="part.text">{{ part.text }}</span>
             </p>
+            <span
+              v-if="part.grantedSpells?.length"
+              class="features__part-spells"
+              data-feature-part-spells
+            >
+              <strong>{{ partSpellLabel(part) }}:</strong>
+              {{ part.grantedSpells.join(', ') }}
+            </span>
             <div v-if="part.list?.items.length" class="features__part-list" data-feature-list>
               <StructuredList :list="part.list" />
             </div>
@@ -216,6 +229,15 @@ function needsFullWidth(item: FeatureItem): boolean {
 
 .features__part-line {
   margin: 0;
+}
+
+.features__part-spells {
+  display: block;
+  margin-top: 2px;
+}
+
+.features__part-spells strong {
+  color: #1c1c1e;
 }
 
 .features__part-name {

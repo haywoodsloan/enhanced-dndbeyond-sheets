@@ -222,6 +222,45 @@ describe('FeaturesCard', () => {
     expect(wrapper.find('[data-resource]').exists()).toBe(false);
   });
 
+  it('renders level-grouped spell grants under their matching feature parts', () => {
+    const wrapper = mount(FeaturesCard, {
+      props: {
+        features: [
+          {
+            label: 'Feats',
+            items: [
+              {
+                name: 'Magic Initiate (Cleric)',
+                summary: 'You gain the following benefits.',
+                parts: [
+                  {
+                    label: 'Two Cantrips',
+                    text: 'You learn two Cleric cantrips.',
+                    grantedSpells: ['Spare the Dying', 'Word of Radiance'],
+                  },
+                  {
+                    label: 'Level 1 Spell',
+                    text: 'Choose a level 1 Cleric spell.',
+                    grantedSpells: ['Bless'],
+                  },
+                  { label: 'Spell Change', text: 'You can replace a chosen spell.' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(wrapper.find('[data-feature-spells]').exists()).toBe(false);
+    const parts = wrapper.findAll('[data-feature-part]');
+    expect(parts[0].get('[data-feature-part-spells]').text()).toBe(
+      'Cantrips: Spare the Dying, Word of Radiance',
+    );
+    expect(parts[1].get('[data-feature-part-spells]').text()).toBe('Spell: Bless');
+    expect(parts[2].find('[data-feature-part-spells]').exists()).toBe(false);
+  });
+
   it('renders labeled language and spell grants together', () => {
     const wrapper = mount(FeaturesCard, {
       props: {

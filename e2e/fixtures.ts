@@ -7,10 +7,21 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** The built, unpacked Chrome (MV3) extension the tests load. */
 const extensionPath = resolve(rootDir, '.output/chrome-mv3');
 
+interface FixtureCharacter {
+  id: number;
+  customProficiencies?: { type: number; name: string }[];
+  [key: string]: unknown;
+}
+
 /** A real D&D Beyond character payload — the same "Noct" fixture the unit tests use. */
 export const noctRaw = JSON.parse(
   readFileSync(resolve(rootDir, 'tests/fixtures/noct.json'), 'utf-8'),
-) as { id: number; customProficiencies?: { type: number; name: string }[] };
+) as FixtureCharacter;
+
+/** Sorcerer fixture with feature-granted spell casts such as Darkness. */
+export const hestRaw = JSON.parse(
+  readFileSync(resolve(rootDir, 'tests/fixtures/hest.json'), 'utf-8'),
+) as FixtureCharacter;
 
 /**
  * Playwright fixtures that load the built extension into a persistent Chromium
@@ -53,7 +64,7 @@ export const expect = test.expect;
 export async function openSheet(
   context: BrowserContext,
   extensionId: string,
-  rawCharacter: typeof noctRaw = noctRaw,
+  rawCharacter: FixtureCharacter = noctRaw,
 ): Promise<Page> {
   const page = await context.newPage();
   await page.route('**/character-service.dndbeyond.com/**', (route) =>

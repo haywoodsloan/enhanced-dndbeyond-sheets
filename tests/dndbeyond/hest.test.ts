@@ -232,16 +232,21 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(feature?.summary).toBeUndefined();
     expect(feature?.parts).toBeUndefined();
 
-    // The Bonus Action carries the full effect — the benefits the snippet dropped —
-    // trimmed of its lead-in flavor and the recharge line (shown as use checkboxes).
+    // The Bonus Action carries the full effect — the HTML benefits the snippet
+    // dropped — trimmed of its lead-in flavor and rendered as a semantic list.
     const action = character.actions.find(
       (entry) => entry.name === 'Innate Sorcery' && entry.category === 'bonus',
     );
     expect(action?.summary).toBe(
       'As a Bonus Action, you can unleash that magic for 1 minute, during which you gain ' +
-        'the following benefits: The spell save DC of your Sorcerer spells increases by 1. ' +
-        'You have Advantage on the attack rolls of Sorcerer spells you cast.',
+        'the following benefits:',
     );
+    expect(action?.list).toEqual({
+      items: [
+        { text: 'The spell save DC of your Sorcerer spells increases by 1.' },
+        { text: 'You have Advantage on the attack rolls of Sorcerer spells you cast.' },
+      ],
+    });
     expect(action?.summary).not.toMatch(/an event in your past|regain all expended uses/i);
 
     // A passive "other" option that merely shares a name with an action is NOT

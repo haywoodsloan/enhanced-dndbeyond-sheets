@@ -1,4 +1,4 @@
-import { expect, noctRaw, openSheet, test } from './fixtures';
+import { expect, hestRaw, noctRaw, openSheet, test } from './fixtures';
 import { cardBox, settle } from './helpers';
 
 test.describe('sheet layout controls', () => {
@@ -193,6 +193,90 @@ test.describe('sheet layout controls', () => {
     await expect(sap).toHaveCSS('color', 'rgb(181, 181, 189)');
     await expect(attacks.locator('.attacks__legend dt', { hasText: /^Sap$/ })).toHaveCount(0);
     await expect(attacks.locator('[data-mastery-note]')).toHaveCount(0);
+  });
+
+  test('places feature-granted spell casts after the spell shorthand', async ({
+    context,
+    extensionId,
+  }) => {
+    const page = await openSheet(context, extensionId, hestRaw);
+    const darkness = page
+      .locator('[data-spell]')
+      .filter({ has: page.locator('.spells__name', { hasText: /^Darkness$/ }) })
+      .first();
+    const use = darkness.locator('[data-spell-use]');
+
+    await expect(use).toContainText('Fiendish Legacy Spells:');
+    await expect(use).toContainText('Long rest');
+    await expect(use.locator('.resource__box')).toHaveCount(1);
+    const placement = await darkness.evaluate((spell) => {
+      const meta = spell.querySelector<HTMLElement>('.spells__meta');
+      const tracker = spell.querySelector<HTMLElement>('[data-spell-use]');
+      if (!meta || !tracker) return null;
+      const metaRect = meta.getBoundingClientRect();
+      const trackerRect = tracker.getBoundingClientRect();
+      const sameLine = Math.abs(metaRect.top - trackerRect.top) < 3;
+      return {
+        follows: Boolean(
+          meta.compareDocumentPosition(tracker) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+        positionedAfter: sameLine
+          ? trackerRect.left >= metaRect.right - 1
+          : trackerRect.top >= metaRect.bottom - 1,
+      };
+    });
+    expect(placement).toEqual({ follows: true, positionedAfter: true });
+  });
+
+  test('groups Magic Initiate spells beneath their matching feature parts', async ({
+    context,
+    extensionId,
+  }) => {
+    const character = {
+      id: 9001,
+      name: 'Magic Initiate',
+      stats: [],
+      classes: [],
+      feats: [
+        {
+          definition: {
+            id: 800,
+            name: 'Magic Initiate (Cleric)',
+            description:
+              '<p><em>Origin Feat</em></p>' +
+              '<p>You gain the following benefits.</p>' +
+              '<p><em><strong>Two Cantrips.</strong></em> Learn two Cleric cantrips.</p>' +
+              '<p><em><strong>Level 1 Spell.</strong></em> Choose a level 1 Cleric spell.</p>' +
+              '<p><em><strong>Spell Change.</strong></em> You can replace a chosen spell.</p>',
+          },
+        },
+      ],
+      spells: {
+        feat: [
+          { definition: { name: 'Spare the Dying', level: 0 }, componentId: 800 },
+          { definition: { name: 'Word of Radiance', level: 0 }, componentId: 800 },
+          { definition: { name: 'Bless', level: 1 }, componentId: 800 },
+        ],
+      },
+    };
+    const page = await openSheet(context, extensionId, character);
+    const feature = page
+      .locator('[data-feature]')
+      .filter({
+        has: page.locator('.features__name', { hasText: /^Magic Initiate \(Cleric\)$/ }),
+      });
+    const cantrips = feature
+      .locator('[data-feature-part]')
+      .filter({ has: page.locator('.features__part-name', { hasText: /^Two Cantrips$/ }) });
+    const leveled = feature
+      .locator('[data-feature-part]')
+      .filter({ has: page.locator('.features__part-name', { hasText: /^Level 1 Spell$/ }) });
+
+    await expect(feature.locator('[data-feature-spells]')).toHaveCount(0);
+    await expect(cantrips.locator('[data-feature-part-spells]')).toHaveText(
+      'Cantrips: Spare the Dying, Word of Radiance',
+    );
+    await expect(leveled.locator('[data-feature-part-spells]')).toHaveText('Spell: Bless');
   });
 
   test('switching to landscape swaps the sheet dimensions', async ({ context, extensionId }) => {

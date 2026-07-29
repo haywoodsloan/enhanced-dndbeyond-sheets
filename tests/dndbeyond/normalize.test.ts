@@ -933,8 +933,9 @@ describe('normalizeCharacter', () => {
     const divineSpark = actions.find(
       (action) => action.name === 'Channel Divinity: Divine Spark',
     );
-    expect(divineSpark?.summary).toContain('DC 14');
-    expect(divineSpark?.summary).not.toMatch(/DC\s+Con/);
+    expect(divineSpark?.summary).toContain('You either:');
+    expect(JSON.stringify(divineSpark?.list)).toContain('DC 14');
+    expect(JSON.stringify(divineSpark?.list)).not.toMatch(/DC\s+Con/);
     // {{13+proficiency}} -> 13 + 2 = 15, so no empty "(DC )".
     const voices = actions.find(
       (action) => action.name === 'Gathered Whispers: Voices from Beyond',
@@ -944,6 +945,182 @@ describe('normalizeCharacter', () => {
     for (const action of actions) {
       expect(action.summary ?? '').not.toContain('{{');
     }
+  });
+
+  it('renders literal bullet and numbered action alternatives as lists', () => {
+    const character = {
+      id: 1,
+      name: 'Action Choices',
+      classes: [],
+      actions: {
+        class: [
+          {
+            name: 'Either Way',
+            snippet: 'Choose an effect:\n• Move up to 10 feet.\n• Gain 5 Temporary HP.',
+          },
+          {
+            name: 'Three Paths',
+            snippet: 'Choose a path:\n1. Advance toward the target.\n2. Hold your position.\n3. Withdraw safely.',
+          },
+          {
+            name: 'Wild Shape',
+            snippet:
+              'You shape-shift into a Beast form. You can leave the form early as a Bonus Action.\n' +
+              'Rules While Shape-Shifted:\n• You retain your personality.\n• You can’t cast spells.',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const actions = new Map(
+      normalizeCharacter(character).actions.map((action) => [action.name, action]),
+    );
+    expect(actions.get('Either Way')).toMatchObject({
+      summary: 'Choose an effect:',
+      list: {
+        items: [
+          { text: 'Move up to 10 feet.' },
+          { text: 'Gain 5 Temporary HP.' },
+        ],
+      },
+    });
+    expect(actions.get('Three Paths')).toMatchObject({
+      summary: 'Choose a path:',
+      list: {
+        items: [
+          { text: 'Advance toward the target.' },
+          { text: 'Hold your position.' },
+          { text: 'Withdraw safely.' },
+        ],
+      },
+    });
+    expect(actions.get('Wild Shape')?.summary).toMatch(/^You shape-shift into a Beast form/);
+    expect(actions.get('Wild Shape')?.list?.items).toEqual([
+      { text: 'You retain your personality.' },
+      { text: 'You can’t cast spells.' },
+    ]);
+  });
+
+  it('lists whole-feature named benefits but isolates selected option actions', () => {
+    const character = {
+      id: 1,
+      name: 'Named Action Benefits',
+      classes: [
+        {
+          level: 4,
+          definition: {
+            name: 'Test Class',
+            classFeatures: [
+              { id: 100, name: 'Guarded Mind', requiredLevel: 1 },
+              { id: 200, name: 'Cunning Strike', requiredLevel: 1 },
+              { id: 300, name: 'Assassinate', requiredLevel: 1 },
+            ],
+          },
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Guarded Mind',
+            componentId: 100,
+            componentTypeId: 12168134,
+            snippet: 'Once per Short Rest, turn a failed mental save into a success.',
+            description:
+              '<p><em>General Feat (Prerequisite: Level 4+)</em></p>' +
+              '<p>You gain the following benefits.</p>' +
+              '<p><em><strong>Ability Score Increase.</strong></em> Increase Strength or Dexterity by 1.</p>' +
+              '<p><em><strong>Concentration Breaker.</strong></em> Creatures you damage have Disadvantage on Concentration saves.</p>' +
+              '<p><em><strong>Guarded Mind.</strong></em> Turn a failed mental save into a success. Once you use this benefit, you can’t use it again until you finish a Short Rest.</p>',
+            limitedUse: { maxUses: 1, resetType: 1 },
+          },
+          {
+            name: 'Sneak Attack: Trip (Cost: 1d6)',
+            componentId: 200,
+            componentTypeId: 12168134,
+            snippet: 'The target must save or fall Prone.',
+            description:
+              '<p>Choose one of the following Cunning Strike effects.</p>' +
+              '<p><strong><em>Poison (Cost: 1d6).</em></strong> Poison the target.</p>' +
+              '<p><strong><em>Trip (Cost: 1d6).</em></strong> Knock the target Prone.</p>' +
+              '<p><strong><em>Withdraw (Cost: 1d6).</em></strong> Move without provoking.</p>',
+          },
+          {
+            name: 'Sneak Attack: Assassinate',
+            componentId: 300,
+            componentTypeId: 12168134,
+            snippet: 'Gain an edge during the first combat round.',
+            description:
+              '<p>You’re adept at ambushing a target, granting you the following benefits.</p>' +
+              '<p><strong><em>Initiative.</em></strong> You have Advantage on Initiative rolls.</p>' +
+              '<p><strong><em>Surprising Strikes.</em></strong> You have Advantage against creatures that haven’t acted.</p>',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const actions = new Map(
+      normalizeCharacter(character).actions.map((action) => [action.name, action]),
+    );
+    expect(actions.get('Guarded Mind')).toMatchObject({
+      summary: 'You gain the following benefits.',
+      list: {
+        items: [
+          { label: 'Ability Score Increase', text: 'Increase Strength or Dexterity by 1.' },
+          {
+            label: 'Concentration Breaker',
+            text: 'Creatures you damage have Disadvantage on Concentration saves.',
+          },
+          { label: 'Guarded Mind', text: 'Turn a failed mental save into a success.' },
+        ],
+      },
+    });
+    expect(actions.get('Sneak Attack: Trip (Cost: 1d6)')).toMatchObject({
+      summary: 'The target must save or fall Prone.',
+    });
+    expect(actions.get('Sneak Attack: Trip (Cost: 1d6)')?.list).toBeUndefined();
+    expect(actions.get('Sneak Attack: Assassinate')?.list).toEqual({
+      items: [
+        { label: 'Initiative', text: 'You have Advantage on Initiative rolls.' },
+        {
+          label: 'Surprising Strikes',
+          text: 'You have Advantage against creatures that haven’t acted.',
+        },
+      ],
+    });
+  });
+
+  it('supports list-only actions without dropping meaningful post-list riders', () => {
+    const character = {
+      id: 1,
+      name: 'List Boundaries',
+      classes: [],
+      customActions: [
+        {
+          name: 'Pure Options',
+          snippet: '• Take cover.\n• Move carefully.',
+        },
+        {
+          name: 'Options with Rider',
+          snippet: 'Choose either option, then you glow until your next turn.',
+          description:
+            '<p>Choose an option:</p><ul><li>Take cover.</li><li>Move carefully.</li></ul>' +
+            '<p>Afterward, you glow until your next turn.</p>',
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const actions = new Map(
+      normalizeCharacter(character).actions.map((action) => [action.name, action]),
+    );
+    expect(actions.get('Pure Options')?.summary).toBeUndefined();
+    expect(actions.get('Pure Options')?.list?.items).toEqual([
+      { text: 'Take cover.' },
+      { text: 'Move carefully.' },
+    ]);
+    expect(actions.get('Options with Rider')).toMatchObject({
+      summary: 'Choose either option, then you glow until your next turn.',
+    });
+    expect(actions.get('Options with Rider')?.list).toBeUndefined();
   });
 
   it('leaves no unresolved or empty dynamic values in real fixture output', () => {
@@ -2868,6 +3045,68 @@ describe('normalizeCharacter', () => {
     expect(racialTraits.find((item) => item.name === 'Keen Senses')?.related).toBeUndefined();
   });
 
+  it('shows the feat selected through a feat-granting trait', () => {
+    const character = {
+      id: 1,
+      name: 'Versatile Human',
+      classes: [],
+      race: {
+        racialTraits: [
+          {
+            definition: {
+              id: 100,
+              name: 'Versatile',
+              snippet: 'You gain an Origin feat of your choice.',
+              description: '<p>You gain an Origin feat of your choice.</p>',
+            },
+          },
+        ],
+      },
+      feats: [
+        {
+          componentId: 100,
+          componentTypeId: 1960452172,
+          definition: {
+            id: 200,
+            name: 'Tough',
+            snippet: 'Your Hit Point maximum increases.',
+            categories: [{ tagName: 'Origin' }],
+          },
+        },
+        {
+          componentId: 999,
+          definition: {
+            id: 201,
+            name: 'Alert',
+            categories: [{ tagName: 'Origin' }],
+          },
+        },
+      ],
+      choices: {
+        race: [
+          {
+            componentId: 100,
+            componentTypeId: 1960452172,
+            optionValue: 200,
+            label: 'Choose an Origin feat',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    const versatile = normalized.features
+      .find((group) => group.label === 'Racial Traits')
+      ?.items.find((item) => item.name === 'Versatile');
+    expect(versatile?.summary).toBe('Tough');
+    expect(versatile?.summary).not.toMatch(/of your choice/i);
+    expect(
+      normalized.features
+        .find((group) => group.label === 'Feats')
+        ?.items.find((item) => item.name === 'Tough')?.summary,
+    ).toContain('Hit Point maximum');
+  });
+
   it('summarizes ability-score features as just the bumps they grant', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
     // The Ability Score Improvement feat took +1 Strength / +1 Wisdom — shown as
@@ -3052,6 +3291,49 @@ describe('normalizeCharacter', () => {
     ]);
     // A normal prepared/known spell carries no free-cast tracker.
     expect(spells.some((spell) => spell.featureUses == null)).toBe(true);
+  });
+
+  it('groups Magic Initiate spells under their matching benefit parts', () => {
+    const character = {
+      id: 1,
+      name: 'Magic Initiate',
+      classes: [],
+      feats: [
+        {
+          definition: {
+            id: 800,
+            name: 'Magic Initiate (Cleric)',
+            description:
+              '<p><em>Origin Feat</em></p>' +
+              '<p>You gain the following benefits.</p>' +
+              '<p><em><strong>Two Cantrips.</strong></em> You learn two cantrips of your choice from the Cleric spell list.</p>' +
+              '<p><em><strong>Level 1 Spell.</strong></em> Choose a level 1 spell from the same list.</p>' +
+              '<p><em><strong>Spell Change.</strong></em> You can replace one of the chosen spells.</p>',
+          },
+        },
+      ],
+      spells: {
+        feat: [
+          { definition: { name: 'Spare the Dying', level: 0 }, componentId: 800 },
+          { definition: { name: 'Word of Radiance', level: 0 }, componentId: 800 },
+          { definition: { name: 'Bless', level: 1 }, componentId: 800 },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const magicInitiate = normalizeCharacter(character).features
+      .flatMap((group) => group.items)
+      .find((item) => item.name === 'Magic Initiate (Cleric)');
+    expect(magicInitiate?.grantedSpells).toBeUndefined();
+    expect(magicInitiate?.parts?.find((part) => part.label === 'Two Cantrips')).toMatchObject({
+      grantedSpells: ['Spare the Dying', 'Word of Radiance'],
+    });
+    expect(magicInitiate?.parts?.find((part) => part.label === 'Level 1 Spell')).toMatchObject({
+      grantedSpells: ['Bless'],
+    });
+    expect(
+      magicInitiate?.parts?.find((part) => part.label === 'Spell Change')?.grantedSpells,
+    ).toBeUndefined();
   });
 
   it('deduplicates identical spell grants but preserves independent pools', () => {

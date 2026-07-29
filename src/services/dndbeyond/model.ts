@@ -314,6 +314,8 @@ export interface FeaturePart {
   text: string;
   /** Structured option rows that should render as a list rather than prose. */
   list?: StructuredList;
+  /** Spells selected for this sub-part, such as Magic Initiate's cantrips. */
+  grantedSpells?: string[];
   /** Dedicated card that owns this part's full mechanics. */
   reference?: SectionKey;
 }
