@@ -225,6 +225,8 @@ export interface RawLimitedUse {
   resetType?: number | null;
   /** When true the pool size scales with the proficiency bonus. */
   useProficiencyBonus?: boolean | null;
+  /** Ability whose modifier sets the pool size (1-6 = STR..CHA). */
+  statModifierUsesId?: number | null;
 }
 
 /** Range / area block on an action. */

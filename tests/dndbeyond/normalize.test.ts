@@ -2949,6 +2949,99 @@ describe('normalizeCharacter', () => {
     );
   });
 
+  it('sizes a limited-use pool from the ability modifier it scales with', () => {
+    const character = {
+      id: 1,
+      name: 'Inspiring Bard',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 10 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 18 },
+      ],
+      classes: [
+        {
+          level: 5,
+          definition: {
+            name: 'Bard',
+            classFeatures: [{ id: 500, name: 'Bardic Inspiration', requiredLevel: 1 }],
+          },
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Bardic Inspiration',
+            componentId: 500,
+            activation: { activationType: 3 },
+            limitedUse: { maxUses: 0, resetType: 1, statModifierUsesId: 6 },
+            snippet: 'Inspire another creature.',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const action = normalizeCharacter(character).actions.find(
+      (entry) => entry.name === 'Bardic Inspiration',
+    );
+    expect(action?.resource).toMatchObject({ max: 4, recovery: { kind: 'rest', rest: 'short' } });
+  });
+
+  it('folds an upgrade feature into the option entry it improves', () => {
+    const character = {
+      id: 1,
+      name: 'Improving Cleric',
+      stats: [{ id: 1, name: null, value: 16 }],
+      classes: [
+        {
+          level: 14,
+          definition: {
+            name: 'Cleric',
+            classFeatures: [
+              { id: 700, name: 'Blessed Strikes', requiredLevel: 7 },
+              { id: 800, name: 'Improved Blessed Strikes', requiredLevel: 14 },
+            ],
+          },
+          classFeatures: [
+            { definition: { id: 700, name: 'Blessed Strikes', requiredLevel: 7 } },
+            { definition: { id: 800, name: 'Improved Blessed Strikes', requiredLevel: 14 } },
+          ],
+        },
+      ],
+      options: {
+        class: [
+          {
+            componentId: 800,
+            definition: {
+              id: 2,
+              name: 'Divine Strike',
+              snippet: 'The extra damage of your Divine Strike increases to 2d8.',
+            },
+          },
+          {
+            componentId: 700,
+            definition: {
+              id: 1,
+              name: 'Divine Strike',
+              snippet: 'Deal an extra 1d8 Radiant damage once on each of your turns.',
+            },
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const items = normalizeCharacter(character).features.flatMap((group) => group.items);
+    const strike = items.filter((item) => item.name === 'Divine Strike');
+    expect(strike).toHaveLength(1);
+    expect(strike[0].summary).toBe(
+      'Deal an extra 1d8 Radiant damage once on each of your turns. ' +
+        'The extra damage of your Divine Strike increases to 2d8.',
+    );
+    expect(items.some((item) => item.name === 'Improved Blessed Strikes')).toBe(false);
+  });
+
   it('structures alternate recovery costs and removes their duplicate prose', () => {
     const character = {
       id: 1,

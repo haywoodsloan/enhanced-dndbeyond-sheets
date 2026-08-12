@@ -1851,7 +1851,7 @@ function resolveActions(
         if (action.componentId != null && companionComponentIds.has(action.componentId)) {
           entry.related = ['companions'];
         }
-        const resource = limitedUseToPool(action.limitedUse, level);
+        const resource = limitedUseToPool(action.limitedUse, level, abilities);
         if (resource) {
           // A pool that resets on a long rest but also regains one use on a
           // short rest (Channel Divinity): the reset type only records the long
@@ -2298,6 +2298,7 @@ function resolveSpells(
   raw: RawCharacter,
   level: number,
   resolvePlaceholders: PlaceholderResolver,
+  abilities?: AbilityScore[],
 ): SpellEntry[] {
   const disguiseFeatIds = new Set<number>();
   for (const feat of asArray(raw.feats)) {
@@ -2345,7 +2346,7 @@ function resolveSpells(
       (spell.componentId != null && disguiseFeatIds.has(spell.componentId))
     ) return;
     const hasCompanion = hasCompanionStatBlock(def.description || def.snippet, def.name);
-    const pool = limitedUseToPool(spell.limitedUse, level);
+    const pool = limitedUseToPool(spell.limitedUse, level, abilities);
     const featureUse = pool ? { source: sourceFor(spell.componentId), pool } : undefined;
     const existing = byName.get(def.name);
     if (existing) {
@@ -2478,14 +2479,21 @@ function resolveWealth(raw: RawCharacter): Coins {
 
 /** Resolve a raw limited-use block into a checkbox pool, or nothing when the
  * feature/action isn't actually rationed. A pool whose size scales with the
- * proficiency bonus (`maxUses` 0) is expanded to that bonus. */
+ * proficiency bonus or an ability modifier (`maxUses` 0) is expanded to it. */
 function limitedUseToPool(
   limitedUse: RawLimitedUse | null | undefined,
   level: number,
+  abilities?: AbilityScore[],
 ): ResourcePool | undefined {
   if (!limitedUse) return undefined;
   let max = limitedUse.maxUses ?? 0;
   if (max <= 0 && limitedUse.useProficiencyBonus) max = proficiencyBonus(level);
+  if (max <= 0 && limitedUse.statModifierUsesId != null && abilities) {
+    const key = ABILITIES.find((entry) => entry.id === limitedUse.statModifierUsesId)?.key;
+    const modifier = key ? (abilities.find((entry) => entry.key === key)?.modifier ?? 0) : 0;
+    // D&D Beyond floors these pools at one use even for a negative modifier.
+    max = Math.max(modifier, 1);
+  }
   if (max < 1) return undefined;
   const recovery =
     limitedUse.resetType === 1
@@ -2581,13 +2589,17 @@ function regainsOneOnShortRest(...texts: (string | null | undefined)[]): boolean
  * Channel Divinity's "twice per long rest" lives on its action, not the
  * feature). Features with no rationed action get no checkboxes.
  */
-function resolveResourceMap(raw: RawCharacter, level: number): Map<number, ResourcePool> {
+function resolveResourceMap(
+  raw: RawCharacter,
+  level: number,
+  abilities: AbilityScore[],
+): Map<number, ResourcePool> {
   const map = new Map<number, ResourcePool>();
   if (!raw.actions) return map;
   for (const group of Object.values(raw.actions)) {
     for (const action of asArray<RawAction>(group)) {
       if (action.componentId == null) continue;
-      const pool = limitedUseToPool(action.limitedUse, level);
+      const pool = limitedUseToPool(action.limitedUse, level, abilities);
       if (pool) map.set(action.componentId, pool);
     }
   }
@@ -4274,12 +4286,33 @@ function resolveFeatures(
 
   const classItems: FeatureItem[] = [];
   const seen = new Set<string>();
+  const levelShown = new Map<string, number>();
+  // A later feature that resolves to the same option is an upgrade of it
+  // ("Improved Blessed Strikes" -> Divine Strike at 2d8), so its text is folded
+  // into the entry already shown rather than dropped. The halves can be visited
+  // in either order, so they are joined by required level.
+  const foldUpgrade = (displayName: string, content: FeatureContent, level: number) => {
+    const existing = classItems.find((item) => item.name === displayName);
+    if (!existing) return;
+    const addition = content.summary?.trim();
+    if (addition && !existing.summary?.includes(addition)) {
+      const isEarlier = level < (levelShown.get(displayName) ?? 0);
+      existing.summary = !existing.summary
+        ? addition
+        : isEarlier
+          ? `${addition} ${existing.summary}`
+          : `${existing.summary} ${addition}`;
+      if (isEarlier) levelShown.set(displayName, level);
+    }
+    if (content.parts?.length) existing.parts = [...(existing.parts ?? []), ...content.parts];
+  };
   const addClass = (
     id: number | undefined,
     rawName: string | undefined,
     snippet: string | null | undefined,
     description: string | null | undefined,
     context: PlaceholderContext = {},
+    requiredLevel = 0,
   ) => {
     // Skip a feature whose original name is already shown, so an option-renamed
     // grant (e.g. "Innate Sorcery" -> its "Activate Innate Sorcery" option) isn't
@@ -4288,7 +4321,13 @@ function resolveFeatures(
     const { name, content } = resolve(id, rawName, snippet, description, context);
     if (!name || isStructuralClassFeature(name)) return;
     const displayName = classFeatureDisplayName(name);
-    if (seen.has(displayName)) return;
+    if (seen.has(displayName)) {
+      if (id != null && optionByComponent.get(id)?.length === 1) {
+        foldUpgrade(displayName, content, requiredLevel);
+      }
+      return;
+    }
+    levelShown.set(displayName, requiredLevel);
     if (rawName) seen.add(classFeatureDisplayName(rawName));
     seen.add(displayName);
     classItems.push(toItem(displayName, id, content));
@@ -4329,6 +4368,7 @@ function resolveFeatures(
             def?.snippet,
             def?.description,
             contextForScale(cls.definition?.name, cls.level, grant.levelScale),
+            feature.requiredLevel ?? 0,
           );
         } else {
           const scale = asArray(feature.levelScales)
@@ -4340,6 +4380,7 @@ function resolveFeatures(
             feature.snippet,
             feature.description,
             contextForScale(cls.definition?.name, cls.level, scale),
+            feature.requiredLevel ?? 0,
           );
         }
       }
@@ -4355,6 +4396,7 @@ function resolveFeatures(
         def?.snippet,
         def?.description,
         contextForScale(cls.definition?.name, cls.level, grant.levelScale),
+        def?.requiredLevel ?? 0,
       );
     }
   }
@@ -4643,9 +4685,9 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     companionFeatureIds,
     resolvePlaceholders,
   );
-  const resources = resolveResourceMap(raw, level);
+  const resources = resolveResourceMap(raw, level, abilities);
   const spellsByComponent = featureSpellsByComponent(raw);
-  const spells = resolveSpells(raw, level, resolvePlaceholders);
+  const spells = resolveSpells(raw, level, resolvePlaceholders, abilities);
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
   for (const id of resourceComponentIds) resources.delete(id);
