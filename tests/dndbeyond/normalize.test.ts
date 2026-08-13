@@ -3672,6 +3672,79 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('keeps a feature\'s own rules when a proficiency grant is incidental', () => {
+    const character = {
+      id: 1,
+      name: 'Incidental',
+      stats: [{ id: 1, name: null, value: 10 }],
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Cleric', classFeatures: [] },
+          classFeatures: [
+            {
+              definition: {
+                id: 70,
+                name: 'Unfettered Mind',
+                snippet: 'You gain telepathy out to 60 ft. and proficiency in Int. saving throws.',
+              },
+            },
+          ],
+        },
+      ],
+      modifiers: {
+        class: [
+          {
+            type: 'language',
+            subType: 'telepathy',
+            friendlySubtypeName: 'Telepathy',
+            componentId: 70,
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const item = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((entry) => entry.name === 'Unfettered Mind');
+    // The granted language must not replace the rules that mention it.
+    expect(item?.summary).toContain('60 ft.');
+    expect(item?.grants).toEqual([{ label: 'Languages', items: ['Telepathy'] }]);
+  });
+
+  it('prefers the description when the snippet is cut short or drops mechanics', () => {
+    const character = {
+      id: 1,
+      name: 'Snippet Loss',
+      stats: [{ id: 1, name: null, value: 10 }],
+      feats: [
+        {
+          definition: {
+            id: 1,
+            name: 'Truncated Snippet',
+            snippet: 'You glow faintly while the spell is active. While glowing...',
+            description:
+              '<p>You glow faintly while the spell is active. While glowing, an ally within 60 feet regains 2d4 Hit Points.</p>',
+          },
+        },
+        {
+          definition: {
+            id: 2,
+            name: 'Condensed Snippet',
+            snippet: 'Your constellations improve, and you can change which one glimmers.',
+            description:
+              '<p>Your constellations improve. The 1d8 of the Archer becomes 2d8, and the Dragon grants a Fly Speed of 20 feet.</p>',
+          },
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const feats = normalizeCharacter(character).features.flatMap((group) => group.items);
+    expect(feats.find((item) => item.name === 'Truncated Snippet')?.summary).toContain('2d4');
+    expect(feats.find((item) => item.name === 'Condensed Snippet')?.summary).toContain('2d8');
+  });
+
   it('keeps an over-cap tail that states a real rule, but still trims flavour', () => {
     const lead = `${'A rule sentence that fills space. '.repeat(11)}`;
     const character = {

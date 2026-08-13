@@ -793,7 +793,9 @@ function summarize(
   resolvePlaceholders?: (text: string) => string,
 ): string {
   const source = text ?? '';
-  const plain = withSaveDcLabel(richText(resolvePlaceholders ? resolvePlaceholders(source) : source));
+  const plain = dropBuilderInstructions(
+    withSaveDcLabel(richText(resolvePlaceholders ? resolvePlaceholders(source) : source)),
+  );
   const isList = (plain.match(/\*\*[^*]+\*\*/g) ?? []).length >= 2;
   const cap = isList ? Math.max(maxLength, 1200) : maxLength;
   if (!plain || plain.length <= cap) return plain;
@@ -809,9 +811,21 @@ function summarize(
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : cap).trimEnd()}…`;
 }
 
+/** D&D Beyond appends instructions for driving its own character builder
+ * ("Activate X by clicking on this feature"), which mean nothing in print. */
+function dropBuilderInstructions(text: string): string {
+  const pattern =
+    /[^.!?]*\b(?:by clicking on this (?:feature|trait)|selecting the drop ?down|deselect it to)\b[^.!?]*[.!?]/gi;
+  if (!pattern.test(text)) return text;
+  return text
+    .replace(pattern, ' ')
+    .replace(/\s+([.!?,;])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Hard mechanics worth overrunning the summary cap for: a roll, a DC, a
- * measured distance, or a named condition. */
-function statesMechanics(text: string): boolean {
+ * measured distance, or a named condition. */function statesMechanics(text: string): boolean {
   return (
     /\b\d*d(?:4|6|8|10|12|20|100)\b/i.test(text) ||
     /\bDC\s*\d+/i.test(text) ||
@@ -2888,6 +2902,21 @@ function firstFeatureSentence(
   return /^.*?[.!?](?=\s|$)/.exec(resolved)?.[0] ?? resolved;
 }
 
+/** D&D Beyond's snippet is usually the better blurb, but it is sometimes cut
+ * short or condensed past the actual rules, in which case use the description. */
+function richerRulesText(
+  snippet: string | null | undefined,
+  description: string | null | undefined,
+  resolvePlaceholders: (text: string) => string,
+): string | null | undefined {
+  if (!snippet?.trim()) return description;
+  if (!description?.trim()) return snippet;
+  const short = plainText(resolvePlaceholders(snippet));
+  if (/(?:\.\.\.|\u2026)\s*$/.test(short)) return description;
+  const full = plainText(resolvePlaceholders(description));
+  return statesMechanics(full) && !statesMechanics(short) ? description : snippet;
+}
+
 function concreteProficiencySummary(
   featureName: string | undefined,
   proficiencyText: string,
@@ -4105,7 +4134,8 @@ function resolveFeatures(
     if (structuredBenefits) return structuredBenefits;
     const { intro, parts } = parseFeatureParts(description || snippet, featureResolver, featureName);
     if (parts.length === 0) {
-      const summary = summarize(snippet || intro || description, 400, featureResolver);
+      const blurb = richerRulesText(snippet, description, featureResolver);
+      const summary = summarize(blurb || intro || description, 400, featureResolver);
       return summary ? { summary } : {};
     }
     const shown: FeaturePart[] = [];
@@ -4233,7 +4263,22 @@ function resolveFeatures(
         : isActivationAlias
           ? rawName
           : chosen.name;
-      content = chosen.summary ? { summary: chosen.summary } : {};
+      if (isActivationAlias) {
+        // The option only describes the effect while active; the feature still
+        // owns its duration and recharge, so keep both.
+        const own = contentFor(id, snippet, description, featureResolver, rawName);
+        const effect = chosen.summary?.trim();
+        content =
+          own.summary && effect && !own.summary.includes(effect)
+            ? { ...own, summary: `${own.summary} ${effect}` }
+            : own.summary || own.parts?.length
+              ? own
+              : effect
+                ? { summary: effect }
+                : {};
+      } else {
+        content = chosen.summary ? { summary: chosen.summary } : {};
+      }
     } else if (choices?.length) {
       // Multi-choice systems (Metamagic options, Eldritch Invocations,
       // artificer plans, etc.) are one owning feature with every selected
@@ -4289,6 +4334,14 @@ function resolveFeatures(
         content = { ...content, parts };
       } else if (selfNamedProficiency) {
         content = { ...content, summary: undefined, grants: proficiencies.grants };
+      } else if (
+        statesMechanics(
+          [content.summary ?? '', ...(content.parts ?? []).map((part) => part.text)].join(' '),
+        )
+      ) {
+        // The grant is incidental to a feature that states its own rules, so
+        // list the picks instead of replacing the rules with them.
+        content = { ...content, grants: proficiencies.grants };
       } else {
         content = {
           ...content,
