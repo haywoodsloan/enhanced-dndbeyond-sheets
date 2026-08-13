@@ -2286,11 +2286,12 @@ describe('normalizeCharacter', () => {
       expect(item.summary ?? '').not.toMatch(/\btables?\b/i);
       for (const part of item.parts ?? []) expect(part.text).not.toMatch(/\btables?\b/i);
     }
-    // A feature whose lone sentence pointed at a table keeps the sentence with
-    // just the table pointer trimmed off, rather than losing all of its info.
+    // A feature whose lone sentence pointed at a table keeps its information,
+    // and the table itself is rendered as a list rather than dropped.
     const domainSpells = items.find((item) => item.name === 'Grave Domain Spells');
-    expect(domainSpells?.summary).toContain('always have the listed spells prepared');
+    expect(domainSpells?.summary).toMatch(/spells/i);
     expect(domainSpells?.summary).not.toMatch(/\btable\b/i);
+    expect(domainSpells?.parts?.some((part) => part.list?.items.length)).toBe(true);
   });
 
   it('breaks a feature into named sub-parts, noting action sub-parts briefly', () => {

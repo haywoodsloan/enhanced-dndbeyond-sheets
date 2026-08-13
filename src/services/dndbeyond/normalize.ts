@@ -3117,13 +3117,13 @@ function parseRollTables(html: string, source: string): RuleTable[] {
 
 interface FeatureLookup {
   title: string;
-  columns: [string, string];
-  rows: [string, string][];
+  columns: string[];
+  rows: string[][];
 }
 
-/** Compact two-column lookup tables whose caption names a feature part. These
- * are actionable option lists rather than progression tables; they stay inside
- * that part instead of becoming a separate Tables card. */
+/** Compact lookup tables whose caption names a feature part. These are
+ * actionable option lists rather than progression tables; they stay inside that
+ * part instead of becoming a separate Tables card. */
 function parseFeatureLookups(html: string): FeatureLookup[] {
   const lookups: FeatureLookup[] = [];
   for (const match of html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)) {
@@ -3137,19 +3137,30 @@ function parseFeatureLookups(html: string): FeatureLookup[] {
       })),
     );
     const header = rows.find((row) => row.some((cell) => cell.header));
-    if (!header || header.length !== 2) continue;
+    if (!header || header.length < 2) continue;
     const data = rows
-      .filter((row) => row !== header && row.length === 2 && row.some((cell) => !cell.header))
-      .map((row) => [row[0].text, row[1].text] as [string, string])
+      .filter(
+        (row) => row !== header && row.length === header.length && row.some((cell) => !cell.header),
+      )
+      .map((row) => row.map((cell) => cell.text))
       .filter((row) => row.every(Boolean));
     if (!data.length) continue;
     lookups.push({
       title: caption,
-      columns: [header[0].text, header[1].text],
+      columns: header.map((cell) => cell.text),
       rows: data,
     });
   }
   return lookups;
+}
+
+/** Render a lookup row as one list entry: the first column labels it and the
+ * remaining columns are joined, so wider tables keep every value. */
+function lookupToList(lookup: FeatureLookup): StructuredList {
+  return {
+    label: lookup.columns.slice(1).join(' · '),
+    items: lookup.rows.map(([label, ...rest]) => ({ label, text: rest.join(' · ') })),
+  };
 }
 
 function withoutNamedTableReference(text: string, title: string): string {
@@ -3574,6 +3585,7 @@ function resolveRuleArtifacts(
 function parseFeatureParts(
   html: string | null | undefined,
   resolvePlaceholders?: (text: string) => string,
+  featureName?: string,
 ): {
   intro: string;
   parts: FeaturePart[];
@@ -3653,16 +3665,28 @@ function parseFeatureParts(
     }
   }
   if (pendingHeading) parts.push({ label: pendingHeading, text: '' });
+  const used = new Set<FeatureLookup>();
   for (const part of parts) {
     const lookup = lookups.find(
       (entry) => entry.title.trim().toLowerCase() === part.label.trim().toLowerCase(),
     );
     if (!lookup) continue;
+    used.add(lookup);
     part.text = withoutNamedTableReference(part.text, lookup.title);
-    part.list = {
-      label: lookup.columns[1],
-      items: lookup.rows.map(([label, text]) => ({ label, text })),
-    };
+    part.list = lookupToList(lookup);
+  }
+  // A table whose caption names the feature itself (domain spell lists, lineage
+  // options) belongs to no part, so it becomes one rather than being dropped.
+  for (const lookup of lookups) {
+    if (used.has(lookup)) continue;
+    const isFeatureTitle =
+      featureName != null &&
+      lookup.title.trim().toLowerCase() === featureName.trim().toLowerCase();
+    parts.push({
+      label: isFeatureTitle ? '' : lookup.title,
+      text: '',
+      list: lookupToList(lookup),
+    });
   }
   return { intro: introChunks.join(' '), parts };
 }
@@ -4005,10 +4029,11 @@ function resolveFeatures(
     snippet: string | null | undefined,
     description: string | null | undefined,
     featureResolver: (text: string) => string = resolvePlaceholders,
+    featureName?: string,
   ): FeatureContent => {
     const structuredBenefits = structuredFeatureBenefits(snippet, featureResolver);
     if (structuredBenefits) return structuredBenefits;
-    const { intro, parts } = parseFeatureParts(description || snippet, featureResolver);
+    const { intro, parts } = parseFeatureParts(description || snippet, featureResolver, featureName);
     if (parts.length === 0) {
       const summary = summarize(snippet || intro || description, 400, featureResolver);
       return summary ? { summary } : {};
@@ -4156,6 +4181,7 @@ function resolveFeatures(
         snippet,
         isFeat ? stripFeatMetadata(description) : description,
         featureResolver,
+        rawName,
       );
       // Spellcasting/Pact Magic is fully owned by the Spells card: stats, slots,
       // focus, and spell rows all live there rather than repeating progression rules.
