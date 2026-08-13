@@ -3886,6 +3886,47 @@ describe('normalizeCharacter', () => {
     );
   });
 
+  it('sends an oversized lookup table to the Tables card, keeping small ones inline', () => {
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, index) => `<tr><td>Item ${index}</td><td>Yes</td></tr>`).join('');
+    const table = (caption: string, count: number) =>
+      `<table><caption>${caption}</caption><thead><tr><th>Item</th><th>Attunement</th></tr></thead>` +
+      `<tbody>${rows(count)}</tbody></table>`;
+
+    const character = {
+      id: 1,
+      name: 'Tabler',
+      stats: [{ id: 1, name: null, value: 10 }],
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Artificer', classFeatures: [] },
+          classFeatures: [
+            {
+              definition: {
+                id: 80,
+                name: 'Replicate Magic Item',
+                description:
+                  `<p>You learn plans.</p><p>Small List</p>${table('Small List', 3)}${table('Huge List', 12)}`,
+              },
+            },
+          ],
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    expect(normalized.ruleTables.map((entry) => entry.title)).toEqual(['Huge List']);
+    const item = normalized.features
+      .flatMap((group) => group.items)
+      .find((entry) => entry.name === 'Replicate Magic Item');
+    // The compact table stays with the feature; the big one is referenced.
+    expect(item?.parts?.some((part) => part.list?.items.length === 3)).toBe(true);
+    expect(item?.parts?.some((part) => part.list?.items.length === 12)).toBe(false);
+    expect(item?.related).toContain('tables');
+  });
+
   it('labels a resolved save DC so the number is not bare', () => {
     const character = {
       id: 1,

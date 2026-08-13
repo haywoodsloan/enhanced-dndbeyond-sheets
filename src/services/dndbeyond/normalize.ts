@@ -855,6 +855,8 @@ function plainText(html: string): string {
     .replace(/&ndash;/g, '–')
     .replace(/&minus;/g, '−')
     .replace(/&hellip;/g, '…')
+    .replace(/&dagger;/g, '†')
+    .replace(/&Dagger;/g, '‡')
     .replace(/&#(\d+);/g, (match, code: string) => {
       const point = Number(code);
       return point > 0 && point <= 0x10ffff ? String.fromCodePoint(point) : match;
@@ -3338,11 +3340,13 @@ interface FeatureLookup {
   rows: string[][];
 }
 
-/** Compact lookup tables whose caption names a feature part. These are
- * actionable option lists rather than progression tables; they stay inside that
- * part instead of becoming a separate Tables card. */
-function parseFeatureLookups(html: string): FeatureLookup[] {
-  const lookups: FeatureLookup[] = [];
+/** Beyond this many rows a lookup dominates the feature it belongs to, so it
+ * moves to the Tables card and the feature just points there. */
+const INLINE_LOOKUP_ROW_LIMIT = 6;
+
+/** Every captioned table in a block, before deciding where it belongs. */
+function captionTables(html: string): FeatureLookup[] {
+  const tables: FeatureLookup[] = [];
   for (const match of html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)) {
     const table = match[0];
     const caption = plainText(/<caption\b[^>]*>([\s\S]*?)<\/caption>/i.exec(table)?.[1] ?? '');
@@ -3362,13 +3366,34 @@ function parseFeatureLookups(html: string): FeatureLookup[] {
       .map((row) => row.map((cell) => cell.text))
       .filter((row) => row.every(Boolean));
     if (!data.length) continue;
-    lookups.push({
+    tables.push({
       title: caption,
       columns: header.map((cell) => cell.text),
       rows: data,
     });
   }
-  return lookups;
+  return tables;
+}
+
+/** True when a table's first column is a die, so the Tables card already owns it. */
+function isRollTable(lookup: FeatureLookup): boolean {
+  return /^(?:\d*d\d+|roll)$/i.test((lookup.columns[0] ?? '').replace(/\s+/g, ''));
+}
+
+/** Compact lookup tables whose caption names a feature part. These are
+ * actionable option lists rather than progression tables; they stay inside that
+ * part instead of becoming a separate Tables card. */
+function parseFeatureLookups(html: string): FeatureLookup[] {
+  return captionTables(html).filter(
+    (lookup) => lookup.rows.length <= INLINE_LOOKUP_ROW_LIMIT && !isRollTable(lookup),
+  );
+}
+
+/** Captioned tables too big to sit inside a feature; the Tables card shows them. */
+function parseLargeLookupTables(html: string, source: string): RuleTable[] {
+  return captionTables(html)
+    .filter((lookup) => lookup.rows.length > INLINE_LOOKUP_ROW_LIMIT && !isRollTable(lookup))
+    .map((lookup) => ({ ...lookup, source }));
 }
 
 /** Render a lookup row as one list entry: the first column labels it and the
@@ -3752,7 +3777,10 @@ function resolveRuleArtifacts(
       companionCategories.add(companionCategory(source.name, source.kind));
       if (source.id != null) companionFeatureIds.add(source.id);
     }
-    for (const table of parseRollTables(html, source.name)) {
+    for (const table of [
+      ...parseRollTables(html, source.name),
+      ...parseLargeLookupTables(html, source.name),
+    ]) {
       const key = `${source.name}|${table.title}|${JSON.stringify(table.rows)}`;
       if (tableKeys.has(key)) continue;
       tableKeys.add(key);
