@@ -104,6 +104,8 @@ export interface RawRacialTrait {
 export interface RawRace {
   fullName?: string;
   baseRaceName?: string;
+  /** False for 2024 species, which grant no ability score increases. */
+  isLegacy?: boolean | null;
   size?: string | null;
   sizeId?: number | null;
   creatureTypeId?: number | null;

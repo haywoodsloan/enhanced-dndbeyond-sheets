@@ -123,9 +123,54 @@ function sumBonusModifiers(raw: RawCharacter, subType: string): number {
   );
 }
 
+/** Ids of everything the character actually has. D&D Beyond leaves modifiers
+ * from discarded builder paths in the payload (a 2014 species' +1/+1/+1 on a
+ * 2024 character) and ignores them; keying on the owner does the same. */
+function activeComponentIds(raw: RawCharacter): Set<number> {
+  const ids = new Set<number>();
+  const add = (id: number | null | undefined) => {
+    if (id != null) ids.add(id);
+  };
+  for (const trait of asArray(raw.race?.racialTraits)) add(trait.definition?.id);
+  for (const feat of asArray(raw.feats)) add(feat.definition?.id);
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.classFeatures)) add(feature.definition?.id);
+    for (const feature of asArray(cls.definition?.classFeatures)) add(feature.id);
+  }
+  for (const group of Object.values(raw.options ?? {})) {
+    for (const option of asArray<{ componentId?: number | null; definition?: { id?: number | null } }>(
+      group,
+    )) {
+      add(option.componentId);
+      add(option.definition?.id);
+    }
+  }
+  return ids;
+}
+
 /** Sum ability-score bonus modifiers for one ability (e.g. "strength-score"). */
 function abilityScoreBonus(raw: RawCharacter, abilityName: string): number {
-  return sumBonusModifiers(raw, `${abilityName.toLowerCase()}-score`);
+  const subType = `${abilityName.toLowerCase()}-score`;
+  const active = activeComponentIds(raw);
+  // 2024 species grant no ability increases, but D&D Beyond keeps the legacy
+  // +1/+1/+1 modifiers in the payload; it ignores them and so must we.
+  const skipRace = raw.race?.isLegacy === false;
+  return Object.entries(raw.modifiers ?? {}).reduce<number>(
+    (total, [group, mods]) =>
+      group === 'race' && skipRace
+        ? total
+        : total +
+          asArray<RawModifier>(mods)
+            .filter(
+              (mod) =>
+                mod.type === 'bonus' &&
+                mod.subType === subType &&
+                !mod.restriction?.trim() &&
+                (mod.componentId == null || active.has(mod.componentId)),
+            )
+            .reduce((sum, mod) => sum + (mod.value ?? mod.fixedValue ?? 0), 0),
+    0,
+  );
 }
 
 /** Highest unrestricted score setter (e.g. Belt of Giant Strength), if any. */

@@ -3672,6 +3672,43 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('ignores a 2024 species\' leftover ability score increases', () => {
+    const base = {
+      id: 1,
+      name: 'Species Bonus',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 13 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 10 },
+      ],
+      modifiers: {
+        race: [{ type: 'bonus', subType: 'dexterity-score', value: 1, componentId: 5 }],
+      },
+    };
+
+    const modern = normalizeCharacter({
+      ...base,
+      race: { fullName: 'Aasimar', isLegacy: false, racialTraits: [{ definition: { id: 5 } }] },
+    } as unknown as RawCharacter);
+    // D&D Beyond keeps the legacy modifier but does not apply it, so DEX stays 13 (+1).
+    expect(modern.abilities.find((ability) => ability.key === 'dex')).toMatchObject({
+      score: 13,
+      modifier: 1,
+    });
+
+    const legacy = normalizeCharacter({
+      ...base,
+      race: { fullName: 'Half-Elf', isLegacy: true, racialTraits: [{ definition: { id: 5 } }] },
+    } as unknown as RawCharacter);
+    expect(legacy.abilities.find((ability) => ability.key === 'dex')).toMatchObject({
+      score: 14,
+      modifier: 2,
+    });
+  });
+
   it('keeps a feature\'s own rules when a proficiency grant is incidental', () => {
     const character = {
       id: 1,
