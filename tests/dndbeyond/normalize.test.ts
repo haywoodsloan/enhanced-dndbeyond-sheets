@@ -3713,12 +3713,36 @@ describe('normalizeCharacter', () => {
         ],
         // D&D Beyond leaves Alert's value empty, meaning "add proficiency bonus".
         feat: [{ type: 'bonus', subType: 'initiative', componentId: 50 }],
+        race: [{ type: 'bonus', subType: 'speed-walking', value: 5, componentId: 60 }],
       },
     } as unknown as RawCharacter;
 
     const { basics } = normalizeCharacter(character);
-    expect(basics.speed).toBe(70);
+    expect(basics.speed).toBe(75);
     expect(basics.initiative).toBe(6);
+  });
+
+  it('adds the named ability modifier when an initiative bonus has no value', () => {
+    const character = {
+      id: 1,
+      name: 'Ambusher',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 16 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 14 },
+        { id: 6, name: null, value: 10 },
+      ],
+      race: { fullName: 'Human', isLegacy: false },
+      classes: [{ id: 5, level: 20, definition: { id: 9, name: 'Ranger', classFeatures: [] } }],
+      // statId 5 is Wisdom: Dread Ambusher adds that modifier, not the proficiency bonus.
+      modifiers: {
+        class: [{ type: 'bonus', subType: 'initiative', statId: 5, componentId: 70 }],
+      },
+    } as unknown as RawCharacter;
+
+    expect(normalizeCharacter(character).basics.initiative).toBe(5);
   });
 
   it('ignores a 2024 species\' leftover ability score increases', () => {

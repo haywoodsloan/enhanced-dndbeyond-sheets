@@ -369,14 +369,27 @@ function resolveCreatureSize(raw: RawCharacter): string | undefined {
   return raw.race?.sizeId == null ? undefined : CREATURE_SIZES[raw.race.sizeId];
 }
 
-/** Initiative bonuses. D&D Beyond encodes the Alert feat as a `bonus` with no
- * value, meaning "add your Proficiency Bonus". */
-function initiativeBonus(raw: RawCharacter, level: number): number {
+/** Initiative bonuses. D&D Beyond leaves the value empty when the bonus is
+ * derived: `statId` means "add that ability's modifier" (Gloom Stalker's Dread
+ * Ambusher), and no `statId` means the Proficiency Bonus (the Alert feat). */
+function initiativeBonus(
+  raw: RawCharacter,
+  level: number,
+  abilities: AbilityScore[],
+): number {
   let total = 0;
   for (const mods of Object.values(raw.modifiers ?? {})) {
     for (const mod of asArray<RawModifier>(mods)) {
       if (mod.type !== 'bonus' || mod.subType !== 'initiative' || mod.restriction?.trim()) continue;
-      total += mod.value ?? mod.fixedValue ?? proficiencyBonus(level);
+      const value = mod.value ?? mod.fixedValue;
+      if (value != null) {
+        total += value;
+        continue;
+      }
+      const key = abilityKeyById(mod.statId);
+      total += key
+        ? (abilities.find((ability) => ability.key === key)?.modifier ?? 0)
+        : proficiencyBonus(level);
     }
   }
   return total;
@@ -405,7 +418,7 @@ function speedBonus(raw: RawCharacter): number {
   let total = 0;
   for (const mods of Object.values(raw.modifiers ?? {})) {
     for (const mod of asArray<RawModifier>(mods)) {
-      if (mod.type !== 'bonus' || mod.subType !== 'speed') continue;
+      if (mod.type !== 'bonus' || !/^speed(?:-walking)?$/.test(mod.subType ?? '')) continue;
       const restriction = mod.restriction?.trim() ?? '';
       if (restriction && !/heavy armor/i.test(restriction)) continue;
       if (restriction && heavyArmorWorn) continue;
@@ -471,7 +484,7 @@ function resolveBasics(
   const conditionLevels = resolveConditionLevels(raw);
   return {
     armorClass: resolveArmorClass(raw, abilities),
-    initiative: modifierOf('dex') + initiativeBonus(raw, level),
+    initiative: modifierOf('dex') + initiativeBonus(raw, level, abilities),
     speed: speeds.walk,
     ...(specialSpeeds.length ? { specialSpeeds } : {}),
     proficiencyBonus: proficiencyBonus(level),
