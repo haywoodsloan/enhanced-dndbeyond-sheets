@@ -1559,9 +1559,12 @@ function actionDamage(
     action.value != null ||
     action.damageBonus != null;
   if (!hasExplicitDamage) return undefined;
+  // D&D Beyond's diceString already spells out its own fixed value ("1d6 + 10"),
+  // so adding it again would print the bonus twice.
+  const fixedInDice = action.dice?.fixedValue != null && /[+-]\s*\d+\s*$/.test(dice);
   const bonus =
     modByStatId(action.abilityModifierStatId) +
-    (action.dice?.fixedValue ?? action.value ?? 0) +
+    (fixedInDice ? 0 : (action.dice?.fixedValue ?? action.value ?? 0)) +
     (action.damageBonus ?? 0);
   if (!dice && bonus === 0) return undefined;
   if (!type && action.saveStatId == null && action.displayAsAttack !== true) return undefined;
@@ -1585,9 +1588,11 @@ function actionRoll(
     action.value != null ||
     action.damageBonus != null;
   if (!hasExplicitRoll) return undefined;
+  // The diceString already carries its own fixed value ("1d10 + 20").
+  const fixedInDice = action.dice?.fixedValue != null && /[+-]\s*\d+\s*$/.test(dice);
   const bonus =
     modByStatId(action.abilityModifierStatId) +
-    (action.dice?.fixedValue ?? action.value ?? 0) +
+    (fixedInDice ? 0 : (action.dice?.fixedValue ?? action.value ?? 0)) +
     (action.damageBonus ?? 0);
   if (!dice) return bonus ? String(bonus) : undefined;
   if (!bonus) return dice;

@@ -144,12 +144,14 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 }
 
 /* Once a card needs continuations, align items into rows so every horizontal
-   slice boundary falls between complete features in both columns. */
+   slice boundary falls between complete features in both columns. Row height
+   follows the taller neighbour, which is the cost of never slicing a feature. */
 .features__list--row-aligned {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   column-gap: 20px;
   row-gap: 6px;
+  align-items: start;
 }
 
 .features__item {
