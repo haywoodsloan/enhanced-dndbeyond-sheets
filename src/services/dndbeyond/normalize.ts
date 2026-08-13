@@ -899,9 +899,12 @@ function summarize(
 ): string {
   const source = text ?? '';
   const plain = dropBuilderInstructions(
-    withSaveDcLabel(richText(resolvePlaceholders ? resolvePlaceholders(source) : source)),
+    withSaveDcLabel(fixSourceTypos(richText(resolvePlaceholders ? resolvePlaceholders(source) : source))),
   );
-  const isList = (plain.match(/\*\*[^*]+\*\*/g) ?? []).length >= 2;
+  // Bulleted rules read as a list, so cutting one mid-item loses a whole
+  // benefit; give them the same generous cap as bold-headed lists.
+  const isList =
+    (plain.match(/\*\*[^*]+\*\*/g) ?? []).length >= 2 || (plain.match(/\u2022/g) ?? []).length >= 2;
   const cap = isList ? Math.max(maxLength, 1200) : maxLength;
   if (!plain || plain.length <= cap) return plain;
   const slice = plain.slice(0, cap);
@@ -914,6 +917,11 @@ function summarize(
   if (sentences && sentences.length >= cap * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : cap).trimEnd()}…`;
+}
+
+/** Corrections for wrong feature names in D&D Beyond's own rules text. */
+function fixSourceTypos(text: string): string {
+  return text.replace(/\bRadiant of the Dawn\b/g, 'Radiance of the Dawn');
 }
 
 /** D&D Beyond appends instructions for driving its own character builder
@@ -4979,7 +4987,9 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     ),
     toSection('attacks', sectionLabel('attacks'), attacks.length),
     toSection('actions', sectionLabel('actions'), actions.length),
-    toSection('spells', sectionLabel('spells'), spells.length),
+    // A spell-less character has no use for the card, but everyone can write
+    // gear onto the inventory's blank lines during play.
+    ...(spells.length ? [toSection('spells', sectionLabel('spells'), spells.length)] : []),
     ...(companions.length
       ? [toSection('companions', companionTitle, companionPartCount)]
       : []),
@@ -4992,7 +5002,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
           ),
         ]
       : []),
-    toSection('inventory', sectionLabel('inventory'), inventory.length),
+    toSection('inventory', sectionLabel('inventory'), inventory.length, { alwaysPresent: true }),
     toSection('wealth', sectionLabel('wealth'), 0, { alwaysPresent: hasWealth(raw) }),
     toSection('features', sectionLabel('features'), featureCount),
     toSection('notes', sectionLabel('notes'), 0, { alwaysPresent: true }),

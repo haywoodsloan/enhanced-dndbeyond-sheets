@@ -4263,7 +4263,7 @@ describe('normalizeCharacter', () => {
     }
   });
 
-  it('reports zero spells for a non-caster and marks the section empty', () => {
+  it('omits the spells section for a non-caster but keeps inventory write-in lines', () => {
     const fighter = {
       id: 1,
       name: 'Grib',
@@ -4278,11 +4278,13 @@ describe('normalizeCharacter', () => {
       classes: [{ level: 3, definition: { name: 'Fighter' } }],
     } as unknown as RawCharacter;
 
-    const spells = normalizeCharacter(fighter).sections.find(
-      (section) => section.key === 'spells',
-    );
-    expect(spells?.count).toBe(0);
-    expect(spells?.isEmpty).toBe(true);
+    const { sections } = normalizeCharacter(fighter);
+    expect(sections.find((section) => section.key === 'spells')).toBeUndefined();
+    // Inventory stays so its blank rows can be filled in by hand.
+    expect(sections.find((section) => section.key === 'inventory')).toMatchObject({
+      count: 0,
+      isEmpty: false,
+    });
   });
 
   it.each(['http://[bad', 'http://example.com/avatar.png', 'data:image/png;base64,abc'])(
