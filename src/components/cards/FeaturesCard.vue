@@ -1,11 +1,12 @@
 <script lang="ts" setup>
+import { computed } from 'vue';
 import type { FeatureGroup, FeatureItem } from '@/services/dndbeyond/model';
 import { sectionLabel } from '@/utils/character/section-label';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
 import StructuredList from '@/components/StructuredList.vue';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     features: FeatureGroup[];
     companionTitle?: string;
@@ -22,6 +23,64 @@ function needsFullWidth(item: FeatureItem): boolean {
   );
 }
 
+/** Rough rendered height of an item, from the text it will show. */
+function weightOf(item: FeatureItem): number {
+  const parts = item.parts ?? [];
+  const text =
+    item.name.length +
+    (item.summary?.length ?? 0) +
+    (item.grantedSpells?.join(', ').length ?? 0) +
+    (item.grants ?? []).reduce((total, grant) => total + grant.items.join(', ').length, 0) +
+    parts.reduce(
+      (total, part) =>
+        total +
+        part.label.length +
+        part.text.length +
+        (part.list?.items ?? []).reduce(
+          (sum, row) => sum + (row.label?.length ?? 0) + row.text.length,
+          0,
+        ),
+      0,
+    );
+  // Every part and list row starts a new line regardless of how short it is.
+  const lines = parts.length + parts.reduce((total, part) => total + (part.list?.items.length ?? 0), 0);
+  return text + lines * 40;
+}
+
+/**
+ * Row-aligned columns make each row as tall as its taller item, so pair items
+ * of similar height. Partners are chosen from a short lookahead window to keep
+ * features close to their original (level) order.
+ */
+const LOOKAHEAD = 6;
+
+function balanceRows(items: FeatureItem[]): FeatureItem[] {
+  const pool = [...items];
+  const ordered: FeatureItem[] = [];
+  while (pool.length) {
+    const first = pool.shift()!;
+    ordered.push(first);
+    if (needsFullWidth(first)) continue;
+    const candidates = pool
+      .slice(0, LOOKAHEAD)
+      .filter((candidate) => !needsFullWidth(candidate));
+    if (!candidates.length) continue;
+    const target = weightOf(first);
+    const partner = candidates.reduce((best, candidate) =>
+      Math.abs(weightOf(candidate) - target) < Math.abs(weightOf(best) - target) ? candidate : best,
+    );
+    pool.splice(pool.indexOf(partner), 1);
+    ordered.push(partner);
+  }
+  return ordered;
+}
+
+const groups = computed(() =>
+  props.rowAligned
+    ? props.features.map((group) => ({ ...group, items: balanceRows(group.items) }))
+    : props.features,
+);
+
 function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string {
   if (/cantrips?/i.test(part.label)) return 'Cantrips';
   return part.grantedSpells?.length === 1 ? 'Spell' : 'Spells';
@@ -31,7 +90,7 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 <template>
   <div class="features">
     <div
-      v-for="group in features"
+      v-for="group in groups"
       :key="group.label"
       class="features__group"
       :data-group="group.label"
