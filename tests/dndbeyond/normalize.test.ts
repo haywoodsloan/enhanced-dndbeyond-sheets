@@ -3672,6 +3672,51 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('points an action that is only a rules table at the Tables card', () => {
+    const surgeTable =
+      '<table><caption>Wild Magic Surge</caption><thead><tr><th>1d100</th><th>Effect</th></tr></thead>' +
+      '<tbody><tr><td>01-04</td><td>Roll again next turn.</td></tr></tbody></table>';
+    const character = {
+      id: 1,
+      name: 'Wild One',
+      stats: [{ id: 1, name: null, value: 10 }],
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Sorcerer', classFeatures: [] },
+          classFeatures: [
+            {
+              definition: {
+                id: 42,
+                name: 'Wild Magic Surge',
+                description: `<p>Your magic can surge.</p>${surgeTable}`,
+              },
+            },
+          ],
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Wild Magic Surge Table',
+            componentId: 42,
+            activation: { activationType: 1 },
+            snippet: '',
+            description: surgeTable,
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    const action = normalized.actions.find((entry) => entry.name === 'Wild Magic Surge Table');
+    // Without this the row renders blank, since the table itself lives elsewhere.
+    expect(action?.summary).toBeUndefined();
+    expect(action?.related).toEqual(['tables']);
+    expect(normalized.ruleTables.map((table) => table.title)).toEqual(['Wild Magic Surge']);
+  });
+
   it('gives a Monk the Martial Arts die and Dexterity for Unarmed Strikes', () => {
     const character = {
       id: 1,

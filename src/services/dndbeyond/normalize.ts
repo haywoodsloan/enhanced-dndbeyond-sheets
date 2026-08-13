@@ -1972,6 +1972,9 @@ function resolveActions(
             : detail;
         const conciseSummary = withoutRedundantActionDamage(summary, damage);
         if (conciseSummary) entry.summary = conciseSummary;
+        // Some actions are nothing but a rules table (Wild Magic Surge Table),
+        // which the Tables card owns; point there instead of showing a bare row.
+        else if (/<table\b/i.test(action.description ?? '')) entry.related = ['tables'];
         const benefitList = structuredBenefits?.parts?.[0]?.list;
         if (benefitList?.items.length) entry.list = benefitList;
         if (action.componentId != null) {
