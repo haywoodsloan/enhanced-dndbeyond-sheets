@@ -109,7 +109,7 @@ describe('FeaturesCard', () => {
     expect(parts[2].text()).toContain('highest number possible');
   });
 
-  it('marks multipart features as full-width continuation rows', () => {
+  it('keeps every feature in a single column, whatever its shape', () => {
     const wrapper = mount(FeaturesCard, {
       props: {
         features: [
@@ -123,16 +123,6 @@ describe('FeaturesCard', () => {
                   { label: 'Infused Items', text: 'You can infuse two items.' },
                 ],
               },
-              {
-                name: 'List-Only Feature',
-                parts: [
-                  {
-                    label: '',
-                    text: '',
-                    list: { items: [{ text: 'First benefit.' }] },
-                  },
-                ],
-              },
               { name: 'Simple Feature' },
             ],
           },
@@ -141,9 +131,10 @@ describe('FeaturesCard', () => {
     });
 
     const items = wrapper.findAll('[data-feature]');
-    expect(items[0].classes()).toContain('features__item--multipart');
-    expect(items[1].classes()).not.toContain('features__item--multipart');
-    expect(items[2].classes()).not.toContain('features__item--multipart');
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item.classes()).toEqual(['features__item']);
+    }
   });
 
   it('uses uncoupled columns until continuation-safe rows are requested', () => {

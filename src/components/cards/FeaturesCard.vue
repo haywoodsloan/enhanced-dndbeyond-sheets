@@ -15,14 +15,6 @@ const props = withDefaults(
   { companionTitle: 'Companions', rowAligned: false },
 );
 
-function needsFullWidth(item: FeatureItem): boolean {
-  const parts = item.parts ?? [];
-  return (
-    parts.length > 1 ||
-    parts.some((part) => Boolean(part.label || part.text || part.reference))
-  );
-}
-
 /** Rough rendered height of an item, from the text it will show. */
 function weightOf(item: FeatureItem): number {
   const parts = item.parts ?? [];
@@ -60,10 +52,7 @@ function balanceRows(items: FeatureItem[]): FeatureItem[] {
   while (pool.length) {
     const first = pool.shift()!;
     ordered.push(first);
-    if (needsFullWidth(first)) continue;
-    const candidates = pool
-      .slice(0, LOOKAHEAD)
-      .filter((candidate) => !needsFullWidth(candidate));
+    const candidates = pool.slice(0, LOOKAHEAD);
     if (!candidates.length) continue;
     const target = weightOf(first);
     const partner = candidates.reduce((best, candidate) =>
@@ -105,7 +94,6 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
           v-for="(item, index) in group.items"
           :key="index"
           class="features__item"
-          :class="{ 'features__item--multipart': needsFullWidth(item) }"
           data-feature
         >
           <span class="features__name">{{ item.name }}</span
@@ -217,10 +205,6 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
   position: relative;
   padding-left: 14px;
   break-inside: avoid;
-}
-
-.features__list--row-aligned .features__item--multipart {
-  grid-column: 1 / -1;
 }
 
 .features__list:not(.features__list--row-aligned) .features__item:not(:last-child) {

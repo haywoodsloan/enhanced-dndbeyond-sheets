@@ -401,7 +401,7 @@ describe('SectionCard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses feature parts instead of their parent as continuation break units', async () => {
+  it('breaks continuations between whole features, never inside one', async () => {
     const rect = (top: number, bottom: number) => ({
       top,
       bottom,
@@ -464,7 +464,8 @@ describe('SectionCard', () => {
     const geometry = measured?.[measured.length - 1]?.[1] as
       | { breaks: number[] }
       | undefined;
-    expect(geometry?.breaks).toEqual([100, 200, 260]);
+    // A feature never spans the grid, so its sub-parts are not break points.
+    expect(geometry?.breaks).toEqual([220, 260]);
 
     wrapper.unmount();
 

@@ -223,24 +223,10 @@ function measure() {
   const bodyRect = body.getBoundingClientRect();
   const total = bodyRect.height;
   if (total <= 0) return;
-  // Each break item's top/bottom edge, body-relative.
+  // Each break item's top/bottom edge, body-relative. A feature never spans the
+  // grid, so it breaks as a whole and its sub-parts are not break candidates.
   const breakItems = Array.from(body.querySelectorAll(BREAK_ITEMS)).filter(
-    (element) => {
-      if (element.hasAttribute('data-feature')) {
-        const rowAligned = element
-          .closest('.features__list')
-          ?.classList.contains('features__list--row-aligned');
-        return !rowAligned || !element.classList.contains('features__item--multipart');
-      }
-      if (element.hasAttribute('data-feature-part')) {
-        const feature = element.closest('[data-feature]');
-        return Boolean(
-          feature?.closest('.features__list')?.classList.contains('features__list--row-aligned') &&
-          feature.classList.contains('features__item--multipart'),
-        );
-      }
-      return true;
-    },
+    (element) => !element.hasAttribute('data-feature-part'),
   );
   const rects = breakItems.map((el) => {
     const r = el.getBoundingClientRect();
