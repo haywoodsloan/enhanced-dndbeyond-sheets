@@ -32,12 +32,21 @@ withDefaults(defineProps<{ list: StructuredList; bullets?: boolean }>(), {
 
 .structured-list ul {
   margin: 2px 0 0;
-  padding-left: 16px;
-}
-
-.structured-list ul.structured-list__items--plain {
   padding-left: 0;
   list-style: none;
+}
+
+/* Bullets hang in the item's own gutter, so a list nested under a bulleted
+   feature lines up with the text above it instead of stepping further right. */
+.structured-list__item {
+  position: relative;
+  padding-left: 10px;
+}
+
+.structured-list__item::before {
+  content: '•';
+  position: absolute;
+  left: 0;
 }
 
 .structured-list__items--plain .structured-list__item {
@@ -54,14 +63,6 @@ withDefaults(defineProps<{ list: StructuredList; bullets?: boolean }>(), {
   height: 4px;
   border-radius: 50%;
   background: currentColor;
-}
-
-.structured-list li {
-  padding-left: 1px;
-}
-
-.structured-list ul:not(.structured-list__items--plain) li::marker {
-  content: '• ';
 }
 
 .structured-list li + li {
