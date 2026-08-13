@@ -8,6 +8,30 @@ describe('RichText', () => {
     expect(wrapper.get('.rich-text').classes()).toContain('rich-text');
   });
 
+  it('breaks inline bullet runs onto their own lines', () => {
+    const wrapper = mount(RichText, {
+      props: {
+        text: 'While active, Rage follows these rules: • You have Resistance. • You gain a bonus.',
+      },
+    });
+
+    const bullets = wrapper.findAll('[data-rich-text-bullet]');
+    expect(bullets.map((node) => node.text())).toEqual([
+      'You have Resistance.',
+      'You gain a bonus.',
+    ]);
+    // The marker is supplied by CSS, so it must not be duplicated in the text.
+    expect(wrapper.text()).not.toContain('•');
+  });
+
+  it('keeps bold markers working inside a bullet', () => {
+    const wrapper = mount(RichText, {
+      props: { text: 'Benefits: • **Damage.** You deal more.' },
+    });
+
+    expect(wrapper.get('[data-rich-text-bullet]').get('strong').text()).toBe('Damage.');
+  });
+
   it('renders text wrapped in ** as bold, leaving the rest plain', () => {
     const wrapper = mount(RichText, {
       props: { text: 'Choose the command: **Approach.** The target moves toward you.' },
