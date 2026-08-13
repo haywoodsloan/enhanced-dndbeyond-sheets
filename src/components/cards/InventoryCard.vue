@@ -10,9 +10,12 @@ const props = defineProps<{ inventory: InventoryEntry[]; columns?: number }>();
 const columnGroups = computed(() => {
   const count = Math.max(1, props.columns ?? 3);
   const size = Math.ceil(props.inventory.length / count);
-  return Array.from({ length: count }, (_, index) =>
+  const groups = Array.from({ length: count }, (_, index) =>
     props.inventory.slice(index * size, (index + 1) * size),
   ).filter((column) => column.length > 0);
+  // With nothing carried the card still prints its write-in lines, so keep one
+  // column for the blank rows to hang off.
+  return groups.length ? groups : [[]];
 });
 
 // Minimum blank write-in rows per column (before measuring): fewer once the list
