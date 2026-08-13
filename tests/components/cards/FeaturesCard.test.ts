@@ -137,22 +137,24 @@ describe('FeaturesCard', () => {
     }
   });
 
-  it('uses uncoupled columns until continuation-safe rows are requested', () => {
+  it('splits into segments only when continuation-safe breaks are requested', () => {
     const features = [
       {
         label: 'Class Features',
-        items: [{ name: 'Short Feature' }, { name: 'Tall Feature', summary: 'Long text.' }],
+        items: Array.from({ length: 9 }, (_, index) => ({
+          name: `Feature ${index}`,
+          summary: 'Tall enough to matter. '.repeat(18),
+        })),
       },
     ];
     const compact = mount(FeaturesCard, { props: { features } });
-    expect(compact.get('.features__list').classes()).not.toContain(
-      'features__list--row-aligned',
-    );
+    // One masonry list packs the whole group when the card fits on a page.
+    expect(compact.findAll('[data-feature-segment]')).toHaveLength(1);
 
     const continued = mount(FeaturesCard, { props: { features, rowAligned: true } });
-    expect(continued.get('.features__list').classes()).toContain(
-      'features__list--row-aligned',
-    );
+    // Segments close once they fill two columns, so the gaps between them are safe cuts.
+    expect(continued.findAll('[data-feature-segment]')).toHaveLength(3);
+    expect(continued.findAll('[data-feature]')).toHaveLength(9);
   });
 
   it('labels feature references to other dedicated cards', () => {

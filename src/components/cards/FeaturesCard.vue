@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
 import type { FeatureGroup, FeatureItem } from '@/services/dndbeyond/model';
 import { sectionLabel } from '@/utils/character/section-label';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
@@ -40,35 +39,46 @@ function weightOf(item: FeatureItem): number {
 }
 
 /**
- * Row-aligned columns make each row as tall as its taller item, so pair items
- * of similar height. Partners are chosen from a short lookahead window to keep
- * features close to their original (level) order.
+ * Masonry columns pack tightly but leave no horizontal line free of items, so a
+ * continuation card has nowhere safe to cut. Splitting a group into segments
+ * restores those cut lines: each segment packs its own columns and both end
+ * flush, so the boundary between segments is always safe to break at.
+ *
+ * Items are dealt into the shorter column, and a segment stays open until both
+ * columns are full and level. Whatever is left over at the end of a segment
+ * shows up as blank space beside the taller column, so a feature long enough to
+ * fill a column on its own keeps taking neighbours until the gap beside it is
+ * filled -- up to a ceiling, past which cut lines matter more than the gap.
  */
-const LOOKAHEAD = 6;
+const COLUMN_TARGET = 450;
+const COLUMN_LIMIT = COLUMN_TARGET * 3;
+const LEVEL_ENOUGH = 150;
 
-function balanceRows(items: FeatureItem[]): FeatureItem[] {
-  const pool = [...items];
-  const ordered: FeatureItem[] = [];
-  while (pool.length) {
-    const first = pool.shift()!;
-    ordered.push(first);
-    const candidates = pool.slice(0, LOOKAHEAD);
-    if (!candidates.length) continue;
-    const target = weightOf(first);
-    const partner = candidates.reduce((best, candidate) =>
-      Math.abs(weightOf(candidate) - target) < Math.abs(weightOf(best) - target) ? candidate : best,
-    );
-    pool.splice(pool.indexOf(partner), 1);
-    ordered.push(partner);
+function segmentsOf(items: FeatureItem[]): FeatureItem[][] {
+  if (!props.rowAligned) return [items];
+  const segments: FeatureItem[][] = [];
+  let columns = [
+    { items: [] as FeatureItem[], weight: 0 },
+    { items: [] as FeatureItem[], weight: 0 },
+  ];
+  for (const item of items) {
+    const shorter = columns[0].weight <= columns[1].weight ? columns[0] : columns[1];
+    shorter.items.push(item);
+    shorter.weight += weightOf(item);
+    const filled = Math.min(columns[0].weight, columns[1].weight);
+    const gap = Math.abs(columns[0].weight - columns[1].weight);
+    if (filled >= COLUMN_TARGET && (gap <= LEVEL_ENOUGH || filled >= COLUMN_LIMIT)) {
+      segments.push(columns.flatMap((column) => column.items));
+      columns = [
+        { items: [], weight: 0 },
+        { items: [], weight: 0 },
+      ];
+    }
   }
-  return ordered;
+  const tail = columns.flatMap((column) => column.items);
+  if (tail.length) segments.push(tail);
+  return segments;
 }
-
-const groups = computed(() =>
-  props.rowAligned
-    ? props.features.map((group) => ({ ...group, items: balanceRows(group.items) }))
-    : props.features,
-);
 
 function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string {
   if (/cantrips?/i.test(part.label)) return 'Cantrips';
@@ -79,7 +89,7 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 <template>
   <div class="features">
     <div
-      v-for="group in groups"
+      v-for="group in features"
       :key="group.label"
       class="features__group"
       :data-group="group.label"
@@ -87,11 +97,13 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
     >
       <span class="features__label">{{ group.label }}</span>
       <ul
+        v-for="(segment, segmentIndex) in segmentsOf(group.items)"
+        :key="segmentIndex"
         class="features__list"
-        :class="{ 'features__list--row-aligned': rowAligned }"
+        data-feature-segment
       >
         <li
-          v-for="(item, index) in group.items"
+          v-for="(item, index) in segment"
           :key="index"
           class="features__item"
           data-feature
@@ -183,22 +195,16 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
   font-size: 14px;
 }
 
-/* A card that fits on one page uses independent masonry-like columns, so a
-   short item never inherits empty height from a taller neighbor. */
-.features__list:not(.features__list--row-aligned) {
+/* Every segment packs its own masonry columns, so a short item never inherits
+   empty height from a taller neighbour. */
+.features__list {
   column-width: 220px;
   column-gap: 20px;
 }
 
-/* Once a card needs continuations, align items into rows so every horizontal
-   slice boundary falls between complete features in both columns. Row height
-   follows the taller neighbour, which is the cost of never slicing a feature. */
-.features__list--row-aligned {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  column-gap: 20px;
-  row-gap: 6px;
-  align-items: start;
+/* Segments sit flush; the gap between them is the safe cut line. */
+.features__list + .features__list {
+  margin-top: 6px;
 }
 
 .features__item {
@@ -207,7 +213,7 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
   break-inside: avoid;
 }
 
-.features__list:not(.features__list--row-aligned) .features__item:not(:last-child) {
+.features__item:not(:last-child) {
   margin-bottom: 6px;
 }
 
