@@ -369,6 +369,52 @@ function resolveCreatureSize(raw: RawCharacter): string | undefined {
   return raw.race?.sizeId == null ? undefined : CREATURE_SIZES[raw.race.sizeId];
 }
 
+/** Initiative bonuses. D&D Beyond encodes the Alert feat as a `bonus` with no
+ * value, meaning "add your Proficiency Bonus". */
+function initiativeBonus(raw: RawCharacter, level: number): number {
+  let total = 0;
+  for (const mods of Object.values(raw.modifiers ?? {})) {
+    for (const mod of asArray<RawModifier>(mods)) {
+      if (mod.type !== 'bonus' || mod.subType !== 'initiative' || mod.restriction?.trim()) continue;
+      total += mod.value ?? mod.fixedValue ?? proficiencyBonus(level);
+    }
+  }
+  return total;
+}
+
+/** Walking speed a class feature adds through its level scale rather than a
+ * modifier (the Monk's Unarmored Movement). */
+function levelScaledSpeedBonus(raw: RawCharacter): number {
+  let bonus = 0;
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.classFeatures)) {
+      const fixed = feature.levelScale?.fixedValue;
+      if (fixed == null) continue;
+      if (/movement|speed/i.test(feature.definition?.name ?? '')) bonus += fixed;
+    }
+  }
+  return bonus;
+}
+
+/** Speed bonuses, including ones D&D Beyond gates on not wearing Heavy armor
+ * (a Barbarian's Fast Movement) once that condition is actually met. */
+function speedBonus(raw: RawCharacter): number {
+  const heavyArmorWorn = asArray(raw.inventory).some(
+    (item) => item.equipped && item.definition?.armorTypeId === 3,
+  );
+  let total = 0;
+  for (const mods of Object.values(raw.modifiers ?? {})) {
+    for (const mod of asArray<RawModifier>(mods)) {
+      if (mod.type !== 'bonus' || mod.subType !== 'speed') continue;
+      const restriction = mod.restriction?.trim() ?? '';
+      if (restriction && !/heavy armor/i.test(restriction)) continue;
+      if (restriction && heavyArmorWorn) continue;
+      total += mod.value ?? mod.fixedValue ?? 0;
+    }
+  }
+  return total;
+}
+
 function resolveMovementSpeeds(raw: RawCharacter): Record<MovementSpeed, number> {
   const normal = raw.race?.weightSpeeds?.normal;
   const speeds: Record<MovementSpeed, number> = {
@@ -384,6 +430,7 @@ function resolveMovementSpeeds(raw: RawCharacter): Record<MovementSpeed, number>
       speeds[movement] = custom.distance;
     }
   }
+  speeds.walk += speedBonus(raw) + levelScaledSpeedBonus(raw);
   return speeds;
 }
 
@@ -424,7 +471,7 @@ function resolveBasics(
   const conditionLevels = resolveConditionLevels(raw);
   return {
     armorClass: resolveArmorClass(raw, abilities),
-    initiative: modifierOf('dex') + sumBonusModifiers(raw, 'initiative'),
+    initiative: modifierOf('dex') + initiativeBonus(raw, level),
     speed: speeds.walk,
     ...(specialSpeeds.length ? { specialSpeeds } : {}),
     proficiencyBonus: proficiencyBonus(level),

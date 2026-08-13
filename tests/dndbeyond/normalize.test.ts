@@ -3672,6 +3672,55 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('adds class speed bonuses and a proficiency-based initiative bonus', () => {
+    const character = {
+      id: 1,
+      name: 'Swift',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 10 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 10 },
+      ],
+      race: { fullName: 'Human', isLegacy: false, weightSpeeds: { normal: { walk: 30 } } },
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Monk', classFeatures: [] },
+          classFeatures: [
+            {
+              definition: { id: 40, name: 'Fast Movement' },
+            },
+            {
+              definition: { id: 41, name: 'Unarmored Movement' },
+              levelScale: { level: 18, fixedValue: 30 },
+            },
+          ],
+        },
+      ],
+      modifiers: {
+        class: [
+          {
+            type: 'bonus',
+            subType: 'speed',
+            value: 10,
+            componentId: 40,
+            restriction: 'while you aren\u2019t wearing Heavy armor.',
+          },
+        ],
+        // D&D Beyond leaves Alert's value empty, meaning "add proficiency bonus".
+        feat: [{ type: 'bonus', subType: 'initiative', componentId: 50 }],
+      },
+    } as unknown as RawCharacter;
+
+    const { basics } = normalizeCharacter(character);
+    expect(basics.speed).toBe(70);
+    expect(basics.initiative).toBe(6);
+  });
+
   it('ignores a 2024 species\' leftover ability score increases', () => {
     const base = {
       id: 1,
