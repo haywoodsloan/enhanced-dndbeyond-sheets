@@ -793,7 +793,7 @@ function summarize(
   resolvePlaceholders?: (text: string) => string,
 ): string {
   const source = text ?? '';
-  const plain = richText(resolvePlaceholders ? resolvePlaceholders(source) : source);
+  const plain = withSaveDcLabel(richText(resolvePlaceholders ? resolvePlaceholders(source) : source));
   const isList = (plain.match(/\*\*[^*]+\*\*/g) ?? []).length >= 2;
   const cap = isList ? Math.max(maxLength, 1200) : maxLength;
   if (!plain || plain.length <= cap) return plain;
@@ -802,6 +802,16 @@ function summarize(
   if (sentences && sentences.length >= cap * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : cap).trimEnd()}…`;
+}
+
+/** D&D Beyond's own text drops the "DC" label once its placeholder resolves,
+ * leaving "a 17 Cha. saving throw". Restore it so the number reads as a DC. */
+function withSaveDcLabel(text: string): string {
+  return text.replace(
+    /(\b(?:DC|dc)\s+)?\b(\d{1,2})(\s+(?:Str|Dex|Con|Int|Wis|Cha)\.\s+saving throw)/g,
+    (match, existing: string | undefined, value: string, tail: string) =>
+      existing ? match : `DC ${value}${tail}`,
+  );
 }
 
 /**

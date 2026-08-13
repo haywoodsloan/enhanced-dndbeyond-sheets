@@ -3672,6 +3672,54 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('labels a resolved save DC so the number is not bare', () => {
+    const character = {
+      id: 1,
+      name: 'Glamour',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 10 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 20 },
+      ],
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Bard', canCastSpells: true, spellCastingAbilityId: 6, classFeatures: [] },
+          classFeatures: [{ definition: { id: 42, name: 'Unbreakable Majesty' } }],
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Unbreakable Majesty',
+            componentId: 42,
+            activation: { activationType: 1 },
+            snippet: 'The attacker must make a {{savedc:cha}} Cha. saving throw or the attack misses.',
+          },
+          {
+            name: 'Already Labelled',
+            componentId: 42,
+            activation: { activationType: 1 },
+            snippet: 'Make a DC 10 Con. saving throw.',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const actions = normalizeCharacter(character).actions;
+    expect(actions.find((entry) => entry.name === 'Unbreakable Majesty')?.summary).toContain(
+      'DC 19 Cha. saving throw',
+    );
+    // An existing label must not be doubled up.
+    expect(actions.find((entry) => entry.name === 'Already Labelled')?.summary).toContain(
+      'DC 10 Con. saving throw',
+    );
+  });
+
   it('points an action that is only a rules table at the Tables card', () => {
     const surgeTable =
       '<table><caption>Wild Magic Surge</caption><thead><tr><th>1d100</th><th>Effect</th></tr></thead>' +
