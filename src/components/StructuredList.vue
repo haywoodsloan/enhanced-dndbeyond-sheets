@@ -47,6 +47,7 @@ withDefaults(defineProps<{ list: StructuredList; bullets?: boolean }>(), {
   content: '•';
   position: absolute;
   left: 0;
+  color: #1c1c1e;
 }
 
 .structured-list__items--plain .structured-list__item {
