@@ -1582,6 +1582,20 @@ function grantedFeatureNamesById(raw: RawCharacter): Map<number, string> {
   return names;
 }
 
+/** Active level-scale value per class feature, so an action that carries no
+ * dice of its own still resolves `{{scalevalue}}` (Sneak Attack's 10d6). */
+function levelScalesByComponent(raw: RawCharacter): Map<number, string> {
+  const scales = new Map<number, string>();
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.classFeatures)) {
+      const id = feature.definition?.id;
+      const scale = feature.levelScale?.dice?.diceString ?? feature.levelScale?.fixedValue;
+      if (id != null && scale != null) scales.set(id, String(scale));
+    }
+  }
+  return scales;
+}
+
 /** Owning class level for class features and any selected options nested under
  * them. This keeps `{{classlevel}}` correct on multiclass characters. */
 function classLevelsByComponent(raw: RawCharacter): Map<number, number> {
@@ -1785,13 +1799,16 @@ function withoutRedundantActionDamage(summary: string, damage: DamageInfo | unde
   const dice = damage?.dice.trim();
   if (!dice) return summary;
   const diceParts = /^(\d+)(d\d+)(.*)$/i.exec(dice);
+  // Bold markers can wrap the whole roll or sit inside it; consume every one so
+  // removing the roll cannot leave an unbalanced `**` bolding the rest of the line.
+  const bold = '(?:\\*\\*)?';
   const escaped = diceParts
-    ? `${diceParts[1]}(?:\\*\\*)?${diceParts[2]}(?:\\*\\*)?${diceParts[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
-    : dice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    ? `${bold}${diceParts[1]}${bold}${diceParts[2]}${bold}${diceParts[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${bold}`
+    : `${bold}${dice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${bold}`;
   return summary
     .replace(
       new RegExp(
-        `\\b(?:an?\\s+)?(extra\\s+)?${escaped}\\s+(?=(?:damage\\b|[A-Z][a-z]+(?:\\s+damage\\b|,|\\s+or\\b)))`,
+        `(?:\\*\\*)?\\b(?:an?\\s+)?(extra\\s+)?${escaped}\\s+(?=(?:damage\\b|[A-Z][a-z]+(?:\\s+damage\\b|,|\\s+or\\b)))`,
         'i',
       ),
       (_match, extra: string | undefined) => extra ?? '',
@@ -1837,6 +1854,7 @@ function resolveActions(
     modByKey.get(abilityKeyById(id) ?? ('' as AbilityKey)) ?? 0;
   const saveDc = spellSaveDc(raw, abilities, level);
   const classLevelByComponent = classLevelsByComponent(raw);
+  const scaleByComponent = levelScalesByComponent(raw);
   const castingAbilityByComponent = castingAbilitiesByComponent(raw);
   const castingClassByComponent = castingClassNamesByComponent(raw);
   const featureNameById = grantedFeatureNamesById(raw);
@@ -1926,7 +1944,10 @@ function resolveActions(
                 ? undefined
                 : castingClassByComponent.get(action.componentId),
             limitedUse: resource?.max,
-            scaleValue: action.dice?.diceString ?? action.value ?? undefined,
+            scaleValue:
+              action.dice?.diceString ??
+              action.value ??
+              (action.componentId == null ? undefined : scaleByComponent.get(action.componentId)),
           });
         const detail = actionDetail(action.snippet, action.description, actionResolver);
         const structuredBenefits =

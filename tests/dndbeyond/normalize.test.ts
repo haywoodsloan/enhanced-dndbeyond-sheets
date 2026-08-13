@@ -3635,6 +3635,43 @@ describe('normalizeCharacter', () => {
     expect(unarmed?.damage).toMatchObject({ dice: '', bonus: 3, type: 'Bludgeoning' });
   });
 
+  it('removes a bolded damage roll without orphaning its markers', () => {
+    const character = {
+      id: 1,
+      name: 'Sneak',
+      stats: [{ id: 1, name: null, value: 10 }],
+      classes: [
+        {
+          id: 5,
+          level: 20,
+          definition: { id: 9, name: 'Rogue', classFeatures: [{ id: 77, name: 'Sneak Attack' }] },
+          classFeatures: [{ definition: { id: 77, name: 'Sneak Attack' } }],
+        },
+      ],
+      actions: {
+        class: [
+          {
+            name: 'Sneak Attack',
+            componentId: 77,
+            activation: { activationType: 1 },
+            damageTypeId: 1,
+            dice: { diceCount: 10, diceValue: 6, diceString: '10d6' },
+            snippet:
+              'Once per turn you can deal an extra <strong>{{(classlevel/2)@roundup}}d6</strong> damage to one creature.',
+          },
+        ],
+      },
+    } as unknown as RawCharacter;
+
+    const action = normalizeCharacter(character).actions.find(
+      (entry) => entry.name === 'Sneak Attack',
+    );
+    // The roll is already in the damage column, so the blurb drops it — and an
+    // unpaired ** would bold the rest of the line.
+    expect(action?.summary).toBe('Once per turn you can deal extra damage to one creature.');
+    expect(action?.summary).not.toContain('**');
+  });
+
   it('gives a Monk the Martial Arts die and Dexterity for Unarmed Strikes', () => {
     const character = {
       id: 1,
