@@ -1100,6 +1100,19 @@ function weaponAttack(
   return attack;
 }
 
+/** The active Martial Arts die, which replaces the default Unarmed Strike
+ * damage. Read from the character's own level scale so it tracks D&D Beyond. */
+function martialArtsDie(raw: RawCharacter): string | undefined {
+  for (const cls of asArray(raw.classes)) {
+    for (const feature of asArray(cls.classFeatures)) {
+      if (!/^Martial Arts$/i.test(feature.definition?.name ?? '')) continue;
+      const dice = feature.levelScale?.dice?.diceString;
+      if (dice) return dice;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Weapon and weapon-like attacks: a base Unarmed Strike plus every equipped (or
  * attack-flagged) weapon, each with a computed to-hit and damage line. Unequipped
@@ -1156,12 +1169,17 @@ function resolveAttacks(
     seen.add(signature);
     attacks.push(attack);
   }
-  // Every creature can make an Unarmed Strike (2024 rules: 1 + Str bludgeoning),
-  // so keep it as an always-available fallback at the end of the list.
+  // Every creature can make an Unarmed Strike (2024 rules: 1 + Str bludgeoning).
+  // Martial Arts replaces that with its die and lets a Monk use Dexterity.
+  const martialArts = martialArtsDie(raw);
+  const unarmedKey: AbilityKey =
+    martialArts && modOf('dex') > modOf('str') ? 'dex' : 'str';
   attacks.push({
     name: 'Unarmed Strike',
-    toHit: modOf('str') + prof,
-    damage: { dice: '', bonus: 1 + modOf('str'), type: 'Bludgeoning' },
+    toHit: modOf(unarmedKey) + prof,
+    damage: martialArts
+      ? { dice: martialArts, bonus: modOf(unarmedKey), type: 'Bludgeoning' }
+      : { dice: '', bonus: 1 + modOf('str'), type: 'Bludgeoning' },
     range: '5 ft.',
   });
   return attacks;

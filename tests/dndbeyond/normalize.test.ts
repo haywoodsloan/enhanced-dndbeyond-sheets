@@ -3635,6 +3635,40 @@ describe('normalizeCharacter', () => {
     expect(unarmed?.damage).toMatchObject({ dice: '', bonus: 3, type: 'Bludgeoning' });
   });
 
+  it('gives a Monk the Martial Arts die and Dexterity for Unarmed Strikes', () => {
+    const character = {
+      id: 1,
+      name: 'Martial Artist',
+      stats: [
+        { id: 1, name: null, value: 10 },
+        { id: 2, name: null, value: 18 },
+        { id: 3, name: null, value: 10 },
+        { id: 4, name: null, value: 10 },
+        { id: 5, name: null, value: 10 },
+        { id: 6, name: null, value: 10 },
+      ],
+      classes: [
+        {
+          level: 17,
+          definition: { name: 'Monk', classFeatures: [] },
+          classFeatures: [
+            {
+              definition: { id: 1, name: 'Martial Arts' },
+              levelScale: { level: 17, dice: { diceString: '1d12' } },
+            },
+          ],
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const unarmed = normalizeCharacter(character).attacks.find(
+      (attack) => attack.name === 'Unarmed Strike',
+    );
+    // DEX +4 beats STR +0, and the die replaces the default 1 + STR damage.
+    expect(unarmed?.toHit).toBe(10);
+    expect(unarmed?.damage).toMatchObject({ dice: '1d12', bonus: 4, type: 'Bludgeoning' });
+  });
+
   it('marks selected weapon masteries and omits their redundant actions', () => {
     const weapon = (id: number, name: string, mastery: string) => ({
       id,
