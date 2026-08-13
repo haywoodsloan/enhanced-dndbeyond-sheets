@@ -799,9 +799,27 @@ function summarize(
   if (!plain || plain.length <= cap) return plain;
   const slice = plain.slice(0, cap);
   const sentences = slice.match(/^[\s\S]*[.!?](?=\s+\**[A-Z(]|$)/)?.[0];
+  // Trimming flavour is fine, but the tail often carries a real rule (Sneak
+  // Attack's "ally within 5 ft." alternative), so keep it rather than lose it.
+  if (plain.length <= cap * 2 && statesMechanics(plain.slice(sentences?.length ?? cap))) {
+    return plain;
+  }
   if (sentences && sentences.length >= cap * 0.5) return sentences.trimEnd();
   const lastSpace = slice.lastIndexOf(' ');
   return `${slice.slice(0, lastSpace > 0 ? lastSpace : cap).trimEnd()}…`;
+}
+
+/** Hard mechanics worth overrunning the summary cap for: a roll, a DC, a
+ * measured distance, or a named condition. */
+function statesMechanics(text: string): boolean {
+  return (
+    /\b\d*d(?:4|6|8|10|12|20|100)\b/i.test(text) ||
+    /\bDC\s*\d+/i.test(text) ||
+    /\b\d+\s*(?:ft\.?|feet|foot|miles?)\b/i.test(text) ||
+    /\b(?:blinded|charmed|deafened|frightened|grappled|incapacitated|invisible|paralyzed|petrified|poisoned|prone|restrained|stunned|unconscious|exhaustion)\b/i.test(
+      text,
+    )
+  );
 }
 
 /** D&D Beyond's own text drops the "DC" label once its placeholder resolves,

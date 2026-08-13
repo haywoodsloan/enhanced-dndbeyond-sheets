@@ -3672,6 +3672,37 @@ describe('normalizeCharacter', () => {
     expect(action?.summary).not.toContain('**');
   });
 
+  it('keeps an over-cap tail that states a real rule, but still trims flavour', () => {
+    const lead = `${'A rule sentence that fills space. '.repeat(11)}`;
+    const character = {
+      id: 1,
+      name: 'Tail Test',
+      stats: [{ id: 1, name: null, value: 10 }],
+      feats: [
+        {
+          definition: {
+            id: 1,
+            name: 'Mechanical Tail',
+            snippet: `${lead}You don't need Advantage if an ally is within 5 ft. of the target.`,
+          },
+        },
+        {
+          definition: {
+            id: 2,
+            name: 'Flavour Tail',
+            snippet: `${lead}The gods smile upon your many noble and storied deeds.`,
+          },
+        },
+      ],
+    } as unknown as RawCharacter;
+
+    const feats = normalizeCharacter(character).features.flatMap((group) => group.items);
+    expect(feats.find((item) => item.name === 'Mechanical Tail')?.summary).toContain('5 ft.');
+    expect(feats.find((item) => item.name === 'Flavour Tail')?.summary).not.toContain(
+      'noble and storied',
+    );
+  });
+
   it('labels a resolved save DC so the number is not bare', () => {
     const character = {
       id: 1,
