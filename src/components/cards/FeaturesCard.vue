@@ -25,14 +25,20 @@ interface FeatureChunk {
   flowing: boolean;
 }
 
-/** Rough rendered height of an item, from the text it will show. */
+/** Rough rendered height of an item, from the text it will show. Measured
+ * against real renders the cost is affine, not proportional: every item pays
+ * for its name line and the gap below it before a word of body text is set. */
+const ITEM_BASE = 80;
+
 function weightOf(item: FeatureItem): number {
   const text =
     item.name.length +
     (item.summary?.length ?? 0) +
     (item.grantedSpells?.join(', ').length ?? 0) +
     (item.grants ?? []).reduce((total, grant) => total + grant.items.join(', ').length, 0);
-  return text + (item.parts ?? []).reduce((total, part) => total + partWeight(part), 0);
+  return (
+    ITEM_BASE + text + (item.parts ?? []).reduce((total, part) => total + partWeight(part), 0)
+  );
 }
 
 function partWeight(part: FeaturePart): number {
@@ -60,13 +66,13 @@ function partWeight(part: FeaturePart): number {
  * fill a column on its own keeps taking neighbours until the gap beside it is
  * filled -- up to a ceiling, past which cut lines matter more than the gap.
  */
-const COLUMN_TARGET = 450;
+const COLUMN_TARGET = 650;
 const COLUMN_LIMIT = COLUMN_TARGET * 3;
 const LEVEL_ENOUGH = 150;
 
 /** Roughly a page-tall column of text: what one feature can take before it has
  * to carry on in the next column. */
-const COLUMN_CAPACITY = 2800;
+const COLUMN_CAPACITY = 2900;
 
 /** A feature taller than a column continues in the next one under a "(cont.)"
  * heading, cut between its named parts so the split lands somewhere readable. */
@@ -89,7 +95,8 @@ function chunksOf(item: FeatureItem): FeatureChunk[] {
     if (current.length && chunks.length < pieces - 1 && weight + partWeight(part) > target) {
       chunks.push(current);
       current = [];
-      weight = 0;
+      // Every chunk repeats the feature's name, so it starts at the same base.
+      weight = ITEM_BASE;
     }
     current.push(part);
     weight += partWeight(part);
