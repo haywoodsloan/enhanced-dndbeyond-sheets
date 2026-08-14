@@ -3366,6 +3366,41 @@ describe('normalizeCharacter', () => {
     });
   });
 
+  it('names the level a lookup row applies to', () => {
+    const character = {
+      id: 1,
+      name: 'Artillerist',
+      stats: [],
+      classes: [],
+      feats: [
+        {
+          definition: {
+            id: 801,
+            name: 'Artillerist Spells',
+            description:
+              '<p>When you reach an Artificer level specified in the Artillerist Spells table, you thereafter always have the listed spells prepared.</p>' +
+              '<table><caption>Artillerist Spells</caption><thead><tr><th>Artificer Level</th><th>Prepared Spells</th></tr></thead><tbody>' +
+              '<tr><td>3</td><td>Shield, Thunderwave</td></tr>' +
+              '<tr><td>5</td><td>Scorching Ray, Shatter</td></tr>' +
+              '</tbody></table>',
+          },
+        },
+      ],
+      modifiers: {},
+    } as unknown as RawCharacter;
+
+    const spells = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Artillerist Spells');
+    expect(spells?.parts?.[0]?.list).toEqual({
+      label: 'Prepared Spells',
+      items: [
+        { label: 'Level 3', text: 'Shield, Thunderwave' },
+        { label: 'Level 5', text: 'Scorching Ray, Shatter' },
+      ],
+    });
+  });
+
   it('tracks the limited free-cast spells a feature grants', () => {
     const spells = normalizeCharacter(raw).spells;
     // Gathered Whispers grants a free Augury once per long rest.

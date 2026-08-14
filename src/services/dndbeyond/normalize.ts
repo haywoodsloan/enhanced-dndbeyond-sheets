@@ -3399,9 +3399,14 @@ function parseLargeLookupTables(html: string, source: string): RuleTable[] {
 /** Render a lookup row as one list entry: the first column labels it and the
  * remaining columns are joined, so wider tables keep every value. */
 function lookupToList(lookup: FeatureLookup): StructuredList {
+  // The dropped first-column header is the only thing saying a bare "3" is a level.
+  const levels = /\blevels?\b/i.test(lookup.columns[0] ?? '');
   return {
     label: lookup.columns.slice(1).join(' · '),
-    items: lookup.rows.map(([label, ...rest]) => ({ label, text: rest.join(' · ') })),
+    items: lookup.rows.map(([label, ...rest]) => ({
+      label: levels && /^\d+$/.test(label) ? `Level ${label}` : label,
+      text: rest.join(' · '),
+    })),
   };
 }
 
