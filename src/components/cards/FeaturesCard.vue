@@ -55,10 +55,10 @@ const COLUMN_LIMIT = COLUMN_TARGET * 3;
 const LEVEL_ENOUGH = 150;
 
 /** Roughly a page-tall column of text. A feature past this can't fit a column at
- * all, so it takes the card's full width rather than run off the page edge. */
+ * all, so it wraps into the next one rather than run off the page edge. */
 const FULL_WIDTH_WEIGHT = 2800;
 
-function spansColumns(item: FeatureItem): boolean {
+function flowsColumns(item: FeatureItem): boolean {
   return props.rowAligned && weightOf(item) >= FULL_WIDTH_WEIGHT;
 }
 
@@ -78,8 +78,9 @@ function segmentsOf(items: FeatureItem[]): FeatureItem[][] {
     ];
   };
   for (const item of items) {
-    // A full-width feature is its own segment, so the card can cut either side of it.
-    if (spansColumns(item)) {
+    // A feature that wraps across the columns owns its segment, so the columns
+    // still end level either side of it and the card can cut there.
+    if (flowsColumns(item)) {
       flush();
       segments.push([item]);
       continue;
@@ -121,7 +122,7 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
           v-for="(item, index) in segment"
           :key="index"
           class="features__item"
-          :class="{ 'features__item--wide': spansColumns(item) }"
+          :class="{ 'features__item--flowing': flowsColumns(item) }"
           data-feature
         >
           <span class="features__name">{{ item.name }}</span
@@ -233,9 +234,9 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
   margin-bottom: 6px;
 }
 
-/* Too tall for one column, so it reads across the whole card instead. */
-.features__item--wide {
-  column-span: all;
+/* Too tall for one column, so it carries on down the next one. */
+.features__item--flowing {
+  break-inside: auto;
 }
 
 /* A disc marker to match the other bulleted list cards (a multi-column list can

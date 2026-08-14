@@ -157,7 +157,7 @@ describe('FeaturesCard', () => {
     expect(continued.findAll('[data-feature]')).toHaveLength(9);
   });
 
-  it('gives a feature too tall for one column the full card width', () => {
+  it('lets a feature too tall for one column wrap into the next', () => {
     const features = [
       {
         label: 'Class Features',
@@ -172,11 +172,11 @@ describe('FeaturesCard', () => {
     const segments = continued.findAll('[data-feature-segment]');
     // The tall feature is alone in its segment, so the card can cut either side of it.
     expect(segments.map((segment) => segment.findAll('[data-feature]').length)).toEqual([1, 1, 1]);
-    expect(segments[1].get('[data-feature]').classes()).toContain('features__item--wide');
-    expect(segments[0].get('[data-feature]').classes()).not.toContain('features__item--wide');
+    expect(segments[1].get('[data-feature]').classes()).toContain('features__item--flowing');
+    expect(segments[0].get('[data-feature]').classes()).not.toContain('features__item--flowing');
 
     const compact = mount(FeaturesCard, { props: { features } });
-    expect(compact.find('.features__item--wide').exists()).toBe(false);
+    expect(compact.find('.features__item--flowing').exists()).toBe(false);
   });
 
   it('labels feature references to other dedicated cards', () => {
