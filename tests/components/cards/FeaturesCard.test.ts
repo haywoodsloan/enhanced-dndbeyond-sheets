@@ -157,6 +157,28 @@ describe('FeaturesCard', () => {
     expect(continued.findAll('[data-feature]')).toHaveLength(9);
   });
 
+  it('gives a feature too tall for one column the full card width', () => {
+    const features = [
+      {
+        label: 'Class Features',
+        items: [
+          { name: 'Short Feature' },
+          { name: 'Wild Shape', summary: 'Taller than a page-long column. '.repeat(95) },
+          { name: 'Another Feature' },
+        ],
+      },
+    ];
+    const continued = mount(FeaturesCard, { props: { features, rowAligned: true } });
+    const segments = continued.findAll('[data-feature-segment]');
+    // The tall feature is alone in its segment, so the card can cut either side of it.
+    expect(segments.map((segment) => segment.findAll('[data-feature]').length)).toEqual([1, 1, 1]);
+    expect(segments[1].get('[data-feature]').classes()).toContain('features__item--wide');
+    expect(segments[0].get('[data-feature]').classes()).not.toContain('features__item--wide');
+
+    const compact = mount(FeaturesCard, { props: { features } });
+    expect(compact.find('.features__item--wide').exists()).toBe(false);
+  });
+
   it('labels feature references to other dedicated cards', () => {
     const wrapper = mount(FeaturesCard, {
       props: {

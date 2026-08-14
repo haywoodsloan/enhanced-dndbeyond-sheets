@@ -54,6 +54,14 @@ const COLUMN_TARGET = 450;
 const COLUMN_LIMIT = COLUMN_TARGET * 3;
 const LEVEL_ENOUGH = 150;
 
+/** Roughly a page-tall column of text. A feature past this can't fit a column at
+ * all, so it takes the card's full width rather than run off the page edge. */
+const FULL_WIDTH_WEIGHT = 2800;
+
+function spansColumns(item: FeatureItem): boolean {
+  return props.rowAligned && weightOf(item) >= FULL_WIDTH_WEIGHT;
+}
+
 function segmentsOf(items: FeatureItem[]): FeatureItem[][] {
   if (!props.rowAligned) return [items];
   const segments: FeatureItem[][] = [];
@@ -61,22 +69,29 @@ function segmentsOf(items: FeatureItem[]): FeatureItem[][] {
     { items: [] as FeatureItem[], weight: 0 },
     { items: [] as FeatureItem[], weight: 0 },
   ];
+  const flush = () => {
+    const packed = columns.flatMap((column) => column.items);
+    if (packed.length) segments.push(packed);
+    columns = [
+      { items: [], weight: 0 },
+      { items: [], weight: 0 },
+    ];
+  };
   for (const item of items) {
+    // A full-width feature is its own segment, so the card can cut either side of it.
+    if (spansColumns(item)) {
+      flush();
+      segments.push([item]);
+      continue;
+    }
     const shorter = columns[0].weight <= columns[1].weight ? columns[0] : columns[1];
     shorter.items.push(item);
     shorter.weight += weightOf(item);
     const filled = Math.min(columns[0].weight, columns[1].weight);
     const gap = Math.abs(columns[0].weight - columns[1].weight);
-    if (filled >= COLUMN_TARGET && (gap <= LEVEL_ENOUGH || filled >= COLUMN_LIMIT)) {
-      segments.push(columns.flatMap((column) => column.items));
-      columns = [
-        { items: [], weight: 0 },
-        { items: [], weight: 0 },
-      ];
-    }
+    if (filled >= COLUMN_TARGET && (gap <= LEVEL_ENOUGH || filled >= COLUMN_LIMIT)) flush();
   }
-  const tail = columns.flatMap((column) => column.items);
-  if (tail.length) segments.push(tail);
+  flush();
   return segments;
 }
 
@@ -106,6 +121,7 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
           v-for="(item, index) in segment"
           :key="index"
           class="features__item"
+          :class="{ 'features__item--wide': spansColumns(item) }"
           data-feature
         >
           <span class="features__name">{{ item.name }}</span
@@ -215,6 +231,11 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 
 .features__item:not(:last-child) {
   margin-bottom: 6px;
+}
+
+/* Too tall for one column, so it reads across the whole card instead. */
+.features__item--wide {
+  column-span: all;
 }
 
 /* A disc marker to match the other bulleted list cards (a multi-column list can
