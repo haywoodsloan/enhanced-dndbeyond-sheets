@@ -159,6 +159,9 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
             <span v-if="spell.related?.includes('companions')" class="spells__reference">
               (see {{ companionTitle }})
             </span>
+            <span v-if="spell.related?.includes('tables')" class="spells__reference">
+              (see Tables)
+            </span>
           </div>
           <span v-if="spell.material" class="spells__material">
             <strong>Material:</strong> {{ spell.material }}

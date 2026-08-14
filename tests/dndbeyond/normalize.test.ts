@@ -1318,6 +1318,14 @@ describe('normalizeCharacter', () => {
             snippet: 'Move {{speed/2#rounddown}} feet.',
           },
           {
+            name: 'Rend',
+            snippet: 'Hit: 1d8{{2+modifier:wis}} Force damage.',
+          },
+          {
+            name: 'Radiant Fire',
+            snippet: 'Takes 1d{{4+(classlevel-13)@min:0,max:1*4}} Radiant damage.',
+          },
+          {
             name: 'Effect Roll',
             snippet: 'Roll the effect die.',
             dice: { diceCount: 1, diceValue: 6, diceString: '1d6' },
@@ -1373,6 +1381,10 @@ describe('normalizeCharacter', () => {
       'Deal 1d4 Psychic damage.',
     );
     expect(actionByName.get('Fleet Step')?.summary).toBe('Move 15 feet.');
+    // A placeholder glued to a die is a damage bonus, so it keeps its sign.
+    expect(actionByName.get('Rend')?.summary).toBe('Hit: 1d8+5 Force damage.');
+    // The clamp binds to the bracket, so level 14+ steps the die up to 1d8.
+    expect(actionByName.get('Radiant Fire')?.summary).toBe('Takes 1d8 Radiant damage.');
     expect(actionByName.get('Effect Roll')?.roll).toBe('1d6+3');
 
     const feats = normalized.features.find((group) => group.label === 'Feats')?.items ?? [];
@@ -1386,6 +1398,38 @@ describe('normalizeCharacter', () => {
     expect(feats.find((item) => item.name === 'Long Form')?.summary).toMatch(/…$/);
     expect(feats.some((item) => !item.name)).toBe(false);
     expect(feats.some((item) => item.name === 'Ability Score Increases')).toBe(false);
+  });
+
+  it('keeps a duplicated action summary on the Features card only', () => {
+    const shared = 'When you fail an ability check, you can expend a use of Second Wind.';
+    const character = {
+      id: 1,
+      name: 'Tactician',
+      stats: [],
+      classes: [
+        {
+          level: 5,
+          definition: {
+            name: 'Fighter',
+            classFeatures: [
+              { id: 100, name: 'Tactical Mind', requiredLevel: 1, snippet: shared },
+            ],
+          },
+        },
+      ],
+      actions: {
+        class: [{ name: 'Tactical Mind', componentId: 100, snippet: shared }],
+      },
+    } as unknown as RawCharacter;
+
+    const normalized = normalizeCharacter(character);
+    const feature = normalized.features
+      .flatMap((group) => group.items)
+      .find((item) => item.name === 'Tactical Mind');
+    const action = normalized.actions.find((entry) => entry.name === 'Tactical Mind');
+    expect(feature?.summary).toBe(shared);
+    expect(action?.summary).toBeUndefined();
+    expect(action?.related).toEqual(['features']);
   });
 
   it('lists spells with levels, sorted ascending', () => {

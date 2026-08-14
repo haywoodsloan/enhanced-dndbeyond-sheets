@@ -1047,6 +1047,26 @@ function evaluateTieredClassLevel(expression: string, classLevel: number): numbe
   return base + thresholds.filter((threshold) => classLevel >= threshold).length;
 }
 
+/** Rounding and clamp flags normally trail the whole expression, but D&D Beyond
+ * also writes them against a bracketed term with more maths after it, as in
+ * `4+(classlevel-13)@min:0,max:1*4`. Those bind to the bracket, so they are
+ * folded to a number before the outer expression is evaluated. */
+const BRACKETED_FLAGS =
+  /\(([^()]+)\)@((?:(?:min|max):-?\d+|rounddown|roundup)(?:,(?:(?:min|max):-?\d+|rounddown|roundup))*)/gi;
+
+function applyValueFlags(value: number, flags: string[]): number {
+  let result = value;
+  for (const flag of flags) {
+    const min = /^min:(-?\d+)/.exec(flag);
+    const max = /^max:(-?\d+)/.exec(flag);
+    if (min) result = Math.max(result, Number(min[1]));
+    else if (max) result = Math.min(result, Number(max[1]));
+    else if (/rounddown/i.test(flag)) result = Math.floor(result);
+    else if (/roundup/i.test(flag)) result = Math.ceil(result);
+  }
+  return result;
+}
+
 function makePlaceholderResolver(
   abilities: AbilityScore[],
   characterLevel: number,
@@ -1056,11 +1076,33 @@ function makePlaceholderResolver(
   const modByKey = new Map(abilities.map((ability) => [ability.key, ability.modifier]));
   const scoreByKey = new Map(abilities.map((ability) => [ability.key, ability.score]));
   return (text, context = {}) =>
-    text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_whole, expr: string) => {
+    text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_whole, expr: string, offset: number, whole: string) => {
       const [beforeHash, format = ''] = expr.split('#');
       const classLevel = context.classLevel ?? characterLevel;
+      const substitute = (source: string): string =>
+        source
+          .replace(/modifier:([a-z]{3})/gi, (_match, ability: string) =>
+            String(modByKey.get(ability.toLowerCase() as AbilityKey) ?? 'unknown'),
+          )
+          .replace(/abilityscore:([a-z]{3})/gi, (_match, ability: string) =>
+            String(scoreByKey.get(ability.toLowerCase() as AbilityKey) ?? 'unknown'),
+          )
+          .replace(/characterlevel/gi, String(characterLevel))
+          .replace(/classlevel/gi, String(classLevel))
+          .replace(/proficiency(?:bonus)?/gi, String(proficiencyBonus(characterLevel)))
+          .replace(/limiteduse/gi, String(context.limitedUse ?? ''))
+          .replace(/speed/gi, String(speed));
       const tieredValue = evaluateTieredClassLevel(beforeHash, classLevel);
-      const [core, ...flags] = (tieredValue == null ? beforeHash.split('@') : [beforeHash]).map(
+      const folded =
+        tieredValue == null
+          ? beforeHash.replace(BRACKETED_FLAGS, (unchanged, inner: string, flagList: string) => {
+              const bracketed = evaluateArithmetic(substitute(inner));
+              return bracketed == null
+                ? unchanged
+                : String(applyValueFlags(bracketed, flagList.split(',')));
+            })
+          : beforeHash;
+      const [core, ...flags] = (tieredValue == null ? folded.split('@') : [folded]).map(
         (part) => part.trim(),
       );
       const modMatch = /^modifier:([a-z]+)$/i.exec(core);
@@ -1096,32 +1138,15 @@ function makePlaceholderResolver(
       } else {
         // Arithmetic on the known character values, e.g. (classlevel/2),
         // 2*characterlevel, speed/2, or 13+proficiency.
-        const arith = core
-          .replace(/modifier:([a-z]{3})/gi, (_match, ability: string) =>
-            String(modByKey.get(ability.toLowerCase() as AbilityKey) ?? 'unknown'),
-          )
-          .replace(/abilityscore:([a-z]{3})/gi, (_match, ability: string) =>
-            String(scoreByKey.get(ability.toLowerCase() as AbilityKey) ?? 'unknown'),
-          )
-          .replace(/characterlevel/gi, String(characterLevel))
-          .replace(/classlevel/gi, String(classLevel))
-          .replace(/proficiency(?:bonus)?/gi, String(proficiencyBonus(characterLevel)))
-          .replace(/limiteduse/gi, String(context.limitedUse ?? ''))
-          .replace(/speed/gi, String(speed));
-        value = evaluateArithmetic(arith);
+        value = evaluateArithmetic(substitute(core));
       }
       if (value == null || Number.isNaN(value)) return ''; // unresolved -> drop
       const allFlags = [...flags.flatMap((flag) => flag.split(',')), ...format.split(',')];
-      for (const flag of allFlags) {
-        const min = /^min:(-?\d+)/.exec(flag);
-        const max = /^max:(-?\d+)/.exec(flag);
-        if (min) value = Math.max(value, Number(min[1]));
-        else if (max) value = Math.min(value, Number(max[1]));
-        else if (/rounddown/i.test(flag)) value = Math.floor(value);
-        else if (/roundup/i.test(flag)) value = Math.ceil(value);
-      }
-      value = Math.round(value);
-      if (format.split(',').some((flag) => /^signed$/i.test(flag.trim()))) {
+      value = Math.round(applyValueFlags(value, allFlags));
+      // A placeholder written straight after a die is a damage bonus ("1d8{{…}}"),
+      // so it needs its sign or the two run together as one number.
+      const followsDice = /\d+d\d+\s*$/i.test(whole.slice(0, offset));
+      if (format.split(',').some((flag) => /^signed$/i.test(flag.trim())) || followsDice) {
         return value >= 0 ? `+${value}` : String(value);
       }
       if (modMatch && !/unsigned/i.test(format)) return value >= 0 ? `+${value}` : String(value);
@@ -2503,6 +2528,7 @@ function resolveSpells(
   level: number,
   resolvePlaceholders: PlaceholderResolver,
   abilities?: AbilityScore[],
+  tabled: Set<string> = new Set(),
 ): SpellEntry[] {
   const disguiseFeatIds = new Set<number>();
   for (const feat of asArray(raw.feats)) {
@@ -2627,10 +2653,12 @@ function resolveSpells(
     const summary = structured
       ? summarize(structured.intro || snippet, 400)
       : summarize(snippet || description, 400, spellResolver);
-    if (summary) entry.summary = summary;
+    const tabledHere = tabled.has(def.name);
+    if (summary) entry.summary = tabledHere ? withoutBelowTableReference(summary, def.name) : summary;
     if (structured?.list.items.length) entry.list = structured.list;
     if (featureUse) entry.featureUses = [featureUse];
     if (hasCompanion) entry.related = ['companions'];
+    if (tabledHere) entry.related = [...(entry.related ?? []), 'tables'];
     byName.set(def.name, entry);
   };
   for (const group of asArray(raw.classSpells)) asArray(group.spells).forEach(add);
@@ -3431,6 +3459,35 @@ function withoutNamedTableReference(text: string, title: string): string {
     .replace(/\s+([.!?,;])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** The roll table sits on the Tables card, so "below" no longer locates it. */
+function withoutBelowTableReference(text: string, title: string): string {
+  return text.replace(/\bthe (?:table below|following table)\b/gi, `the ${title} table`);
+}
+
+/**
+ * An action that isn't a real activation leaves its feature's text in place, so
+ * both cards end up printing the same paragraph. The Features card keeps it and
+ * the action points there, mirroring how an activation takes the text the other
+ * way round.
+ */
+function pointDuplicateActionsAtFeatures(
+  actions: CharacterAction[],
+  features: FeatureGroup[],
+): void {
+  const summaryByName = new Map<string, string>();
+  for (const group of features) {
+    for (const item of group.items) {
+      if (item.summary) summaryByName.set(item.name.trim().toLowerCase(), item.summary);
+    }
+  }
+  for (const action of actions) {
+    if (!action.summary) continue;
+    if (summaryByName.get(action.name.trim().toLowerCase()) !== action.summary) continue;
+    delete action.summary;
+    action.related = [...(action.related ?? []), 'features'];
+  }
 }
 
 interface RuleSource {
@@ -5005,7 +5062,13 @@ export function normalizeCharacter(raw: RawCharacter): Character {
   );
   const resources = resolveResourceMap(raw, level, abilities);
   const spellsByComponent = featureSpellsByComponent(raw);
-  const spells = resolveSpells(raw, level, resolvePlaceholders, abilities);
+  const spells = resolveSpells(
+    raw,
+    level,
+    resolvePlaceholders,
+    abilities,
+    new Set(ruleTables.map((table) => table.source)),
+  );
   // A feature doesn't need its own checkboxes when the same limited-use pool is
   // already shown on a corresponding action in the Actions card.
   for (const id of resourceComponentIds) resources.delete(id);
@@ -5018,6 +5081,7 @@ export function normalizeCharacter(raw: RawCharacter): Character {
     spellsByComponent,
     resolvePlaceholders,
   );
+  pointDuplicateActionsAtFeatures(actions, features);
   const featureCount = features.reduce((total, group) => total + group.items.length, 0);
   const companionPartCount = companions.reduce(
     (total, companion) => total + 1 + companion.details.length,
