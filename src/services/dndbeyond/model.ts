@@ -306,6 +306,12 @@ export interface StructuredList {
   items: { label?: string; text: string }[];
 }
 
+/** A small lookup grid shown inside the feature it belongs to. */
+export interface FeatureTable {
+  columns: string[];
+  rows: string[][];
+}
+
 /** A named sub-section of a feature (e.g. Circle of Mortality's "Pull of Death"). */
 export interface FeaturePart {
   /** The sub-part name; '' for an un-named trailing rider. */
@@ -314,6 +320,8 @@ export interface FeaturePart {
   text: string;
   /** Structured option rows that should render as a list rather than prose. */
   list?: StructuredList;
+  /** Lookup rows too wide to read as "label: value", kept as a grid. */
+  table?: FeatureTable;
   /** Spells selected for this sub-part, such as Magic Initiate's cantrips. */
   grantedSpells?: string[];
   /** Dedicated card that owns this part's full mechanics. */

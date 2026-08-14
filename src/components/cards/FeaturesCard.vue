@@ -37,12 +37,15 @@ function weightOf(item: FeatureItem): number {
 
 function partWeight(part: FeaturePart): number {
   const rows = part.list?.items ?? [];
+  const table = part.table;
   const text =
     part.label.length +
     part.text.length +
-    rows.reduce((sum, row) => sum + (row.label?.length ?? 0) + row.text.length, 0);
+    rows.reduce((sum, row) => sum + (row.label?.length ?? 0) + row.text.length, 0) +
+    (table?.rows ?? []).reduce((sum, row) => sum + row.join('').length, 0);
   // Every part and list row starts a new line regardless of how short it is.
-  return text + (1 + rows.length) * 40;
+  const lines = 1 + rows.length + (table ? table.rows.length + 1 : 0);
+  return text + lines * 40;
 }
 
 /**
@@ -228,6 +231,27 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
             <div v-if="part.list?.items.length" class="features__part-list" data-feature-list>
               <StructuredList :list="part.list" />
             </div>
+            <div
+              v-if="part.table?.rows.length"
+              class="features__table"
+              :style="{
+                gridTemplateColumns: `repeat(${part.table.columns.length}, minmax(0, auto))`,
+              }"
+              data-feature-table
+            >
+              <div class="features__table-row features__table-row--head">
+                <span v-for="(column, cIndex) in part.table.columns" :key="cIndex">
+                  {{ column }}
+                </span>
+              </div>
+              <div
+                v-for="(row, rIndex) in part.table.rows"
+                :key="rIndex"
+                class="features__table-row"
+              >
+                <span v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</span>
+              </div>
+            </div>
           </div>
         </li>
       </ul>
@@ -373,6 +397,40 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 
 .features__part-list {
   margin-top: 3px;
+}
+
+/* One shared grid for the header and every row (via `subgrid`), so the columns
+   line up; only as wide as its cells, since these sit inside a narrow column. */
+.features__table {
+  display: grid;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.features__table-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  border-top: 1px solid var(--p-primary-200, #e4e4e7);
+}
+
+.features__table-row > span {
+  min-width: 0;
+  padding: 2px 5px;
+}
+
+.features__table-row > span + span {
+  border-left: 1px solid var(--p-primary-200, #e4e4e7);
+}
+
+.features__table-row--head {
+  font-weight: 700;
+  color: var(--p-text-muted-color, #888);
+  border-top: 0;
+  background: var(--p-primary-50, #fafafa);
 }
 
 </style>

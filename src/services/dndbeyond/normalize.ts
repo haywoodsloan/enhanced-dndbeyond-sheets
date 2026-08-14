@@ -3410,6 +3410,13 @@ function lookupToList(lookup: FeatureLookup): StructuredList {
   };
 }
 
+/** Past two columns a row stops reading as "label: value", so it stays a grid. */
+function lookupContent(lookup: FeatureLookup): Pick<FeaturePart, 'list' | 'table'> {
+  return lookup.columns.length > 2
+    ? { table: { columns: lookup.columns, rows: lookup.rows } }
+    : { list: lookupToList(lookup) };
+}
+
 function withoutNamedTableReference(text: string, title: string): string {
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return text
@@ -3923,7 +3930,7 @@ function parseFeatureParts(
     if (!lookup) continue;
     used.add(lookup);
     part.text = withoutNamedTableReference(part.text, lookup.title);
-    part.list = lookupToList(lookup);
+    Object.assign(part, lookupContent(lookup));
   }
   // A table whose caption names the feature itself (domain spell lists, lineage
   // options) belongs to no part, so it becomes one rather than being dropped.
@@ -3935,7 +3942,7 @@ function parseFeatureParts(
     parts.push({
       label: isFeatureTitle ? '' : lookup.title,
       text: '',
-      list: lookupToList(lookup),
+      ...lookupContent(lookup),
     });
   }
   return { intro: introChunks.join(' '), parts };
@@ -4359,6 +4366,7 @@ function resolveFeatures(
             part.text ||
             part.reference ||
             part.list?.items.length ||
+            part.table?.rows.length ||
             part.grantedSpells?.length,
         )
         .filter(
@@ -4569,7 +4577,9 @@ function resolveFeatures(
 
     // A whole feature that is itself an Actions-card activation just points there
     // — its full text (benefits and all) lives on the action.
-    const hasStructuredBenefits = content.parts?.some((part) => part.list?.items.length);
+    const hasStructuredBenefits = content.parts?.some(
+      (part) => part.list?.items.length || part.table?.rows.length,
+    );
     if (name && !hasStructuredBenefits && isDetailedActionFeature(id, name)) {
       const related = content.related?.filter((section) => section !== 'companions');
       return {

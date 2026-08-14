@@ -3401,6 +3401,44 @@ describe('normalizeCharacter', () => {
     });
   });
 
+  it('keeps a lookup wider than two columns as a table', () => {
+    const character = {
+      id: 1,
+      name: 'Shifter',
+      stats: [],
+      classes: [],
+      feats: [
+        {
+          definition: {
+            id: 802,
+            name: 'Wild Shape',
+            description:
+              '<p>You can shape-shift into a Beast form.</p>' +
+              '<p><strong>Beast Shapes.</strong> Your form is limited by the Beast Shapes table.</p>' +
+              '<table><caption>Beast Shapes</caption><thead><tr><th>Druid Level</th><th>Known Forms</th><th>Max CR</th><th>Fly Speed</th></tr></thead><tbody>' +
+              '<tr><td>2</td><td>4</td><td>1/4</td><td>No</td></tr>' +
+              '<tr><td>8</td><td>8</td><td>1</td><td>Yes</td></tr>' +
+              '</tbody></table>',
+          },
+        },
+      ],
+      modifiers: {},
+    } as unknown as RawCharacter;
+
+    const shapes = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Wild Shape')
+      ?.parts?.find((part) => part.label === 'Beast Shapes');
+    expect(shapes?.list).toBeUndefined();
+    expect(shapes?.table).toEqual({
+      columns: ['Druid Level', 'Known Forms', 'Max CR', 'Fly Speed'],
+      rows: [
+        ['2', '4', '1/4', 'No'],
+        ['8', '8', '1', 'Yes'],
+      ],
+    });
+  });
+
   it('tracks the limited free-cast spells a feature grants', () => {
     const spells = normalizeCharacter(raw).spells;
     // Gathered Whispers grants a free Augury once per long rest.
