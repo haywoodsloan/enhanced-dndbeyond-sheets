@@ -4,10 +4,12 @@ import type { RuleTable } from '@/services/dndbeyond/model';
 defineProps<{ tables: RuleTable[] }>();
 
 function columnsFor(table: RuleTable): string {
-  const trailing = Math.max(0, table.columns.length - 1);
-  return trailing
-    ? `minmax(40px, max-content) repeat(${trailing}, minmax(0, 1fr))`
-    : 'minmax(0, 1fr)';
+  return `repeat(${Math.max(1, table.columns.length)}, minmax(40px, auto))`;
+}
+
+/** Roll results centre nicely under their die; names and items don't. */
+function rollKeyed(table: RuleTable): boolean {
+  return /^(?:\d*d\d+|roll)$/i.test((table.columns[0] ?? '').replace(/\s+/g, ''));
 }
 </script>
 
@@ -27,21 +29,25 @@ function columnsFor(table: RuleTable): string {
         </span>
       </header>
       <div
-        v-if="table.columns.length"
-        class="rule-table__row rule-table__head"
+        class="rule-table__grid"
+        :class="{ 'rule-table__grid--roll': rollKeyed(table) }"
         :style="{ gridTemplateColumns: columnsFor(table) }"
-        data-rule-row
       >
-        <span v-for="(column, index) in table.columns" :key="index">{{ column }}</span>
-      </div>
-      <div
-        v-for="(row, rowIndex) in table.rows"
-        :key="rowIndex"
-        class="rule-table__row"
-        :style="{ gridTemplateColumns: columnsFor(table) }"
-        data-rule-row
-      >
-        <span v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</span>
+        <div
+          v-if="table.columns.length"
+          class="rule-table__row rule-table__head"
+          data-rule-row
+        >
+          <span v-for="(column, index) in table.columns" :key="index">{{ column }}</span>
+        </div>
+        <div
+          v-for="(row, rowIndex) in table.rows"
+          :key="rowIndex"
+          class="rule-table__row"
+          data-rule-row
+        >
+          <span v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</span>
+        </div>
       </div>
     </section>
   </div>
@@ -75,8 +81,19 @@ function columnsFor(table: RuleTable): string {
   color: var(--p-text-muted-color, #888);
 }
 
+/* One shared grid for the header and every row (via `subgrid`), so a column is
+   the same width on every row. The grid is only as wide as its widest cells, so
+   a two-column lookup doesn't stretch a narrow value across the whole card. */
+.rule-table__grid {
+  display: grid;
+  width: max-content;
+  max-width: 100%;
+}
+
 .rule-table__row {
   display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   border-top: 1px solid var(--p-primary-200, #e4e4e7);
   font-size: 11px;
   line-height: 1.25;
@@ -100,6 +117,9 @@ function columnsFor(table: RuleTable): string {
 
 .rule-table__row:not(.rule-table__head) > span:first-child {
   font-weight: 700;
+}
+
+.rule-table__grid--roll .rule-table__row:not(.rule-table__head) > span:first-child {
   text-align: center;
 }
 </style>

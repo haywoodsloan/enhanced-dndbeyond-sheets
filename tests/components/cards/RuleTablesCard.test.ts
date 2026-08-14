@@ -40,8 +40,8 @@ describe('RuleTablesCard', () => {
       },
     });
 
-    expect(wrapper.get('.rule-table__row').attributes('style')).toContain(
-      'minmax(0, 1fr)',
+    expect(wrapper.get('.rule-table__grid').attributes('style')).toContain(
+      'repeat(1, minmax(40px, auto))',
     );
     expect(wrapper.get('.rule-table__source').text()).toBe('Wild Magic');
   });
