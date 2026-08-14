@@ -126,11 +126,11 @@ watch(
   display: flex;
   align-items: stretch;
   /* Fill the card height (SectionCard stretches the content) so the blank
-     write-in rows grow into the leftover space. The -6px nudges the columns up
-     under the title; the matching +6px height keeps the bottom at the card edge
-     so the last write-in row reaches it instead of being cut short. */
-  height: calc(100% + 6px);
-  margin-top: -6px;
+     write-in rows grow into the leftover space. Nudging this up under the title
+     with a negative margin would put the column headers above the body's clip
+     edge and shave their tops off, so the gap is tightened on the header row's
+     own line box instead. */
+  height: 100%;
 }
 
 .column {
@@ -162,6 +162,7 @@ watch(
 .column__label {
   justify-self: center;
   font-size: 12px;
+  line-height: 1;
   font-weight: 600;
   color: var(--p-text-muted-color, #888);
   white-space: nowrap;
