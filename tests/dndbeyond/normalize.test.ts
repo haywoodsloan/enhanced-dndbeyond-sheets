@@ -3395,8 +3395,8 @@ describe('normalizeCharacter', () => {
     expect(spells?.parts?.[0]?.list).toEqual({
       label: 'Prepared Spells',
       items: [
-        { label: 'Level 3', text: 'Shield, Thunderwave' },
-        { label: 'Level 5', text: 'Scorching Ray, Shatter' },
+        { label: 'Level 3:', text: 'Shield, Thunderwave' },
+        { label: 'Level 5:', text: 'Scorching Ray, Shatter' },
       ],
     });
   });

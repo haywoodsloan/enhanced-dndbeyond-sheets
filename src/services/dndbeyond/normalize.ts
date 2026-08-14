@@ -3404,7 +3404,7 @@ function lookupToList(lookup: FeatureLookup): StructuredList {
   return {
     label: lookup.columns.slice(1).join(' · '),
     items: lookup.rows.map(([label, ...rest]) => ({
-      label: levels && /^\d+$/.test(label) ? `Level ${label}` : label,
+      label: levels && /^\d+$/.test(label) ? `Level ${label}:` : label,
       text: rest.join(' · '),
     })),
   };
