@@ -179,6 +179,33 @@ describe('FeaturesCard', () => {
     expect(compact.find('.features__item--flowing').exists()).toBe(false);
   });
 
+  it('heads the second column of a split feature with the feature name', () => {
+    const part = (label: string) => ({ label, text: 'Long enough to fill a column. '.repeat(30) });
+    const features = [
+      {
+        label: 'Class Features',
+        items: [
+          {
+            name: 'Wild Shape',
+            summary: 'The power of nature allows you to assume the form of a Beast.',
+            parts: [part('Number of Uses'), part('Known Forms'), part('Beast Shapes')],
+          },
+        ],
+      },
+    ];
+
+    const continued = mount(FeaturesCard, { props: { features, rowAligned: true } });
+    const names = continued.findAll('.features__name').map((node) => node.text());
+    expect(names).toEqual(['Wild Shape', 'Wild Shape (cont.)']);
+    // The summary belongs to the first chunk only; the parts are split between them.
+    expect(continued.findAll('.features__summary')).toHaveLength(1);
+    const chunks = continued.findAll('[data-feature]');
+    expect(chunks.map((chunk) => chunk.findAll('[data-feature-part]').length)).toEqual([1, 2]);
+
+    const compact = mount(FeaturesCard, { props: { features } });
+    expect(compact.findAll('.features__name').map((node) => node.text())).toEqual(['Wild Shape']);
+  });
+
   it('labels feature references to other dedicated cards', () => {
     const wrapper = mount(FeaturesCard, {
       props: {

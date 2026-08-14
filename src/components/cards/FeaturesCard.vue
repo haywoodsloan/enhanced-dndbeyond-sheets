@@ -14,28 +14,35 @@ const props = withDefaults(
   { companionTitle: 'Companions', rowAligned: false },
 );
 
+type FeaturePart = NonNullable<FeatureItem['parts']>[number];
+
+/** One column's worth of a feature: the whole thing, or a slice of a long one. */
+interface FeatureChunk {
+  item: FeatureItem;
+  name: string;
+  parts: FeaturePart[];
+  lead: boolean;
+  flowing: boolean;
+}
+
 /** Rough rendered height of an item, from the text it will show. */
 function weightOf(item: FeatureItem): number {
-  const parts = item.parts ?? [];
   const text =
     item.name.length +
     (item.summary?.length ?? 0) +
     (item.grantedSpells?.join(', ').length ?? 0) +
-    (item.grants ?? []).reduce((total, grant) => total + grant.items.join(', ').length, 0) +
-    parts.reduce(
-      (total, part) =>
-        total +
-        part.label.length +
-        part.text.length +
-        (part.list?.items ?? []).reduce(
-          (sum, row) => sum + (row.label?.length ?? 0) + row.text.length,
-          0,
-        ),
-      0,
-    );
+    (item.grants ?? []).reduce((total, grant) => total + grant.items.join(', ').length, 0);
+  return text + (item.parts ?? []).reduce((total, part) => total + partWeight(part), 0);
+}
+
+function partWeight(part: FeaturePart): number {
+  const rows = part.list?.items ?? [];
+  const text =
+    part.label.length +
+    part.text.length +
+    rows.reduce((sum, row) => sum + (row.label?.length ?? 0) + row.text.length, 0);
   // Every part and list row starts a new line regardless of how short it is.
-  const lines = parts.length + parts.reduce((total, part) => total + (part.list?.items.length ?? 0), 0);
-  return text + lines * 40;
+  return text + (1 + rows.length) * 40;
 }
 
 /**
@@ -54,40 +61,73 @@ const COLUMN_TARGET = 450;
 const COLUMN_LIMIT = COLUMN_TARGET * 3;
 const LEVEL_ENOUGH = 150;
 
-/** Roughly a page-tall column of text. A feature past this can't fit a column at
- * all, so it wraps into the next one rather than run off the page edge. */
-const FULL_WIDTH_WEIGHT = 2800;
+/** Roughly a page-tall column of text: what one feature can take before it has
+ * to carry on in the next column. */
+const COLUMN_CAPACITY = 2800;
 
-function flowsColumns(item: FeatureItem): boolean {
-  return props.rowAligned && weightOf(item) >= FULL_WIDTH_WEIGHT;
+/** A feature taller than a column continues in the next one under a "(cont.)"
+ * heading, cut between its named parts so the split lands somewhere readable. */
+function chunksOf(item: FeatureItem): FeatureChunk[] {
+  const parts = item.parts ?? [];
+  const total = weightOf(item);
+  const pieces = Math.ceil(total / COLUMN_CAPACITY);
+  if (!props.rowAligned || pieces < 2) {
+    return [{ item, name: item.name, parts, lead: true, flowing: false }];
+  }
+  if (parts.length < 2) {
+    // Nothing to cut between, so let the text itself wrap across the columns.
+    return [{ item, name: item.name, parts, lead: true, flowing: true }];
+  }
+  const target = total / pieces;
+  const chunks: FeaturePart[][] = [];
+  let current: FeaturePart[] = [];
+  let weight = total - parts.reduce((sum, part) => sum + partWeight(part), 0);
+  for (const part of parts) {
+    if (current.length && chunks.length < pieces - 1 && weight + partWeight(part) > target) {
+      chunks.push(current);
+      current = [];
+      weight = 0;
+    }
+    current.push(part);
+    weight += partWeight(part);
+  }
+  chunks.push(current);
+  return chunks.map((chunkParts, index) => ({
+    item,
+    name: index ? `${item.name} (cont.)` : item.name,
+    parts: chunkParts,
+    lead: index === 0,
+    flowing: false,
+  }));
 }
 
-function segmentsOf(items: FeatureItem[]): FeatureItem[][] {
-  if (!props.rowAligned) return [items];
-  const segments: FeatureItem[][] = [];
+function segmentsOf(items: FeatureItem[]): FeatureChunk[][] {
+  const chunked = items.map(chunksOf);
+  if (!props.rowAligned) return [chunked.flat()];
+  const segments: FeatureChunk[][] = [];
   let columns = [
-    { items: [] as FeatureItem[], weight: 0 },
-    { items: [] as FeatureItem[], weight: 0 },
+    { chunks: [] as FeatureChunk[], weight: 0 },
+    { chunks: [] as FeatureChunk[], weight: 0 },
   ];
   const flush = () => {
-    const packed = columns.flatMap((column) => column.items);
+    const packed = columns.flatMap((column) => column.chunks);
     if (packed.length) segments.push(packed);
     columns = [
-      { items: [], weight: 0 },
-      { items: [], weight: 0 },
+      { chunks: [], weight: 0 },
+      { chunks: [], weight: 0 },
     ];
   };
-  for (const item of items) {
-    // A feature that wraps across the columns owns its segment, so the columns
+  for (const chunks of chunked) {
+    // A feature that fills more than a column owns its segment, so the columns
     // still end level either side of it and the card can cut there.
-    if (flowsColumns(item)) {
+    if (chunks.length > 1 || chunks[0].flowing) {
       flush();
-      segments.push([item]);
+      segments.push(chunks);
       continue;
     }
     const shorter = columns[0].weight <= columns[1].weight ? columns[0] : columns[1];
-    shorter.items.push(item);
-    shorter.weight += weightOf(item);
+    shorter.chunks.push(chunks[0]);
+    shorter.weight += weightOf(chunks[0].item);
     const filled = Math.min(columns[0].weight, columns[1].weight);
     const gap = Math.abs(columns[0].weight - columns[1].weight);
     if (filled >= COLUMN_TARGET && (gap <= LEVEL_ENOUGH || filled >= COLUMN_LIMIT)) flush();
@@ -119,40 +159,53 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
         data-feature-segment
       >
         <li
-          v-for="(item, index) in segment"
+          v-for="(chunk, index) in segment"
           :key="index"
           class="features__item"
-          :class="{ 'features__item--flowing': flowsColumns(item) }"
+          :class="{ 'features__item--flowing': chunk.flowing }"
           data-feature
         >
-          <span class="features__name">{{ item.name }}</span
-          ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
-          <span v-if="item.reference" class="features__reference features__reference--item">
-            (see {{ sectionLabel(item.reference, companionTitle) }})
-          </span>
-          <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
+          <span class="features__name">{{ chunk.name }}</span
+          ><ResourceBoxes v-if="chunk.lead && chunk.item.resource" :resource="chunk.item.resource" />
           <span
-            v-for="related in item.related"
-            :key="related"
+            v-if="chunk.lead && chunk.item.reference"
             class="features__reference features__reference--item"
           >
-            (see {{ sectionLabel(related, companionTitle) }})
+            (see {{ sectionLabel(chunk.item.reference, companionTitle) }})
           </span>
-          <span
-            v-for="grant in item.grants"
-            :key="grant.label"
-            class="features__grants"
-            data-feature-grant
-          >
-            <span class="features__grants-label">{{ grant.label }}:</span>
-            {{ grant.items.join(', ') }}
-          </span>
-          <span v-if="item.grantedSpells?.length" class="features__spells" data-feature-spells>
-            <span class="features__spells-label">Spells:</span>
-            {{ item.grantedSpells.join(', ') }}
-          </span>
+          <RichText
+            v-if="chunk.lead && chunk.item.summary"
+            :text="chunk.item.summary"
+            class="features__summary"
+          />
+          <template v-if="chunk.lead">
+            <span
+              v-for="related in chunk.item.related"
+              :key="related"
+              class="features__reference features__reference--item"
+            >
+              (see {{ sectionLabel(related, companionTitle) }})
+            </span>
+            <span
+              v-for="grant in chunk.item.grants"
+              :key="grant.label"
+              class="features__grants"
+              data-feature-grant
+            >
+              <span class="features__grants-label">{{ grant.label }}:</span>
+              {{ grant.items.join(', ') }}
+            </span>
+            <span
+              v-if="chunk.item.grantedSpells?.length"
+              class="features__spells"
+              data-feature-spells
+            >
+              <span class="features__spells-label">Spells:</span>
+              {{ chunk.item.grantedSpells.join(', ') }}
+            </span>
+          </template>
           <div
-            v-for="(part, pIndex) in item.parts"
+            v-for="(part, pIndex) in chunk.parts"
             :key="pIndex"
             class="features__part"
             data-feature-part
