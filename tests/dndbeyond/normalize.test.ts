@@ -3439,6 +3439,35 @@ describe('normalizeCharacter', () => {
     });
   });
 
+  it('drops the footnote riders that annotate a feature table', () => {
+    const character = {
+      id: 1,
+      name: 'Replicator',
+      stats: [],
+      classes: [],
+      feats: [
+        {
+          definition: {
+            id: 803,
+            name: 'Replicate Magic Item',
+            description:
+              '<p>You have learned arcane plans that you use to make magic items.</p>' +
+              '<p><strong>Plans Known.</strong> Choose four plans to learn.</p>' +
+              '<p>*You can learn this option multiple times and must select a different item each time.<br />&dagger; See the appendix.</p>' +
+              '<p><strong>Duration.</strong> The item lasts until you die.</p>' +
+              '<p>&dagger; See the appendix.</p>',
+          },
+        },
+      ],
+      modifiers: {},
+    } as unknown as RawCharacter;
+
+    const parts = normalizeCharacter(character)
+      .features.flatMap((group) => group.items)
+      .find((item) => item.name === 'Replicate Magic Item')?.parts;
+    expect(parts?.map((part) => part.label)).toEqual(['Plans Known', 'Duration']);
+  });
+
   it('tracks the limited free-cast spells a feature grants', () => {
     const spells = normalizeCharacter(raw).spells;
     // Gathered Whispers grants a free Augury once per long rest.

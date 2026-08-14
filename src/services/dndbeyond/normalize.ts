@@ -3417,6 +3417,13 @@ function lookupContent(lookup: FeatureLookup): Pick<FeaturePart, 'list' | 'table
     : { list: lookupToList(lookup) };
 }
 
+/** An unnamed rider opening with a footnote marker annotates the table above it,
+ * not the feature. A feature with several tables repeats the same footnote after
+ * each one, and it points at book apparatus the sheet doesn't carry. */
+function isTableFootnote(part: FeaturePart): boolean {
+  return !part.label && /^[*†‡]/.test(part.text.trim());
+}
+
 function withoutNamedTableReference(text: string, title: string): string {
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return text
@@ -4372,7 +4379,8 @@ function resolveFeatures(
         .filter(
           (part) =>
             !/^\s*repeatable\b/i.test(part.label ?? '') &&
-            !/take this feat more than once/i.test(part.text ?? ''),
+            !/take this feat more than once/i.test(part.text ?? '') &&
+            !isTableFootnote(part),
         );
       if (parts.length) item.parts = parts;
     }
