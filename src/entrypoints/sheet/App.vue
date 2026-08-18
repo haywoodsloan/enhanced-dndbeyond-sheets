@@ -569,8 +569,9 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
     // Every card carries a recency: one the user moved uses its saved `seq` (≥ 1);
     // one left alone keeps a negative reading-order baseline, so a freshly-dragged
     // card always outranks the stationary ones — it takes its cell and they flow
-    // aside.
-    const priority = moved ? moved.seq : index - count;
+    // aside. Stationary cards rank in reading order so an earlier card seats its
+    // continuation run before a later card can take the page it needs.
+    const priority = moved ? moved.seq : -index;
     return {
       cols: card.cols,
       rows: card.rows,
