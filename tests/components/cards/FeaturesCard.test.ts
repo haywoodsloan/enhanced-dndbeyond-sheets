@@ -206,6 +206,29 @@ describe('FeaturesCard', () => {
     expect(compact.findAll('.features__name').map((node) => node.text())).toEqual(['Wild Shape']);
   });
 
+  it('keeps reading order so the browser can balance the columns', () => {
+    const long = 'A benefit worth several lines of text. '.repeat(12);
+    const features = [
+      {
+        label: 'Racial Traits',
+        items: [
+          { name: 'Languages', grants: [{ label: 'Languages', items: ['Common'] }] },
+          { name: 'Bestial Instincts', grants: [{ label: 'Skills', items: ['Athletics'] }] },
+          { name: 'Beasthide', summary: long },
+        ],
+      },
+    ];
+
+    // Reordering to "deal" items into columns can pair the two heaviest and
+    // strand a light one; column flow already cuts where the columns level up.
+    const wrapper = mount(FeaturesCard, { props: { features } });
+    expect(wrapper.findAll('.features__name').map((node) => node.text())).toEqual([
+      'Languages',
+      'Bestial Instincts',
+      'Beasthide',
+    ]);
+  });
+
   it('labels feature references to other dedicated cards', () => {
     const wrapper = mount(FeaturesCard, {
       props: {
@@ -229,15 +252,20 @@ describe('FeaturesCard', () => {
       },
     });
 
-    const items = wrapper.findAll('[data-feature]');
-    expect(items[0].text()).toContain('(see Attacks)');
-    expect(items[1].text()).toContain('(see Spells)');
-    expect(items[2].text()).toContain('(see Wild Shapes)');
-    expect(items[3].text()).toContain('(see Tables)');
-    expect(items[3].text().indexOf('Roll to determine the elixir effect.')).toBeLessThan(
-      items[3].text().indexOf('(see Tables)'),
+    const byName = new Map(
+      wrapper
+        .findAll('[data-feature]')
+        .map((item) => [item.get('.features__name').text(), item.text()] as const),
     );
-    expect(items[4].text()).toContain('(see Basics)');
+    expect(byName.get('Weapon Training')).toContain('(see Attacks)');
+    expect(byName.get('Mystic Arcanum')).toContain('(see Spells)');
+    expect(byName.get('Steel Defender')).toContain('(see Wild Shapes)');
+    const elixir = byName.get('Experimental Elixir') ?? '';
+    expect(elixir).toContain('(see Tables)');
+    expect(elixir.indexOf('Roll to determine the elixir effect.')).toBeLessThan(
+      elixir.indexOf('(see Tables)'),
+    );
+    expect(byName.get('Vital Training')).toContain('(see Basics)');
   });
 
   it('lists feature-granted spells without rendering their use trackers', () => {
