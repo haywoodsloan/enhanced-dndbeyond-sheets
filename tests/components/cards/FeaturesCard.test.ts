@@ -133,7 +133,10 @@ describe('FeaturesCard', () => {
     const items = wrapper.findAll('[data-feature]');
     expect(items).toHaveLength(2);
     for (const item of items) {
-      expect(item.classes()).toEqual(['features__item']);
+      expect(item.classes()).toContain('features__item');
+      // Nothing is allowed to run across the columns; a forced break between
+      // items is fine, splitting one open is not.
+      expect(item.classes()).not.toContain('features__item--flowing');
     }
   });
 

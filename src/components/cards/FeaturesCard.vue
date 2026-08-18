@@ -23,6 +23,8 @@ interface FeatureChunk {
   parts: FeaturePart[];
   lead: boolean;
   flowing: boolean;
+  /** Starts the second column: the split that levels the two best. */
+  breakBefore?: boolean;
 }
 
 /** Rough rendered height of an item, from the text it will show. Measured
@@ -145,8 +147,36 @@ function segmentsOf(items: FeatureItem[]): FeatureChunk[][] {
     if (props.rowAligned && weight >= SEGMENT_WEIGHT) flush();
   }
   flush();
+  for (const segment of segments) markColumnBreak(segment);
   return segments;
 }
+
+/**
+ * Column flow picks its own cut, and with unbreakable items it often picks a bad
+ * one — leaving one column half empty beside a long feature. The cut that levels
+ * the columns is cheap to find, so it is marked and forced.
+ */
+function markColumnBreak(segment: FeatureChunk[]): void {
+  if (segment.length < 2) return;
+  const weights = segment.map((chunk) => chunkWeight(chunk));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let running = 0;
+  let best = { index: 1, cost: Number.POSITIVE_INFINITY };
+  for (let index = 1; index < segment.length; index += 1) {
+    running += weights[index - 1];
+    const cost = Math.max(running, total - running);
+    if (cost < best.cost) best = { index, cost };
+  }
+  segment[best.index].breakBefore = true;
+}
+
+function chunkWeight(chunk: FeatureChunk): number {
+  const parts = chunk.parts.reduce((sum, part) => sum + partWeight(part), 0);
+  return chunk.lead ? weightOf(chunk.item) - itemPartsWeight(chunk.item) + parts : ITEM_BASE + parts;
+}
+
+const itemPartsWeight = (item: FeatureItem) =>
+  (item.parts ?? []).reduce((sum, part) => sum + partWeight(part), 0);
 
 function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string {
   if (/cantrips?/i.test(part.label)) return 'Cantrips';
@@ -174,7 +204,10 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
           v-for="(chunk, index) in segment"
           :key="index"
           class="features__item"
-          :class="{ 'features__item--flowing': chunk.flowing }"
+          :class="{
+            'features__item--flowing': chunk.flowing,
+            'features__item--column': chunk.breakBefore,
+          }"
           data-feature
         >
           <span class="features__name">{{ chunk.name }}</span
@@ -323,6 +356,10 @@ function partSpellLabel(part: NonNullable<FeatureItem['parts']>[number]): string
 /* Too tall for one column, so it carries on down the next one. */
 .features__item--flowing {
   break-inside: auto;
+}
+
+.features__item--column {
+  break-before: column;
 }
 
 /* A disc marker to match the other bulleted list cards (a multi-column list can

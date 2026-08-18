@@ -208,8 +208,10 @@ function contentFits(body: HTMLElement): boolean {
 
 // The per-item elements a card may break between when its content overflows
 // onto a continuation card (one selector across every content-fit card type).
+// A spell level heading counts: an empty level is a heading with no spells under
+// it, so without it a run of empty levels has no boundary to cut at.
 const BREAK_ITEMS =
-  '[data-spell],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part],[data-companion-part],[data-rule-row]';
+  '[data-spell],[data-spell-level],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part],[data-companion-part],[data-rule-row]';
 
 function measure() {
   if (props.hidden) return;

@@ -108,7 +108,7 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
       :data-level="group.level"
       data-card-group
     >
-      <div class="spells__group-head">
+      <div class="spells__group-head" data-spell-level>
         <span class="spells__label">{{ group.label }}</span>
         <ResourceBoxes v-if="group.slots > 0" :resource="{ max: group.slots }" data-slots />
         <span
