@@ -62,11 +62,18 @@ function partWeight(part: FeaturePart): number {
  * restores those cut lines: each segment balances its own columns and both end
  * flush, so the boundary between segments is always safe to break at.
  */
-const SEGMENT_WEIGHT = 1300;
 
 /** Roughly a page-tall column of text: what one feature can take before it has
- * to carry on in the next column. */
-const COLUMN_CAPACITY = 2900;
+ * to carry on in the next column. Erring high loses text -- a card can only be
+ * cut between segments, so whatever overflows inside one is clipped away. */
+const COLUMN_CAPACITY = 2400;
+
+/**
+ * A segment spans both columns, so it closes at two columns' worth. Measuring
+ * this against a single column's capacity is what left every segment half full,
+ * with the card ending mid-page.
+ */
+const SEGMENT_WEIGHT = COLUMN_CAPACITY * 2;
 
 /** A feature taller than a column continues in the next one under a "(cont.)"
  * heading, cut between its named parts so the split lands somewhere readable. */
