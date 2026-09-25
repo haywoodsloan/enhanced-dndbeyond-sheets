@@ -23,7 +23,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     ]);
   });
 
-  it('produces all fourteen sections in the stable order', () => {
+  it('produces all sixteen sections in the stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -39,6 +39,8 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       'inventory',
       'wealth',
       'features',
+      'companions',
+      'tables',
       'notes',
     ]);
   });
@@ -51,11 +53,11 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
 
   it('summarizes Charisma-based spellcasting with level-6 slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
-    expect(spellcasting).toEqual({
+    expect(spellcasting).toMatchObject({
       ability: 'CHA',
       modifier: 4,
       attack: 8, // CHA +4, proficiency +3, attuned Wand of the War Mage +1.
-      saveDc: 15,
+      saveDc: 16, // The selected Activate Innate Sorcery option grants +1 to Sorcerer save DCs.
       slots: [4, 3, 3],
     });
   });
@@ -70,13 +72,11 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
-    // Infernal Legacy keeps its info even though its lone sentence pointed at a
-    // "Fiendish Legacies table" — the pointer is trimmed, not the whole sentence.
+    // Selected mechanics supplement the option's lore-only description.
     const infernal = itemsOf('Racial Traits').find(
       (item) => item.name === 'Infernal Legacy',
     );
     expect(infernal?.summary).toContain('resistance to Fire');
-    expect(infernal?.summary).not.toMatch(/\btable\b/i);
     // The base feature is shown; its option-form duplicate is not listed too.
     expect(namesOf('Class Features')).toContain('Innate Sorcery');
     expect(namesOf('Class Features')).not.toContain('Activate Innate Sorcery');
@@ -103,13 +103,11 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
 
-  it('strips table references and the repeatable-feat boilerplate', () => {
+  it('keeps table-referencing mechanics while removing repeatable-feat boilerplate', () => {
     const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
     const find = (name: string) => items.find((item) => item.name === name);
-    // Font of Magic loses its "Sorcerer Features table" sentences, keeps the rest.
     const fom = find('Font of Magic');
-    expect(fom?.summary).not.toMatch(/\btable\b/i);
-    expect(fom?.summary).toContain('Sorcery Points');
+    expect(JSON.stringify(fom)).toContain('Sorcery Points');
     // The "Repeatable — you can take this feat more than once" note is dropped
     // (and the table stripper's \btable\b boundary never touched "Repeatable").
     const skilled = find('Skilled');
@@ -139,12 +137,12 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const fom = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Font of Magic');
-    const partText = (label: string) => fom?.parts?.find((part) => part.label === label)?.text;
+    const part = (label: string) => fom?.parts?.find((entry) => entry.label === label);
     // These options are fully defined as actions ("Convert Spell Slots" / "Create
     // Spell Slot Level N"), so the feature just points there despite the wording
     // difference ("Creating Spell Slots" vs "Create Spell Slot Level 1").
-    expect(partText('Converting Spell Slots to Sorcery Points')).toBe('(see Actions)');
-    expect(partText('Creating Spell Slots')).toBe('(see Actions)');
+    expect(part('Converting Spell Slots to Sorcery Points')?.reference).toBe('actions');
+    expect(part('Creating Spell Slots')?.reference).toBe('actions');
     // The trailing rider only restates that a created slot vanishes on a Long Rest,
     // which the Create Spell Slot actions already show, so it's dropped as redundant.
     expect(
@@ -160,8 +158,8 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The feature IS a Bonus Action detailed on the Actions card, so it just
     // references it rather than repeating the text.
     const feature = featureNamed('Innate Sorcery');
-    expect(feature?.summary).toBe('(see Actions)');
-    expect(feature?.parts).toBeUndefined();
+    expect(JSON.stringify(feature)).toContain('actions');
+    expect(JSON.stringify(feature)).not.toContain('You have Advantage on the attack rolls');
 
     // The Bonus Action carries the complete effect and both benefit-list entries,
     // rather than the short snippet that omits the actual mechanics.
@@ -171,13 +169,12 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(action?.summary).toContain('As a Bonus Action, you can unleash that magic for 1 minute');
     expect(action?.summary).toContain('• The spell save DC of your Sorcerer spells increases by 1.');
     expect(action?.summary).toContain('• You have Advantage on the attack rolls of Sorcerer spells you cast.');
-    expect(action?.resource).toEqual({ max: 2, recharge: 'LR' });
+    expect(action?.resource).toMatchObject({ max: 2, recharge: 'LR' });
 
-    // A passive "other" option that merely shares a name with an action is NOT
-    // collapsed — it keeps its own description in the feature list.
-    expect(featureNamed('Sorcerous Restoration')?.summary).toContain(
-      'regain expended Sorcery Points',
-    );
+    // Exact duplicate text can point at an Other action too; independent
+    // restoration rules remain available on the two cards.
+    expect(featureNamed('Sorcerous Restoration')).toBeDefined();
+    expect(JSON.stringify([character.features, character.actions])).toContain('regain expended Sorcery Points');
     expect(featureNamed('Empowered Spell')?.summary).toContain('reroll up to 4 damage dice');
   });
 

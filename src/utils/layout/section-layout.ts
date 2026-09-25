@@ -38,6 +38,8 @@ const SECTION_SPAN: Record<SectionKey, SectionSpan> = {
   inventory: { cols: 3, rows: 2 },
   wealth: { cols: 1, rows: 1 },
   features: { cols: 3, rows: 2 },
+  companions: { cols: 3, rows: 2 },
+  tables: { cols: 3, rows: 2 },
   notes: { cols: 3, rows: 2 },
 };
 
@@ -107,6 +109,16 @@ const SECTION_LAYOUTS: Partial<Record<SectionKey, LayoutOption[]>> = {
     { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 13, maxRows: 6 } },
     { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 9, maxRows: 6 } },
     { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 5, maxRows: 6 } },
+  ],
+  companions: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 2, maxRows: 6 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 1, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 1, maxRows: 6 } },
+  ],
+  tables: [
+    { label: 'Wide', cols: 3, rows: 2, dynamic: { perRow: 12, maxRows: 6 } },
+    { label: 'Medium', cols: 2, rows: 2, dynamic: { perRow: 9, maxRows: 6 } },
+    { label: 'List', cols: 1, rows: 2, dynamic: { perRow: 6, maxRows: 6 } },
   ],
   notes: [
     { label: 'Wide', cols: 3, rows: 2 },
@@ -250,6 +262,8 @@ export const CONTENT_FIT_SECTIONS: ReadonlySet<SectionKey> = new Set<SectionKey>
   'actions',
   'spells',
   'features',
+  'companions',
+  'tables',
 ]);
 
 /**

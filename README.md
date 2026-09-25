@@ -12,14 +12,14 @@ The extension is functional and under active development. It currently provides:
 
 - Character data layer: fetch a character by id (public, or private via the signed-in user's session) and normalize it into an internal model with per-section metadata.
 - Activation: a toolbar icon and a right-click menu on a D&D Beyond character page open the enhanced sheet in a new tab, carrying the character id.
-- Enhanced sheet: renders every section (attributes, skills, saves, senses, proficiencies, actions, spells, inventory, wealth, features, notes, portrait) with a class-aware default layout and auto-hidden empty sections.
+- Enhanced sheet: renders attributes, skills, saves, senses, proficiencies, actions, spells, companions, rules tables, inventory, wealth, features, notes, and portrait with class-aware ordering and auto-hidden empty sections.
 - Customization: drag any card to any grid cell (free positional placement), hide/show sections, and cycle a card's density — all persisted via `storage.sync`.
 - Print: a page-accurate, paginated layout with selectable page size, margins, and theme color.
 - Tests: unit/integration tests (Vitest) plus end-to-end drag tests (Playwright).
 
 Chrome/Chromium and Firefox MV3 builds are supported.
 
-The current data model has one spellcasting summary and one feature-granted cast pool per spell. Dedicated companion/table cards and separate source-labelled casting pools are not included. Complex multiclass and independently recharging spell grants should be checked against the original sheet; see the [normalization limits](docs/NORMALIZATION.md#current-model-limits).
+Spellcasting profiles, Pact Magic slots, and independently recharging feature-granted casts are shown separately. Companion statistics and lookup tables have dedicated printable cards. The goal is complete playable information, not a visual copy of D&D Beyond; see the [normalization contract](docs/NORMALIZATION.md#rich-rules-and-casting-contract).
 
 ## How it works
 

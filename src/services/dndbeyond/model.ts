@@ -16,6 +16,8 @@ export const SECTION_KEYS = [
   'attacks',
   'actions',
   'spells',
+  'companions',
+  'tables',
   'inventory',
   'wealth',
   'features',
@@ -133,12 +135,17 @@ export interface CharacterAction {
   resource?: ResourcePool;
   /** Damage dice, when the action deals damage. */
   damage?: DamageInfo;
+  /** Non-damage effect roll, such as healing or a resource die. */
+  roll?: string;
   /** Save prompt, e.g. "DC 14 CON", when the action forces a save. */
   save?: string;
   /** Range / reach shorthand, e.g. "30 ft.". */
   range?: string;
   /** Complete action rules, with lightweight bold and bullet markers. */
   summary?: string;
+  list?: StructuredList;
+  /** Supporting sections containing this action's selectable forms or rules. */
+  related?: SectionKey[];
 }
 
 /** Damage dice (and computed flat bonus) for an attack, action, or spell. */
@@ -188,6 +195,8 @@ export interface SpellEntry {
   range?: string;
   /** Components present, e.g. "V, S, M". */
   components?: string;
+  /** Material requirements kept separately from the main rules text. */
+  material?: string;
   /** Duration shorthand, e.g. "Instant", "1 min", "Conc, 1 min". */
   duration?: string;
   concentration?: boolean;
@@ -200,10 +209,26 @@ export interface SpellEntry {
   damage?: DamageInfo;
   /** True when the spell is prepared (vs merely known/available). */
   prepared?: boolean;
-  /** Complete spell rules, including material requirements and higher-level effects. */
+  /** Main spell rules. Legacy payloads may also include materials and higher-level
+   * effects here; rich extraction keeps those in the separate fields below. */
   summary?: string;
+  /** Full higher-slot or cantrip-upgrade rules. */
+  upcast?: string;
+  list?: StructuredList;
   /** A feature-granted free-cast tracker (e.g. Augury 1/long rest), when any. */
   uses?: ResourcePool;
+  /** Independent grants take precedence over the legacy single `uses` pool. */
+  featureUses?: FeatureSpellUse[];
+  /** The ability used by this spell, including non-class grants. */
+  ability?: string;
+  /** Every known casting source for a deduplicated spell; preferred to legacy ability matching. */
+  castingSources?: SpellcastingProfile[];
+  related?: SectionKey[];
+}
+
+export interface FeatureSpellUse {
+  source: string;
+  pool: ResourcePool;
 }
 
 /** At-a-glance spellcasting stats shown at the top of the Spells card. */
@@ -218,6 +243,25 @@ export interface Spellcasting {
   saveDc: number;
   /** Max slots per spell level; index 0 = 1st-level. Trailing zero levels trimmed. */
   slots: number[];
+  /** Source-specific casting stats; when present these replace the flat header. */
+  profiles?: SpellcastingProfile[];
+  /** Pact Magic slots remain separate from the long-rest spell slots. */
+  pactSlots?: PactSlotPool[];
+}
+
+export interface SpellcastingProfile {
+  source: string;
+  ability: string;
+  modifier: number;
+  attack: number;
+  saveDc: number;
+  focus?: string;
+}
+
+export interface PactSlotPool {
+  source: string;
+  level: number;
+  max: number;
 }
 
 /** A carried inventory item. */
@@ -244,14 +288,42 @@ export interface ResourcePool {
   /** Recharge shorthand: 'SR' (short rest), 'LR' (long rest), 'SR1_LR' (one use
    * back on a short rest, all on a long rest), or '' (none). */
   recharge?: string;
+  /** Structured recovery takes precedence over the legacy recharge shorthand. */
+  recovery?: ResourceRecovery;
+  alternateRecovery?: AlternateRecovery[];
+}
+
+export type ResourceRecovery =
+  | { kind: 'rest'; rest: 'short' | 'long' }
+  | { kind: 'partial-short-full-long'; shortRestUses: number };
+
+export interface AlternateRecovery {
+  restores: number | 'all';
+  /** Display-ready resource cost, e.g. "1 Superiority Die". */
+  cost: string;
+}
+
+export interface StructuredList {
+  label?: string;
+  items: { label?: string; text: string }[];
+}
+
+export interface FeatureTable {
+  columns: string[];
+  rows: string[][];
 }
 
 /** A named sub-section of a feature (e.g. Circle of Mortality's "Pull of Death"). */
 export interface FeaturePart {
   /** The sub-part name; '' for an un-named trailing rider. */
   label: string;
-  /** The sub-part text; '' when the detail lives on a matching action instead. */
+  /** The sub-part text; '' when the full detail lives on a referenced section. */
   text: string;
+  list?: StructuredList;
+  table?: FeatureTable;
+  grantedSpells?: string[];
+  /** Section owning the full rules; does not replace any supplied text. */
+  reference?: SectionKey;
 }
 
 /** A single feature/trait, with an optional limited-use resource tracker. */
@@ -259,16 +331,53 @@ export interface FeatureItem {
   name: string;
   /** Limited-use pool rendered as empty checkboxes, when the feature is rationed. */
   resource?: ResourcePool;
-  /** A one-line blurb of what the feature does (the intro for multi-part features). */
+  /** Main rules text, or the introduction when benefits are structured below. */
   summary?: string;
   /** Named sub-parts, when the feature bundles several distinct benefits. */
   parts?: FeaturePart[];
+  list?: StructuredList;
+  table?: FeatureTable;
+  grantedSpells?: string[];
+  grants?: { label: string; items: string[] }[];
+  reference?: SectionKey;
+  related?: SectionKey[];
 }
 
 /** A labeled group of features/traits (e.g. Class Features, Racial Traits). */
 export interface FeatureGroup {
   label: string;
   items: FeatureItem[];
+}
+
+export interface CompanionAbility {
+  key: string;
+  score: string;
+  modifier?: string;
+  save?: string;
+}
+
+export interface CompanionDetail {
+  section: string;
+  label: string;
+  text: string;
+}
+
+/** Display-ready stat block values may include formulas as well as numbers. */
+export interface CompanionEntry {
+  name: string;
+  source: string;
+  meta?: string;
+  challengeRating?: string;
+  armorClass?: string;
+  hitPoints?: string;
+  speed?: string;
+  abilities: CompanionAbility[];
+  details: CompanionDetail[];
+}
+
+export interface RuleTable extends FeatureTable {
+  title: string;
+  source: string;
 }
 
 /** A passive score or special sense, split into a label and its value. */
@@ -324,5 +433,8 @@ export interface Character {
   wealth: Coins;
   /** Features and traits, grouped by source. */
   features: FeatureGroup[];
+  /** Optional until rich source extraction is available for every payload. */
+  companions?: CompanionEntry[];
+  ruleTables?: RuleTable[];
   sections: CharacterSection[];
 }

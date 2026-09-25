@@ -55,4 +55,11 @@ describe('SpellCard', () => {
     expect(wrapper.text()).toContain('Concentration, 1 minute');
     expect(wrapper.text()).not.toContain('Concentration, Conc,');
   });
+
+  it('preserves a ritual casting option when the quick sheet is expanded', () => {
+    const wrapper = mount(SpellCard, {
+      props: { spell: { name: 'Test Ritual', level: 1, ritual: true } },
+    });
+    expect(wrapper.findAll('.spell-card__row').map((row) => row.text())).toContain('RitualYes');
+  });
 });

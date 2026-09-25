@@ -4,13 +4,16 @@ import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import StructuredList from '@/components/StructuredList.vue';
+import { sectionLabel } from '@/utils/character/section-label';
 
 const props = withDefaults(
   defineProps<{
     actions: CharacterAction[];
     rowAligned?: boolean;
+    companionTitle?: string;
   }>(),
-  { rowAligned: false },
+  { rowAligned: false, companionTitle: 'Companions' },
 );
 
 const CATEGORY_ORDER: { category: ActionCategory; label: string }[] = [
@@ -30,7 +33,7 @@ const groups = computed(() =>
 
 /** Compact meta line for an action: "1d8+4 · DC 14 CON · 30 ft.". */
 function metaOf(action: CharacterAction): string {
-  return [formatDamage(action.damage), action.save, action.range]
+  return [formatDamage(action.damage), action.roll, action.save, action.range]
     .filter(Boolean)
     .join(' · ');
 }
@@ -63,6 +66,10 @@ function metaOf(action: CharacterAction): string {
             <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
           </span>
           <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />
+          <StructuredList v-if="action.list?.items.length" :list="action.list" class="actions__summary" />
+          <span v-for="related in action.related" :key="related" class="actions__summary">
+            (see {{ sectionLabel(related, companionTitle) }})
+          </span>
         </li>
       </ul>
     </div>

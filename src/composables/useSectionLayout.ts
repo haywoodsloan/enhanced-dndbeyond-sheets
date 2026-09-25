@@ -34,9 +34,9 @@ const PLACEMENT_PERSIST_DELAY = 500;
  * change a card's density — all persisted to `storage.sync`.
  */
 /**
- * Replace the single `spells` section with one card per spell (`spell:<slug>`),
- * in the same slot, so each spell participates in the grid as a first-class
- * card. Returns the list unchanged when there's no spells section or no spells.
+ * Expand spells into individual cards, retaining their aggregate casting/slots
+ * summary when metadata exists. Without metadata the original card is replaced.
+ * Returns the list unchanged when there's no spells section or no spells.
  */
 function expandSpellSection(
   sections: CharacterSection[],
@@ -51,7 +51,15 @@ function expandSpellSection(
     count: 1,
     isEmpty: false,
   }));
-  return [...sections.slice(0, index), ...spellCards, ...sections.slice(index + 1)];
+  const casting = character.spellcasting;
+  const summary: CharacterSection[] = casting ? [{
+    ...sections[index],
+    count: Math.max(1, casting.profiles?.length ?? 0) +
+      casting.slots.filter((max) => max > 0).length +
+      (casting.pactSlots ?? []).filter((pool) => pool.max > 0).length,
+    isEmpty: false,
+  }] : [];
+  return [...sections.slice(0, index), ...summary, ...spellCards, ...sections.slice(index + 1)];
 }
 
 export function useSectionLayout(
@@ -136,8 +144,7 @@ export function useSectionLayout(
 
   onMounted(load);
   watch(character, rebuild);
-  // Expanding/collapsing the spells section swaps the single card for N spell
-  // cards (or back), keeping every card's saved placement/hidden state.
+  // Keep every card's saved placement/hidden state across spell view changes.
   watch(spellsExpanded, rebuild);
   // Switching the active profile swaps in a whole different saved layout. Flush
   // any pending anchor save (to the profile it belongs to) first, then reload.

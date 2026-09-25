@@ -85,6 +85,8 @@ export interface RawGrantedFeature {
 }
 
 export interface RawCharacterClass {
+  /** Character-specific class mapping, joined by classSpells.characterClassId. */
+  id?: number;
   level: number;
   definition: RawClassDefinition;
   subclassDefinition?: RawSubclassDefinition | null;
@@ -292,7 +294,7 @@ export interface RawSpell {
   limitedUse?: RawLimitedUse | null;
 }
 
-/** A tag on a feat's definition; `__DISGUISE_FEAT` marks a non-feat placeholder. */
+/** A data-origin tag. `__DISGUISE_FEAT` may wrap real owned mechanics or options. */
 export interface RawFeatCategory {
   tagName?: string;
   entityTypeId?: number;
@@ -308,7 +310,7 @@ export interface RawFeat {
     hideInSheet?: boolean;
     snippet?: string | null;
     description?: string | null;
-    /** Origin tags; a `__DISGUISE_FEAT` tag means this isn't a real feat. */
+    /** Catalog-origin wrappers need explicit selection evidence before feat display. */
     categories?: RawFeatCategory[] | null;
   };
 }
@@ -494,6 +496,10 @@ export interface RawModifier {
   subType?: string;
   value?: number | null;
   fixedValue?: number | null;
+  /** Derived bonus sources; 1 means the character's Proficiency Bonus. */
+  bonusTypes?: number[] | null;
+  /** Chosen modifiers can be false here; this is not an activation flag. */
+  isGranted?: boolean;
   friendlyTypeName?: string;
   friendlySubtypeName?: string;
   restriction?: string | null;
@@ -501,6 +507,7 @@ export interface RawModifier {
   statId?: number | null;
   /** Id of the feature/feat/trait that granted this modifier. */
   componentId?: number | null;
+  componentTypeId?: number | null;
   /** Dice for a damage/healing modifier (e.g. a spell's damage). */
   die?: RawDice | null;
   /** Scaling attached directly to this modifier in newer spell definitions. */

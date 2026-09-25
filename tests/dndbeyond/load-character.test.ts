@@ -56,6 +56,8 @@ describe('loadCharacter', () => {
       'inventory',
       'wealth',
       'features',
+      'companions',
+      'tables',
       'notes',
     ]);
     const [, init] = fetchMock.mock.calls[0];

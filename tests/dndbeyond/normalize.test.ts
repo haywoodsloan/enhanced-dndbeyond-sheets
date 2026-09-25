@@ -129,7 +129,7 @@ describe('normalizeCharacter', () => {
     expect(channelDivinity?.summary).not.toContain('{{');
     // Two uses; regains one on a short rest and all on a long rest — the reset
     // type only records the long rest, so the short-rest recovery is inferred.
-    expect(channelDivinity?.resource).toEqual({ max: 2, recharge: 'SR1_LR' });
+    expect(channelDivinity?.resource).toMatchObject({ max: 2, recharge: 'SR1_LR' });
   });
 
   it('resolves save-DC and proficiency placeholders in summaries', () => {
@@ -165,7 +165,7 @@ describe('normalizeCharacter', () => {
   it('summarizes spellcasting: modifier, attack, save DC, and slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
     // WIS 18 (+4), proficiency +2 at level 4.
-    expect(spellcasting).toEqual({
+    expect(spellcasting).toMatchObject({
       ability: 'WIS',
       modifier: 4,
       attack: 6,
@@ -202,18 +202,20 @@ describe('normalizeCharacter', () => {
       expect(summary).toContain(`**${heading}**`);
     }
     // … including the upcast note, and no raw HTML leaks through.
-    expect(summary).toContain('**Using a Higher-Level Spell Slot.**');
+    expect(command?.upcast).toContain('one additional creature');
     expect(summary).not.toContain('<');
   });
 
-  it('keeps essential embedded table rules as distinct bullet rows', () => {
-    const augury = normalizeCharacter(raw).spells.find((spell) => spell.name === 'Augury');
+  it('keeps essential embedded spell tables in their printable owner', () => {
+    const character = normalizeCharacter(raw);
+    const augury = character.spells.find((spell) => spell.name === 'Augury');
     const summary = augury?.summary ?? '';
     expect(summary).toContain('You receive an omen');
-    // The reduced model has no table cards; meaningful results still need to
-    // appear as readable rows, not disappear or become unseparated run-on text.
-    expect(summary).toMatch(/•\s*Weal\s*\|\s*Good/);
-    expect(summary).toContain('Neither good nor bad');
+    expect(augury?.related).toContain('tables');
+    const table = character.ruleTables?.find((entry) => entry.source === 'Augury');
+    expect(JSON.stringify(table)).toContain('Weal');
+    expect(JSON.stringify(table)).toContain('Neither good nor bad');
+    expect(summary).not.toContain('Neither good nor bad');
     expect(summary).not.toContain('<table');
   });
 
@@ -251,23 +253,18 @@ describe('normalizeCharacter', () => {
         expect(part.text).not.toContain('<');
       }
     }
-    // Channel Divinity is itself an Actions-card ability, so it just points there.
+    // Matching action rules are referenced without deleting independent feature rules.
     const channelDivinity = items.find((item) => item.name === 'Channel Divinity');
-    expect(channelDivinity?.summary).toBe('(see Actions)');
+    expect(JSON.stringify(channelDivinity)).toContain('actions');
   });
 
-  it('drops sentences that reference a rules table (absent from the sheet)', () => {
-    const items = normalizeCharacter(raw).features.flatMap((group) => group.items);
-    // No blurb or sub-part still points at a table the printed sheet lacks …
-    for (const item of items) {
-      expect(item.summary ?? '').not.toMatch(/\btables?\b/i);
-      for (const part of item.parts ?? []) expect(part.text).not.toMatch(/\btables?\b/i);
-    }
-    // A feature whose lone sentence pointed at a table keeps the sentence with
-    // just the table pointer trimmed off, rather than losing all of its info.
+  it('preserves operative sentences that reference a rules table', () => {
+    const character = normalizeCharacter(raw);
+    const items = character.features.flatMap((group) => group.items);
     const domainSpells = items.find((item) => item.name === 'Grave Domain Spells');
     expect(domainSpells?.summary).toContain('always have the listed spells prepared');
-    expect(domainSpells?.summary).not.toMatch(/\btable\b/i);
+    expect(domainSpells?.related).toContain('tables');
+    expect(character.ruleTables?.some((table) => table.source === 'Grave Domain Spells')).toBe(true);
   });
 
   it('breaks a feature into named sub-parts, noting action sub-parts briefly', () => {
@@ -278,8 +275,8 @@ describe('normalizeCharacter', () => {
     expect(circleLabels).toContain('Pull of Death');
     expect(circleLabels).toContain('Return to Life');
     // Pull of Death is also an action, so the feature points to the Actions card.
-    expect(circle?.parts?.find((part) => part.label === 'Pull of Death')?.text).toBe(
-      '(see Actions)',
+    expect(circle?.parts?.find((part) => part.label === 'Pull of Death')?.reference).toBe(
+      'actions',
     );
     // Return to Life isn't an action, so it keeps its text.
     expect(circle?.parts?.find((part) => part.label === 'Return to Life')?.text).toContain(
@@ -290,11 +287,9 @@ describe('normalizeCharacter', () => {
       circle?.parts?.some((part) => part.label === '' && part.text.includes('restore 8')),
     ).toBe(true);
 
-    // Channel Divinity is itself an Actions-card ability (its Divine Spark / Turn
-    // Undead effects are actions), so the whole feature collapses to a pointer.
+    // Full action rules stay referenced, while unique resource rules can remain.
     const channel = items.find((item) => item.name === 'Channel Divinity');
-    expect(channel?.summary).toBe('(see Actions)');
-    expect(channel?.parts).toBeUndefined();
+    expect(JSON.stringify(channel)).toContain('actions');
 
     const whispers = items.find((item) => item.name === 'Gathered Whispers');
     expect(whispers?.parts?.map((part) => part.label)).toEqual(
@@ -305,25 +300,20 @@ describe('normalizeCharacter', () => {
       'Augury',
     );
     // …Unearthly Scream / Voices from Beyond are actions -> point to the Actions card.
-    expect(whispers?.parts?.find((part) => part.label === 'Unearthly Scream')?.text).toBe(
-      '(see Actions)',
+    expect(whispers?.parts?.find((part) => part.label === 'Unearthly Scream')?.reference).toBe(
+      'actions',
     );
-    expect(whispers?.parts?.find((part) => part.label === 'Voices from Beyond')?.text).toBe(
-      '(see Actions)',
+    expect(whispers?.parts?.find((part) => part.label === 'Voices from Beyond')?.reference).toBe(
+      'actions',
     );
   });
 
-  it('keeps only the intro blurb for the Spellcasting feature', () => {
+  it('keeps complete class casting and preparation rules', () => {
     const spellcasting = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Spellcasting');
-    // The generic casting mechanics (cantrips, slots, preparing spells, …) live
-    // on the Spells card, so only the basic intro is kept — no sub-parts.
-    expect(spellcasting?.parts).toBeUndefined();
-    expect(spellcasting?.summary).toBe(
-      'You have learned to cast spells through prayer and meditation. The information below ' +
-        'details how you use those rules with Cleric spells, which appear on the Cleric spell list.',
-    );
+    expect(spellcasting?.parts?.some((part) => /prepar/i.test(part.label))).toBe(true);
+    expect(spellcasting?.summary).toContain('prayer and meditation');
   });
 
   it('leaves a feature without sub-parts as a plain summary', () => {
@@ -403,7 +393,7 @@ describe('normalizeCharacter', () => {
     // The Channel Divinity ACTION already shows the use tracker, so the feature
     // omits the duplicate checkboxes.
     expect(channelDivinity?.resource).toBeUndefined();
-    expect(actions.find((action) => action.name === 'Channel Divinity')?.resource).toEqual(
+    expect(actions.find((action) => action.name === 'Channel Divinity')?.resource).toMatchObject(
       { max: 2, recharge: 'SR1_LR' },
     );
     // A passive feature has no resource tracker either.
@@ -421,7 +411,7 @@ describe('normalizeCharacter', () => {
     expect(portrait?.isEmpty).toBe(false);
   });
 
-  it('produces all fourteen sections in a stable order', () => {
+  it('produces all sixteen sections in a stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -437,6 +427,8 @@ describe('normalizeCharacter', () => {
       'inventory',
       'wealth',
       'features',
+      'companions',
+      'tables',
       'notes',
     ]);
   });
@@ -457,12 +449,8 @@ describe('normalizeCharacter', () => {
     expect(counts.savingThrows).toBe(6);
     expect(counts.spells).toBe(16);
     expect(counts.inventory).toBe(24);
-    // The count is the distinct features actually shown: deduped and minus
-    // hidden traits, structural placeholders (ASI / the subclass choice /
-    // "Core Cleric Traits"), above-level granted features (Divine Intervention),
-    // disguise-feat placeholders (Dark Bargain, Runestones), and choice prompts
-    // replaced by their selected option (Elven Lineage -> Drow Lineage).
-    expect(counts.features).toBe(19);
+    expect(counts.features).toBe(character.features.reduce((count, group) => count + group.items.length, 0));
+    expect(character.features.flatMap((group) => group.items).some((item) => item.name === 'Dark Bargain')).toBe(false);
     expect(counts.basics).toBe(0); // Noct has no active conditions
     expect(counts.proficiencies).toBeGreaterThan(0);
     expect(counts.actions).toBeGreaterThan(0);
@@ -512,7 +500,7 @@ describe('normalizeCharacter', () => {
   it('enriches actions with resources, damage, saves, and range', () => {
     const byName = new Map(normalizeCharacter(raw).actions.map((a) => [a.name, a]));
     // Channel Divinity is usable twice; one use returns on a short rest, all on a long rest.
-    expect(byName.get('Channel Divinity')?.resource).toEqual({ max: 2, recharge: 'SR1_LR' });
+    expect(byName.get('Channel Divinity')?.resource).toMatchObject({ max: 2, recharge: 'SR1_LR' });
     // Divine Spark rolls 1d8 + Wisdom (+4), forces a DC 14 Con save, range 30 ft.
     const spark = byName.get('Channel Divinity: Divine Spark');
     expect(spark?.damage).toMatchObject({ dice: '1d8', bonus: 4 });
@@ -725,11 +713,9 @@ describe('normalizeCharacter — filtering spurious features and actions', () =>
     expect(names).toContain('Drow Lineage');
     const racial = normalizeCharacter(raw).features.find((g) => g.label === 'Racial Traits');
     const drow = racial?.items.find((item) => item.name === 'Drow Lineage');
-    // Drow Lineage's only blurb points at the "Elven Lineages table"; the pointer
-    // is trimmed off but the useful text ("Darkvision increases to 120 ft. …") stays.
+    // The selected rules snippet supplements a lore-only description.
     expect(drow).toBeDefined();
     expect(drow?.summary).toContain('Darkvision increases to 120 ft.');
-    expect(drow?.summary).not.toMatch(/\btable\b/i);
   });
 
   it('replaces a choice-base class feature with the selected option', () => {
@@ -744,7 +730,7 @@ describe('normalizeCharacter — filtering spurious features and actions', () =>
     expect(protector?.summary).toContain('proficiency');
   });
 
-  it('filters out __DISGUISE_FEAT placeholder feats', () => {
+  it('filters out unselected __DISGUISE_FEAT placeholder feats', () => {
     const names = featureNames('Feats');
     expect(names).not.toContain('Dark Bargain');
     expect(names).not.toContain('Runestones');

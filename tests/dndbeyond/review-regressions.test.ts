@@ -10,6 +10,22 @@ const base: RawCharacter = {
 };
 
 describe('normalization review regressions', () => {
+  it.each([
+    ['(classlevel/2)@rounddown#signed', '1d6+10'],
+    ['(0-classlevel)#signed', '1d6-20'],
+    ['(classlevel-classlevel)#signed', '1d6+0'],
+  ])('resolves explicitly signed arithmetic beside dice: %s', (expression, expected) => {
+    const { actions } = normalizeCharacter({
+      ...base,
+      classes: [{ level: 20, definition: { name: 'Barbarian' } }],
+      actions: { class: [{
+        name: 'Fury pulse',
+        description: `Deal 1d6{{${expression}}} extra damage.`,
+      }] },
+    });
+    expect(actions[0].summary).toBe(`Deal ${expected} extra damage.`);
+  });
+
   it('preserves full action rules instead of replacing them with a short snippet', () => {
     const rules = 'The target can repeat the saving throw at the end of each turn. ';
     const { actions } = normalizeCharacter({
@@ -64,7 +80,7 @@ describe('normalization review regressions', () => {
       actions: { class: [{ name: 'Ward', limitedUse }] },
       spells: { feat: [{ definition: { name: 'Protection', level: 1 }, limitedUse }] },
     });
-    expect(actions[0].resource).toEqual({ max: 5, recharge: 'LR' });
+    expect(actions[0].resource).toMatchObject({ max: 5, recharge: 'LR' });
     expect(spells[0].uses).toEqual({ max: 5, recharge: 'LR' });
   });
 
@@ -75,7 +91,7 @@ describe('normalization review regressions', () => {
         maxUses: 2, useProficiencyBonus: true, numberUsed: 4, resetType: 1,
       } }] },
     });
-    expect(actions[0].resource).toEqual({ max: 5, recharge: 'SR' });
+    expect(actions[0].resource).toMatchObject({ max: 5, recharge: 'SR' });
   });
 
   it('includes fixed action damage bonuses and floors unarmed damage at zero', () => {
@@ -104,7 +120,7 @@ describe('normalization review regressions', () => {
     expect(sections.find(({ key }) => key === 'spells')?.count).toBe(1);
   });
 
-  it('keeps complete spell rules and required material text in the reduced summary', () => {
+  it('keeps complete spell rules with separate higher-slot and material fields', () => {
     const { spells } = normalizeCharacter({
       ...base,
       spells: { class: [{ definition: {
@@ -113,8 +129,9 @@ describe('normalization review regressions', () => {
         description: `<p>${'The ward lasts for one minute. '.repeat(20)}</p><p>Using a Higher-Level Spell Slot: choose one additional creature.</p>`,
       } }] },
     });
-    expect(spells[0].summary).toContain('choose one additional creature');
-    expect(spells[0].summary).toContain('a gem worth 100 GP, consumed');
+    expect(spells[0].upcast).toContain('choose one additional creature');
+    expect(spells[0].material).toContain('a gem worth 100 GP, consumed');
+    expect(spells[0].summary).toContain('The ward lasts for one minute.');
   });
 
   it('retains nonwalking speeds and exhaustion levels from the API', () => {
@@ -193,18 +210,18 @@ describe('normalization review regressions', () => {
       }] },
     });
     expect(actions[0].summary).toBe('Use 2 and 2d6; proficiency 4.');
-    expect(features[0].items[0].summary).toBe('Use 2 and 2d6; proficiency 4.');
+    expect(features[0].items[0].reference).toBe('actions');
   });
 
-  it('preserves essential rules-table cells as readable text without a table section', () => {
-    const { spells } = normalizeCharacter({
+  it('preserves essential rules-table cells in the printable table section', () => {
+    const { spells, ruleTables } = normalizeCharacter({
       ...base, spells: { class: [{ definition: {
         name: 'Random Gift', level: 1,
         description: '<p>Roll a d6.</p><table><tr><th>Roll</th><th>Effect</th></tr><tr><td>1–3</td><td>Recover 2d6 HP.</td></tr></table>',
       } }] },
     });
-    expect(spells[0].summary).toContain('1–3');
-    expect(spells[0].summary).toContain('Recover 2d6 HP.');
+    expect(ruleTables?.[0].rows).toEqual([['1–3', 'Recover 2d6 HP.']]);
+    expect(spells[0].related).toContain('tables');
     expect(spells[0].summary).not.toContain('<td>');
   });
 

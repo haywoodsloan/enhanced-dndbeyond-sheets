@@ -10,6 +10,8 @@ import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
 import AttacksCard from '@/components/cards/AttacksCard.vue';
 import ActionsCard from '@/components/cards/ActionsCard.vue';
 import SpellsCard from '@/components/cards/SpellsCard.vue';
+import CompanionsCard from '@/components/cards/CompanionsCard.vue';
+import RuleTablesCard from '@/components/cards/RuleTablesCard.vue';
 import SpellCard from '@/components/cards/SpellCard.vue';
 import InventoryCard from '@/components/cards/InventoryCard.vue';
 import WealthCard from '@/components/cards/WealthCard.vue';
@@ -40,6 +42,8 @@ const props = withDefaults(
     /** Explicit grid placement from the packer (`grid-column` / `grid-row`). */
     place?: { gridColumn: string; gridRow: string };
     character?: Character | null;
+    /** Expanded mode retains the aggregate card only as casting/slot reference. */
+    spellsExpanded?: boolean;
     hidden?: boolean;
     /** Render only for off-screen layout-fit measurement. Controls are omitted
      * and the card reports whether its body fits its assigned footprint. */
@@ -105,6 +109,9 @@ const cardSubtitle = computed(() =>
     ? characterSubtitle(props.character)
     : '',
 );
+const companionTitle = computed(() =>
+  props.character?.sections.find((section) => section.key === 'companions')?.title ?? 'Companions',
+);
 
 // A continuation card renders the SAME body as its base card, shifted up to show
 // the overflow slice; `bodyKey` is the base key its content dispatches on.
@@ -163,7 +170,7 @@ const toggleSpellCards = inject(ToggleSpellCardsKey, undefined);
 const spellControl = computed<'expand' | 'collapse' | null>(() => {
   if (props.hidden || props.fitProbe || isContinuation.value || !toggleSpellCards) return null;
   if (props.section.key === 'spells' && (props.character?.spells.length ?? 0) > 0) {
-    return 'expand';
+    return props.spellsExpanded ? 'collapse' : 'expand';
   }
   return isSpellCardKey(props.section.key) ? 'collapse' : null;
 });
@@ -201,7 +208,7 @@ function contentFits(body: HTMLElement): boolean {
 // A spell level heading counts: an empty level is a heading with no spells under
 // it, so without it a run of empty levels has no boundary to cut at.
 const BREAK_ITEMS =
-  '[data-spell],[data-spell-level],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part]';
+  '[data-spell],[data-spell-level],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part],[data-companion-part],[data-rule-row]';
 
 function measure() {
   if (props.hidden) return;
@@ -325,6 +332,7 @@ watch(
   () => [
     props.span.cols, props.span.rows, props.section.count,
     props.rowAlignedFeatures, props.rowAlignedActions,
+    props.spellsExpanded,
     props.maxBodyHeight,
   ],
   () => void nextTick(measure),
@@ -532,12 +540,24 @@ watch(
         <ActionsCard
           v-else-if="bodyKey === 'actions' && character"
           :actions="character.actions"
+          :companion-title="companionTitle"
           :row-aligned="rowAlignedActions"
         />
         <SpellsCard
           v-else-if="bodyKey === 'spells' && character"
           :spells="character.spells"
           :spellcasting="character.spellcasting"
+          :companion-title="companionTitle"
+          :summary-only="spellsExpanded && !!character.spellcasting"
+        />
+        <CompanionsCard
+          v-else-if="bodyKey === 'companions' && character"
+          :companions="character.companions ?? []"
+          :columns="span.cols"
+        />
+        <RuleTablesCard
+          v-else-if="bodyKey === 'tables' && character"
+          :tables="character.ruleTables ?? []"
         />
         <InventoryCard
           v-else-if="bodyKey === 'inventory' && character"
@@ -551,10 +571,16 @@ watch(
         <FeaturesCard
           v-else-if="bodyKey === 'features' && character"
           :features="character.features"
+          :companion-title="companionTitle"
           :row-aligned="rowAlignedFeatures"
         />
         <NotesCard v-else-if="bodyKey === 'notes'" />
-        <SpellCard v-else-if="spell" :spell="spell" />
+        <SpellCard
+          v-else-if="spell"
+          :spell="spell"
+          :spellcasting="character?.spellcasting"
+          :companion-title="companionTitle"
+        />
         <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
         <p v-else class="card__note">Details coming soon.</p>
       </div>

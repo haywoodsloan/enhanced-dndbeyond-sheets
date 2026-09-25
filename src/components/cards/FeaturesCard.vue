@@ -2,8 +2,14 @@
 import type { FeatureGroup } from '@/services/dndbeyond/model';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import StructuredList from '@/components/StructuredList.vue';
+import RulesGrid from '@/components/cards/RulesGrid.vue';
+import { sectionLabel } from '@/utils/character/section-label';
 
-defineProps<{ features: FeatureGroup[]; rowAligned?: boolean }>();
+withDefaults(
+  defineProps<{ features: FeatureGroup[]; rowAligned?: boolean; companionTitle?: string }>(),
+  { companionTitle: 'Companions' },
+);
 </script>
 
 <template>
@@ -20,16 +26,41 @@ defineProps<{ features: FeatureGroup[]; rowAligned?: boolean }>();
         <li v-for="(item, index) in group.items" :key="index" class="features__item" data-feature>
           <span class="features__name">{{ item.name }}</span
           ><ResourceBoxes v-if="item.resource" :resource="item.resource" />
+          <span v-if="item.reference" class="features__reference">
+            (see {{ sectionLabel(item.reference, companionTitle) }})
+          </span>
           <RichText v-if="item.summary" :text="item.summary" class="features__summary" />
-          <p
+          <span
+            v-for="related in item.related"
+            :key="related"
+            class="features__detail"
+          >(see {{ sectionLabel(related, companionTitle) }})</span>
+          <span v-for="grant in item.grants" :key="grant.label" class="features__detail" data-feature-grant>
+            <strong>{{ grant.label }}:</strong> {{ grant.items.join(', ') }}
+          </span>
+          <span v-if="item.grantedSpells?.length" class="features__detail" data-feature-spells>
+            <strong>Spells:</strong> {{ item.grantedSpells.join(', ') }}
+          </span>
+          <StructuredList v-if="item.list?.items.length" :list="item.list" class="features__detail" />
+          <RulesGrid v-if="item.table?.rows.length" :table="item.table" data-feature-table />
+          <div
             v-for="(part, pIndex) in item.parts"
             :key="pIndex"
             class="features__part"
             data-feature-part
           >
             <strong v-if="part.label" class="features__part-name">{{ part.label }}</strong>
-            <span v-if="part.text">{{ part.text }}</span>
-          </p>
+            <span v-if="part.reference" class="features__reference">
+              (see {{ sectionLabel(part.reference, companionTitle) }})
+            </span>
+            <RichText v-if="part.text" :text="part.text" />
+            <span v-if="part.grantedSpells?.length" class="features__detail" data-feature-part-spells>
+              <strong>{{ /cantrips?/i.test(part.label) ? 'Cantrips' : 'Spells' }}:</strong>
+              {{ part.grantedSpells.join(', ') }}
+            </span>
+            <StructuredList v-if="part.list?.items.length" :list="part.list" class="features__detail" />
+            <RulesGrid v-if="part.table?.rows.length" :table="part.table" data-feature-table />
+          </div>
         </li>
       </ul>
     </div>
@@ -87,6 +118,8 @@ defineProps<{ features: FeatureGroup[]; rowAligned?: boolean }>();
   padding-left: 14px;
   /* Keep a feature's name and its blurb together in one column. */
   break-inside: avoid;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .features__list:not(.features__list--row-aligned) .features__item {
@@ -133,5 +166,20 @@ defineProps<{ features: FeatureGroup[]; rowAligned?: boolean }>();
 .features__part-name {
   margin-right: 5px;
   color: #1c1c1e;
+}
+
+.features__reference {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--p-text-muted-color, #888);
+}
+
+.features__detail {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--p-text-muted-color, #888);
 }
 </style>

@@ -334,6 +334,11 @@ watch(character, () => {
   measuredHeights.value = {};
   layoutFitResults.value = {};
 });
+watch(spellsExpanded, () => {
+  const nextHeights = { ...measuredHeights.value };
+  delete nextHeights.spells;
+  measuredHeights.value = nextHeights;
+});
 watch(
   () => [character.value, activeProfileId.value, formatId.value, orientationId.value,
     marginId.value, layoutIndices.value.features, layoutIndices.value.actions],
@@ -1096,6 +1101,7 @@ onUnmounted(() => {
                 :row-aligned-actions="rowAlignedSections.has(continuationBaseKey(entry.section.key))"
                 :max-body-height="pageBodyHeight(measuredHeights[continuationBaseKey(entry.section.key)]?.chrome ?? 0)"
                 :character="character"
+                :spells-expanded="spellsExpanded"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
                 :can-cycle-layout="cardCanCycle(entry.section)"
@@ -1126,6 +1132,7 @@ onUnmounted(() => {
                   gridRow: `1 / span ${probe.span.rows}`,
                 }"
                 :character="character"
+                :spells-expanded="spellsExpanded"
                 fit-probe
                 @layout-fit="onLayoutFit(probe.key, $event)"
               />
@@ -1148,6 +1155,7 @@ onUnmounted(() => {
             :section="section"
             :span="sectionSpan(section.key, section.count, layoutIndices[section.key] ?? 0, rowsPerPage)"
             :character="character"
+            :spells-expanded="spellsExpanded"
             hidden
             @show="show"
           />

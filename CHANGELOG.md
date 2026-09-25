@@ -12,6 +12,7 @@ This project follows [Semantic Versioning](https://semver.org/). User-visible ch
 - Automated lint, type, test, build, dependency, and Playwright checks in CI.
 - A normalization contract and migration runbook for future D&D Beyond payload and webpage overhauls.
 - Local and CI configuration for PrimeUI license verification without committing the key.
+- Printable companion statistics and rules tables, structured feature benefits, source-labelled spellcasting profiles, separate Pact Magic slots, and independent spell-grant trackers.
 
 ### Changed
 
@@ -32,4 +33,9 @@ This project follows [Semantic Versioning](https://semver.org/). User-visible ch
 - Rules blocks taller than a page can continue at internal text boundaries, and spell levels containing only slots provide valid page breaks.
 - Printed pages no longer retain the on-screen desk gap, and failed character loads offer a retry action.
 - Normalization preserves complete action/spell rules, custom proficiencies, selected benefits, and feature-cast trackers in both spell views; ability, AC, HP, damage, and limited-use calculations have additional regression coverage.
-- Patched transitive Nano ID and PostCSS dependencies; removed unused companion/table presentation components from the retained simplified model.
+- Patched transitive Nano ID and PostCSS dependencies.
+- Roster-driven numerical parity for 2024 species bonuses, selected activation effects, walking-speed increases, ability/proficiency-derived initiative, saves, and skills.
+- Explicit signed placeholders retain their sign next to dice instead of producing invalid die sizes.
+- Martial Arts unarmed attacks use their granted progression die and eligible ability modifier; fixed dice constants are counted only once.
+- Selected benefits retain shared replacement requirements, level upgrades retain distinct mechanics, and grouped lookup headers and duplicate companion blocks preserve their meaning.
+- Expanded spell cards retain casting requirements and slot pools; spells learned through multiple classes or class-feature grants preserve every applicable casting source.

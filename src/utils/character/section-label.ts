@@ -14,10 +14,15 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   inventory: 'Inventory',
   wealth: 'Wealth',
   features: 'Features & Traits',
+  companions: 'Companions',
+  tables: 'Tables',
   notes: 'Notes',
 };
 
 /** User-facing label for a character-sheet section. */
-export function sectionLabel(section: SectionKey): string {
-  return SECTION_LABELS[section];
+export function sectionLabel(
+  section: SectionKey,
+  companionTitle = SECTION_LABELS.companions,
+): string {
+  return section === 'companions' ? companionTitle : SECTION_LABELS[section];
 }

@@ -205,7 +205,7 @@ test.describe('sheet layout controls', () => {
       .first();
     const use = darkness.locator('[data-spell-uses]');
 
-    await expect(use).toContainText('Long rest');
+    await expect(use).toContainText(/long rest/i);
     await expect(use.locator('.resource__box')).toHaveCount(1);
     const placement = await darkness.evaluate((spell) => {
       const name = spell.querySelector<HTMLElement>('.spells__name');
@@ -539,6 +539,7 @@ test.describe('sheet layout controls', () => {
     context,
     extensionId,
   }) => {
+    await context.setOffline(true);
     const page = await openSheet(context, extensionId);
 
     // Starts as one quick-sheet spells card with an expand control.
@@ -548,8 +549,9 @@ test.describe('sheet layout controls', () => {
     await page.locator('.page [data-section-key="spells"] .card__spell-toggle').click();
     await settle(page);
 
-    // Each spell is now its own card; the single spells card is gone.
-    expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(0);
+    // Each spell is now its own card; casting stats and slots keep their summary.
+    expect(await page.locator('.page [data-section-key="spells"]').count()).toBe(1);
+    expect(await page.locator('.page [data-section-key="spells"] [data-spell]').count()).toBe(0);
     expect(
       await page.locator('.page [data-section-key^="spell:"]').count(),
     ).toBeGreaterThan(1);
@@ -568,7 +570,17 @@ test.describe('sheet layout controls', () => {
     context,
     extensionId,
   }) => {
-    const page = await openSheet(context, extensionId);
+    const page = await openSheet(context, extensionId, {
+      id: 9503,
+      name: 'Late text wrapping',
+      classes: [],
+      stats: [],
+      spells: { race: [{ definition: {
+        name: 'Wrapping spell',
+        level: 0,
+        description: `<p>${'UnbrokenRuleToken'.repeat(20)}</p>`,
+      } }] },
+    });
     await page.locator('.page [data-section-key="spells"] .card__spell-toggle').click();
     await settle(page);
 
@@ -583,8 +595,9 @@ test.describe('sheet layout controls', () => {
     expect(before).toBeTruthy();
     if (!key || !before) throw new Error('Expanded spell card did not render');
 
-    await candidate.locator('.spell-card__summary').evaluate((element) => {
-      element.textContent = 'UnbrokenRuleToken'.repeat(100);
+    // A late font change survives Vue remounts when the resized card changes pages.
+    await page.addStyleTag({
+      content: `[data-section-key="${key}"] .spell-card__summary { font-size: 20px !important; }`,
     });
     await page.waitForFunction(
       ({ sectionKey, previousHeight }: { sectionKey: string; previousHeight: number }) => {
@@ -594,6 +607,7 @@ test.describe('sheet layout controls', () => {
         return card != null && card.getBoundingClientRect().height > previousHeight + 20;
       },
       { sectionKey: key, previousHeight: before.height },
+      { timeout: 10_000 },
     );
     await settle(page);
 

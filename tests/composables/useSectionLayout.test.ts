@@ -140,6 +140,29 @@ describe('useSectionLayout', () => {
     expect(keys(result.hiddenSections.value)).toContain('spell:bless');
   });
 
+  it('retains a casting summary beside expanded spells and restores the original section on collapse', async () => {
+    const character = ref<Character | null>(makeCharacter({
+      spells: [{ name: 'Ward', level: 1 }],
+      spellcasting: {
+        ability: 'INT', modifier: 2, attack: 5, saveDc: 13, slots: [4],
+        profiles: [
+          { source: 'Wizard', ability: 'INT', modifier: 2, attack: 5, saveDc: 13 },
+          { source: 'Cleric', ability: 'WIS', modifier: 4, attack: 7, saveDc: 15 },
+        ],
+        pactSlots: [{ source: 'Warlock', level: 2, max: 2 }],
+      },
+      sections: [{ key: 'spells', title: 'Spells', count: 1, isEmpty: false }],
+    }));
+    const expanded = ref(true);
+    const { result } = mountComposable(() => useSectionLayout(character, ref(DEFAULT_PROFILE_ID), expanded));
+    await flushPromises();
+    expect(keys(result.sections.value)).toEqual(['spells', 'spell:ward']);
+    expect(result.sections.value[0]).toMatchObject({ count: 4, isEmpty: false });
+    expanded.value = false;
+    await flushPromises();
+    expect(result.sections.value).toEqual(character.value!.sections);
+  });
+
   it('sets a card layout and persists it, but ignores sections with one option', async () => {
     const character = ref<Character | null>(fighter());
     const { result } = mountComposable(() => useSectionLayout(character));

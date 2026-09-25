@@ -231,6 +231,36 @@ describe('sheet App', () => {
     expect(wrapper.findAll('.page [data-section-key^="spell:"]')).toHaveLength(0);
   });
 
+  it.each(['summary', 'spell'])('retains casting requirements and slots, collapsing from the %s control', async (control) => {
+    mockedLoad.mockResolvedValue({
+      ...sampleCharacter,
+      spells: [{ name: 'Light', level: 0 }, { name: 'Ward', level: 1 }],
+      spellcasting: {
+        ability: 'INT', modifier: 2, attack: 5, saveDc: 13, slots: [4],
+        profiles: [{ source: 'Artificer', ability: 'INT', modifier: 2, attack: 5, saveDc: 13, focus: 'Tools required for every spell.' }],
+        pactSlots: [{ source: 'Warlock', level: 3, max: 2 }],
+      },
+    });
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await wrapper.get('.page [data-section-key="spells"] .card__spell-toggle').trigger('click');
+    await flushPromises();
+    const summary = wrapper.get('.page [data-section-key="spells"]');
+    expect(summary.text()).toContain('Tools required for every spell.');
+    expect(summary.findAll('[data-slots] .resource__box')).toHaveLength(4);
+    expect(summary.findAll('[data-pact-slots] .resource__box')).toHaveLength(2);
+    expect(summary.find('[data-spell]').exists()).toBe(false);
+    expect(wrapper.findAll('.page [data-section-key^="spell:"]')).toHaveLength(2);
+    expect(summary.get('.card__spell-toggle').attributes('aria-label')).toBe('Back to spell list');
+    expect(wrapper.findAllComponents(SectionCard).every((card) => card.props('spellsExpanded'))).toBe(true);
+    const selector = control === 'summary' ? '[data-section-key="spells"]' : '[data-section-key="spell:ward"]';
+    await wrapper.get(`.page ${selector} .card__spell-toggle`).trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.page [data-section-key^="spell:"]')).toHaveLength(0);
+    expect(wrapper.findAll('.page [data-section-key="spells"] [data-spell]')).toHaveLength(2);
+    expect(wrapper.findAll('.page [data-slots] .resource__box')).toHaveLength(4);
+  });
+
   it('prints the sheet from the Print button', () => {
     const printMock = vi.fn();
     vi.stubGlobal('print', printMock); // happy-dom has no window.print

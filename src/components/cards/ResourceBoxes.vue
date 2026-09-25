@@ -1,7 +1,17 @@
 <script lang="ts" setup>
+import { computed } from 'vue';
 import type { ResourcePool } from '@/services/dndbeyond/model';
 
-defineProps<{ resource: ResourcePool }>();
+const props = defineProps<{ resource: ResourcePool }>();
+
+const recovery = computed(() => {
+  const rule = props.resource.recovery;
+  if (rule?.kind === 'rest') return rule.rest === 'short' ? 'short rest' : 'Long rest';
+  if (rule?.kind === 'partial-short-full-long') {
+    return `${rule.shortRestUses}/short rest, all/long rest`;
+  }
+  return rechargeLabel(props.resource.recharge ?? '');
+});
 
 /** Spell out the recharge shorthand for the printed tag. */
 function rechargeLabel(recharge: string): string {
@@ -20,9 +30,14 @@ function rechargeLabel(recharge: string): string {
       class="resource__box"
       aria-hidden="true"
     ></span>
-    <span v-if="resource.recharge" class="resource__recharge">{{
-      rechargeLabel(resource.recharge)
-    }}</span>
+    <span v-if="recovery" class="resource__recharge">{{ recovery }}</span>
+    <span
+      v-for="(option, index) in resource.alternateRecovery"
+      :key="index"
+      class="resource__alternate"
+      :title="option.restores === 'all' ? 'Restores all uses' : `Restores ${option.restores} ${option.restores === 1 ? 'use' : 'uses'}`"
+      data-alternate-recovery
+    >or spend {{ option.cost }}{{ option.restores === 1 ? '' : ` to restore ${option.restores}` }}</span>
   </span>
 </template>
 
@@ -31,6 +46,7 @@ function rechargeLabel(recharge: string): string {
    an optional recharge tag ("short rest" / "Long rest"). */
 .resource {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 3px;
   margin-left: 6px;
@@ -43,9 +59,11 @@ function rechargeLabel(recharge: string): string {
   border: 1.5px solid var(--p-primary-400, #9ca3af);
   border-radius: 2px;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
-.resource__recharge {
+.resource__recharge,
+.resource__alternate {
   margin-left: 2px;
   font-size: 12px;
   font-weight: 600;

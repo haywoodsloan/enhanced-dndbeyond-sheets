@@ -1,12 +1,25 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
+import type { PactSlotPool, SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { formatModifier } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
+import SpellUses from '@/components/cards/SpellUses.vue';
+import SpellDetails from '@/components/cards/SpellDetails.vue';
 
-const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>();
+const props = defineProps<{
+  spells: SpellEntry[];
+  spellcasting?: Spellcasting;
+  companionTitle?: string;
+  summaryOnly?: boolean;
+}>();
+
+const profiles = computed(() => {
+  const casting = props.spellcasting;
+  if (!casting) return [];
+  return casting.profiles?.length ? casting.profiles : [{ source: '', ...casting }];
+});
 
 /**
  * Spell levels to show: every level with spells or slots. Each carries its spell
@@ -15,23 +28,28 @@ const props = defineProps<{ spells: SpellEntry[]; spellcasting?: Spellcasting }>
  */
 const groups = computed(() => {
   const byLevel = new Map<number, SpellEntry[]>();
-  for (const spell of props.spells) {
+  for (const spell of props.summaryOnly ? [] : props.spells) {
     const list = byLevel.get(spell.level) ?? [];
     list.push(spell);
     byLevel.set(spell.level, list);
   }
   const slots = props.spellcasting?.slots ?? [];
-  const maxLevel = Math.max(slots.length, 0, ...byLevel.keys());
-  const result: { level: number; label: string; spells: SpellEntry[]; slots: number }[] = [];
+  const pactSlots = props.spellcasting?.pactSlots ?? [];
+  const maxLevel = Math.max(slots.length, 0, ...pactSlots.map((pool) => pool.level), ...byLevel.keys());
+  const result: {
+    level: number; label: string; spells: SpellEntry[]; slots: number; pactSlots: PactSlotPool[];
+  }[] = [];
   for (let level = 0; level <= maxLevel; level += 1) {
     const levelSpells = byLevel.get(level) ?? [];
     const levelSlots = level >= 1 ? (slots[level - 1] ?? 0) : 0;
-    if (levelSpells.length === 0 && levelSlots === 0) continue;
+    const levelPactSlots = pactSlots.filter((pool) => pool.level === level && pool.max > 0);
+    if (levelSpells.length === 0 && levelSlots === 0 && levelPactSlots.length === 0) continue;
     result.push({
       level,
       label: level === 0 ? 'Cantrips' : `Level ${level}`,
       spells: levelSpells,
       slots: levelSlots,
+      pactSlots: levelPactSlots,
     });
   }
   return result;
@@ -40,7 +58,8 @@ const groups = computed(() => {
 /** Compact per-spell shorthand: "A · 60 ft. · V,S · 1d8 Radiant · DEX save". */
 function spellMeta(spell: SpellEntry): string {
   const hit = spell.save ? `${spell.save} save` : spell.attack ? 'Spell attack' : '';
-  return [spell.castingTime, spell.range, spell.components, spell.duration, formatDamage(spell.damage), hit]
+  const ability = spell.castingSources?.length ? undefined : spell.ability;
+  return [ability, spell.castingTime, spell.range, spell.components, spell.duration, formatDamage(spell.damage), hit]
     .filter(Boolean)
     .join(' · ');
 }
@@ -57,11 +76,21 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 <template>
   <div class="spells">
     <div v-if="spellcasting" class="spells__casting" data-spellcasting>
-      <span class="spells__stat">Spell attack <b>{{ formatModifier(spellcasting.attack) }}</b></span>
-      <span class="spells__stat">Save <b>DC {{ spellcasting.saveDc }}</b></span>
-      <span class="spells__stat">
-        Modifier ({{ spellcasting.ability }}) <b>{{ formatModifier(spellcasting.modifier) }}</b>
-      </span>
+      <div
+        v-for="(profile, index) in profiles"
+        :key="`${profile.source}-${profile.ability}-${index}`"
+        class="spells__profile"
+        data-spellcasting-profile
+        data-spell-card-part
+      >
+        <strong v-if="profile.source">{{ profile.source }}</strong>
+        <span class="spells__stat">Spell attack <b>{{ formatModifier(profile.attack) }}</b></span>
+        <span class="spells__stat">Save <b>DC {{ profile.saveDc }}</b></span>
+        <span class="spells__stat">
+          Modifier ({{ profile.ability }}) <b>{{ formatModifier(profile.modifier) }}</b>
+        </span>
+        <span v-if="'focus' in profile && profile.focus" class="spells__stat">Focus <b>{{ profile.focus }}</b></span>
+      </div>
     </div>
     <div
       v-for="group in groups"
@@ -73,6 +102,15 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
       <div class="spells__group-head" data-spell-level>
         <span class="spells__label">{{ group.label }}</span>
         <ResourceBoxes v-if="group.slots > 0" :resource="{ max: group.slots }" data-slots />
+        <span
+          v-for="(pool, index) in group.pactSlots"
+          :key="`${pool.source}-${index}`"
+          class="spells__pact"
+          data-pact-slots
+        >
+          {{ pool.source }} Pact Magic
+          <ResourceBoxes :resource="{ max: pool.max, recovery: { kind: 'rest', rest: 'short' } }" />
+        </span>
       </div>
       <ul v-if="group.spells.length" class="spells__list">
         <li
@@ -89,14 +127,10 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
             :title="tag.title"
             >{{ tag.label }}</span
           >
-          <ResourceBoxes
-            v-if="spell.uses"
-            :resource="spell.uses"
-            class="spells__uses"
-            data-spell-uses
-          />
+          <SpellUses :spell="spell" />
           <span v-if="spellMeta(spell)" class="spells__meta">{{ spellMeta(spell) }}</span>
           <RichText v-if="spell.summary" :text="spell.summary" class="spells__summary" />
+          <SpellDetails :spell="spell" :spellcasting="spellcasting" :companion-title="companionTitle" />
         </li>
       </ul>
     </div>
@@ -113,11 +147,25 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 /* Spell attack / save DC / ability modifier summary. */
 .spells__casting {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   gap: 4px 14px;
   padding-bottom: 4px;
   font-size: 13px;
   border-bottom: 1px solid var(--p-primary-200, #e4e4e7);
+}
+
+.spells__profile,
+.spells__pact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.spells__pact {
+  font-size: 12px;
+  gap: 4px;
 }
 
 .spells__stat {
@@ -146,6 +194,7 @@ function spellTags(spell: SpellEntry): { key: string; label: string; title: stri
 /* Level heading with its slot checkboxes at the start of the level. */
 .spells__group-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
 }

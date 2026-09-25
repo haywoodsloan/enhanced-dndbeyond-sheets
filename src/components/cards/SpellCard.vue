@@ -1,13 +1,14 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import type { SpellEntry } from '@/services/dndbeyond/model';
+import type { SpellEntry, Spellcasting } from '@/services/dndbeyond/model';
 import { spellSchoolStyle } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
 import InlineScalingText from '@/components/InlineScalingText.vue';
 import RichText from '@/components/RichText.vue';
-import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
+import SpellUses from '@/components/cards/SpellUses.vue';
+import SpellDetails from '@/components/cards/SpellDetails.vue';
 
-const props = defineProps<{ spell: SpellEntry }>();
+const props = defineProps<{ spell: SpellEntry; spellcasting?: Spellcasting; companionTitle?: string }>();
 
 const school = computed(() => spellSchoolStyle(props.spell.school));
 const levelLabel = computed(() => (props.spell.level === 0 ? '0' : String(props.spell.level)));
@@ -30,6 +31,8 @@ const rows = computed(() => {
     ['Dur', durationLabel.value],
     ['Hit', hit],
     ['Dmg', formatDamage(spell.damage)],
+    ['Ability', spell.castingSources?.length ? undefined : spell.ability],
+    ['Ritual', spell.ritual ? 'Yes' : undefined],
   ];
   return entries.filter((entry): entry is [string, string] => Boolean(entry[1]));
 });
@@ -45,12 +48,8 @@ const rows = computed(() => {
         {{ levelLabel }}
       </span>
       <span class="spell-card__school" :title="spell.school">{{ school.abbr }}</span>
-      <ResourceBoxes
-        v-if="spell.uses"
-        :resource="spell.uses"
-        data-spell-uses
-      />
     </div>
+    <SpellUses :spell="spell" card-parts />
     <dl class="spell-card__rows">
       <div
         v-for="[label, value] in rows"
@@ -68,6 +67,7 @@ const rows = computed(() => {
       class="spell-card__summary"
       data-spell-card-part
     />
+    <SpellDetails :spell="spell" :spellcasting="spellcasting" :companion-title="companionTitle" card-parts />
   </div>
 </template>
 
