@@ -5,18 +5,17 @@ import { spellSchoolStyle } from '@/utils/character/dnd5e';
 import { formatDamage } from '@/utils/character/format';
 import InlineScalingText from '@/components/InlineScalingText.vue';
 import RichText from '@/components/RichText.vue';
+import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 
-const props = withDefaults(
-  defineProps<{ spell: SpellEntry; companionTitle?: string }>(),
-  { companionTitle: 'Companions' },
-);
+const props = defineProps<{ spell: SpellEntry }>();
 
 const school = computed(() => spellSchoolStyle(props.spell.school));
 const levelLabel = computed(() => (props.spell.level === 0 ? '0' : String(props.spell.level)));
 const durationLabel = computed(() => {
   if (!props.spell.concentration) return props.spell.duration;
-  return props.spell.duration
-    ? `Concentration, ${props.spell.duration}`
+  const duration = props.spell.duration?.replace(/^(?:Conc|Concentration),\s*/i, '');
+  return duration
+    ? `Concentration, ${duration}`
     : 'Concentration';
 });
 
@@ -28,7 +27,6 @@ const rows = computed(() => {
     ['Cast', spell.castingTime],
     ['Range', spell.range],
     ['Comp', spell.components],
-    ['Material', spell.material],
     ['Dur', durationLabel.value],
     ['Hit', hit],
     ['Dmg', formatDamage(spell.damage)],
@@ -47,6 +45,11 @@ const rows = computed(() => {
         {{ levelLabel }}
       </span>
       <span class="spell-card__school" :title="spell.school">{{ school.abbr }}</span>
+      <ResourceBoxes
+        v-if="spell.uses"
+        :resource="spell.uses"
+        data-spell-uses
+      />
     </div>
     <dl class="spell-card__rows">
       <div
@@ -59,23 +62,10 @@ const rows = computed(() => {
         <dd class="spell-card__value"><InlineScalingText :text="value" /></dd>
       </div>
     </dl>
-    <span
-      v-if="spell.related?.includes('companions')"
-      class="spell-card__reference"
-      data-spell-card-part
-    >
-      See {{ companionTitle }}
-    </span>
     <RichText
       v-if="spell.summary"
       :text="spell.summary"
       class="spell-card__summary"
-      data-spell-card-part
-    />
-    <RichText
-      v-if="spell.upcast"
-      :text="spell.upcast"
-      class="spell-card__upcast"
       data-spell-card-part
     />
   </div>
@@ -138,9 +128,7 @@ const rows = computed(() => {
   overflow-wrap: anywhere;
 }
 
-.spell-card__reference,
-.spell-card__summary,
-.spell-card__upcast {
+.spell-card__summary {
   display: block;
   margin-top: 5px;
   font-size: 11px;
@@ -149,7 +137,4 @@ const rows = computed(() => {
   overflow-wrap: anywhere;
 }
 
-.spell-card__reference {
-  font-weight: 600;
-}
 </style>

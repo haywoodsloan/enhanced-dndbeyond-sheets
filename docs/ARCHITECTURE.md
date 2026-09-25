@@ -25,9 +25,17 @@ The D&D Beyond source boundary is documented in [NORMALIZATION.md](NORMALIZATION
 
 ## Layout pipeline
 
-The sheet uses fixed physical page dimensions converted to CSS pixels. Each card receives a footprint, optional saved anchor, and layout variant. The packer places anchored cards first, flows unanchored cards into available cells, and keeps continuations after their base card. Content-fit cards are measured in the browser and split only at supported item boundaries; row-aligned rendering is the fallback when masonry columns cannot be sliced safely.
+The sheet uses fixed physical page dimensions converted to CSS pixels. Each card receives a footprint, optional saved anchor, and layout variant. The packer places anchored cards first, flows unanchored cards into available cells, and keeps continuations after their base card. Content-fit cards are measured in the browser and split at supported item boundaries; row-aligned rendering is the fallback when masonry columns cannot be sliced safely. A single rules block taller than a whole page gets internal bullet/text-line boundaries so its tail is not clipped.
 
 Keep packing and continuation utilities pure. Browser measurement belongs in the sheet/component layer, and persisted layout data should remain independent of measured pixels so profiles survive page-format changes.
+
+Fixed-card alternatives are measured in inert, off-screen probes before their layout toggle is enabled. Small paper uses fewer portrait columns to retain readable widths. Expanded spell cards also report natural content height. A saved card position is revalidated against the current page size so content growth cannot make it cross a page boundary.
+
+## Concurrent sheets and persistence
+
+Profile metadata edits rebase onto current storage under an extension-origin Web Lock, and open sheets consume metadata storage-change events. A failed transactional read aborts rather than overwriting saved profiles with a display fallback. Profile-scoped reads use generation checks; a late read cannot replace the currently selected profile. Duplication flushes local edits and waits for other sheets' reserved debounced-write locks before taking its snapshot; a timed-out copy does not publish a new profile.
+
+Authorization capture and conditional invalidation share a separate Web Lock. A delayed rejected request can clear only its own credential, never a newer captured value. Credentials remain exclusively in `storage.session`; locks do not require an additional extension permission.
 
 ## Extending the model
 

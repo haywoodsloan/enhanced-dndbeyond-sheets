@@ -19,6 +19,8 @@ The extension is functional and under active development. It currently provides:
 
 Chrome/Chromium and Firefox MV3 builds are supported.
 
+The current data model has one spellcasting summary and one feature-granted cast pool per spell. Dedicated companion/table cards and separate source-labelled casting pools are not included. Complex multiclass and independently recharging spell grants should be checked against the original sheet; see the [normalization limits](docs/NORMALIZATION.md#current-model-limits).
+
 ## How it works
 
 1. Open a character on D&D Beyond (`https://www.dndbeyond.com/characters/<id>`).
@@ -158,6 +160,8 @@ See [SECURITY.md](SECURITY.md) for the complete trust boundary and vulnerability
 Unit and integration tests use Vitest with WXT's testing plugin and `@vue/test-utils`. They live in `tests/`, mirror the source layout, and are named `*.test.ts`. Run `npm test` for the suite, or `npm run test:coverage` for a coverage run — it prints a terminal summary and per-file table, writes a browsable report to `coverage/index.html`, and emits `coverage/lcov.info` for editors (e.g. Coverage Gutters) and CI. Coverage is measured against `src/` and gated by minimum thresholds in `vitest.config.ts`, so a regression fails the run.
 
 The pointer-driven card drag needs a real layout engine, so it's covered by Playwright end-to-end tests in `e2e/` (named `*.spec.ts`) that load the built extension and drive the drag in a headless browser. Run them with `npm run test:e2e` (it builds first). These exercise the built bundle in a browser rather than `src/`, so they aren't part of the coverage report.
+
+Browser tests also cover keyboard movement, multiple open sheets editing profiles, small-paper layouts, whole-item continuations, and the generated PDF's page count and dimensions with background graphics disabled. Live MCP checks are optional development diagnostics, not part of the extension or deterministic test suite. Fetch reference characters sequentially, keep captures local, and never commit account data or credentials.
 
 GitHub Actions runs lint, type-checking, coverage-gated tests, Chrome and Firefox builds, a production dependency audit, and the Playwright suite for pushes and pull requests.
 

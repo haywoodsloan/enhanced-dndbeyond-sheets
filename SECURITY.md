@@ -13,7 +13,7 @@ Do not open a public issue for a suspected credential, permission, or data-expos
 Beyond+ runs entirely in the browser and connects only to the D&D Beyond hosts declared in `wxt.config.ts`.
 
 - It captures the signed-in user's D&D Beyond authorization header from the site's own character-service request.
-- That header is stored only in `browser.storage.session`, is used only for direct character-service requests, and is cleared when rejected or when the browser session ends.
+- That header is stored only in `browser.storage.session`, is used only for direct character-service requests, and is cleared when rejected or when the browser session ends. Capture and invalidation are coordinated across extension contexts so an old rejection cannot clear a newer credential.
 - Character payloads are normalized and rendered locally; they are not persisted or sent to project-owned infrastructure, analytics, or MCP services.
 - Layout preferences and profile metadata are stored with browser sync storage and contain no character payload or credential.
 - Production builds disable diagnostic console logging. Development logs redact sensitive keys and bearer/JWT-shaped values.

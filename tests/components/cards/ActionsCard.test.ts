@@ -46,7 +46,7 @@ describe('ActionsCard', () => {
           {
             name: 'Divine Spark',
             category: 'action',
-            resource: { max: 2, recovery: { kind: 'rest', rest: 'long' } },
+            resource: { max: 2, recharge: 'LR' },
             damage: { dice: '1d8', bonus: 4 },
             save: 'DC 14 CON',
             range: '30 ft.',
@@ -70,8 +70,8 @@ describe('ActionsCard', () => {
           {
             name: 'Superiority Dice',
             category: 'other',
-            resource: { max: 5, recovery: { kind: 'rest', rest: 'short' } },
-            roll: '1d10',
+            resource: { max: 5, recharge: 'SR' },
+            summary: 'Roll 1d10 for this effect.',
           },
         ],
       },
@@ -103,42 +103,34 @@ describe('ActionsCard', () => {
     expect(items[1].find('.actions__summary').exists()).toBe(false);
   });
 
-  it('points an action to its dynamically titled creature card', () => {
+  it('keeps self-contained rules without a reference to an unavailable card', () => {
     const wrapper = mount(ActionsCard, {
       props: {
-        companionTitle: 'Summons & Wild Shapes',
         actions: [
-          { name: 'Wild Shape', category: 'bonus', related: ['companions'] },
+          { name: 'Wild Shape', category: 'bonus', summary: 'Transform into a Beast you have seen.' },
         ],
       },
     });
 
-    expect(wrapper.get('.actions__reference').text()).toBe(
-      '(see Summons & Wild Shapes)',
-    );
+    expect(wrapper.get('.actions__summary').text()).toBe('Transform into a Beast you have seen.');
+    expect(wrapper.find('.actions__reference').exists()).toBe(false);
   });
 
-  it('renders structured action benefits as a semantic list', () => {
+  it('renders every benefit from action summary bullet markers', () => {
     const wrapper = mount(ActionsCard, {
       props: {
         actions: [
           {
             name: 'Wild Shape: Circle Forms',
             category: 'bonus',
-            summary: 'You gain the following benefits:',
-            list: {
-              items: [
-                { text: 'The max CR for the form is 3.' },
-                { text: 'You gain 27 Temporary HP.' },
-              ],
-            },
+            summary: 'You gain the following benefits: • The max CR for the form is 3. • You gain 27 Temporary HP.',
           },
         ],
       },
     });
 
-    expect(wrapper.get('.actions__summary').text()).toBe('You gain the following benefits:');
-    expect(wrapper.findAll('[data-action-list] li').map((item) => item.text())).toEqual([
+    expect(wrapper.get('.actions__summary').text()).toContain('You gain the following benefits:');
+    expect(wrapper.findAll('[data-rich-text-bullet]').map((item) => item.text())).toEqual([
       'The max CR for the form is 3.',
       'You gain 27 Temporary HP.',
     ]);

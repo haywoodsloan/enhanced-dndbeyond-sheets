@@ -14,8 +14,11 @@ import {
   HIDDEN_SECTIONS_KEY,
   SECTION_ANCHORS_KEY,
   SECTION_LAYOUT_KEY,
+  registerProfileFlush,
+  reserveProfileWrite,
   scopedPreference,
 } from '@/utils/settings/preferences';
+import { debugLog } from '@/utils/debug';
 
 /**
  * Debounce (ms) before a placement is saved. A live drag calls `placeCard` many
@@ -67,6 +70,8 @@ export function useSectionLayout(
   const anchors = ref<Record<string, { page: number; col: number; row: number; seq: number }>>({});
   // Monotonic recency counter; the most recently moved card wins a contested cell.
   let nextSeq = 1;
+  let generation = 0;
+  let loadedProfileId: string | undefined;
 
   // The active profile's scoped settings (the default profile uses the original,
   // unscoped keys). Recomputed per call so a profile switch takes effect.
@@ -92,17 +97,40 @@ export function useSectionLayout(
   }
 
   async function load() {
+    const currentGeneration = ++generation;
+    const id = profileId.value;
+    loadedProfileId = undefined;
+    await flushAnchors();
+    if (generation !== currentGeneration || id !== profileId.value) return;
     const [hidden, autoShown, layout, anchorData] = await Promise.all([
       hiddenPref().get([]),
       autoShownPref().get([]),
       layoutPref().get({}),
       anchorsPref().get({}),
     ]);
+    if (generation !== currentGeneration || id !== profileId.value) return;
     hiddenKeys.value = hidden;
     autoShownKeys.value = autoShown;
     layoutIndices.value = layout;
-    anchors.value = anchorData;
-    nextSeq = Object.values(anchors.value).reduce((max, p) => Math.max(max, p.seq ?? 0), 0) + 1;
+    const validAnchors: typeof anchors.value = {};
+    let invalid = !anchorData || typeof anchorData !== 'object' || Array.isArray(anchorData);
+    if (!invalid) {
+      for (const [key, placement] of Object.entries(anchorData)) {
+        if (
+          !placement || typeof placement !== 'object' ||
+          ![placement.page, placement.col, placement.row, placement.seq ?? 0]
+            .every((value) => Number.isSafeInteger(value) && value >= 0)
+        ) {
+          invalid = true;
+          continue;
+        }
+        validAnchors[key] = { ...placement, seq: placement.seq ?? 0 };
+      }
+    }
+    if (invalid) debugLog('settings', 'invalid stored section anchors', { profileId: id });
+    anchors.value = validAnchors;
+    nextSeq = Object.values(anchors.value).reduce((max, p) => Math.max(max, p.seq), 0) + 1;
+    loadedProfileId = id;
     rebuild();
   }
 
@@ -114,9 +142,8 @@ export function useSectionLayout(
   // Switching the active profile swaps in a whole different saved layout. Flush
   // any pending anchor save (to the profile it belongs to) first, then reload.
   watch(profileId, () => {
-    flushAnchors();
     void load();
-  });
+  }, { flush: 'sync' });
 
   const autoHiddenKeys = computed<CardKey[]>(() => {
     if (character.value?.avatarUrl || autoShownKeys.value.includes('portrait')) return [];
@@ -133,6 +160,7 @@ export function useSectionLayout(
   );
 
   function setHidden(key: CardKey, hidden: boolean) {
+    if (loadedProfileId !== profileId.value) return;
     const nextHidden = hidden
       ? hiddenKeys.value.includes(key)
         ? hiddenKeys.value
@@ -163,6 +191,7 @@ export function useSectionLayout(
    * index (an option that would overflow a page is skipped), so this just stores
    * and persists the chosen index. */
   function setLayout(key: CardKey, index: number) {
+    if (loadedProfileId !== profileId.value) return;
     const count = sectionLayoutCount(key);
     if (count <= 1) return;
     const clamped = Math.min(Math.max(0, Math.floor(index)), count - 1);
@@ -174,23 +203,42 @@ export function useSectionLayout(
   // Manual placements are set live during a drag (like reorder), so their save
   // is debounced too, to respect the storage.sync write-rate limit.
   let anchorTimer: ReturnType<typeof setTimeout> | undefined;
+  let anchorMaxTimer: ReturnType<typeof setTimeout> | undefined;
+  let commitAnchors: ReturnType<typeof reserveProfileWrite> | undefined;
   let pendingAnchors: Record<string, { page: number; col: number; row: number; seq: number }> | null = null;
   // The profile a pending save belongs to — captured at schedule time so a
   // profile switch mid-debounce still writes to the profile the change was for.
   let pendingProfileId = profileId.value;
-  function flushAnchors() {
+  let anchorWrite = Promise.resolve();
+  function flushAnchors(): Promise<void> {
     if (anchorTimer !== undefined) {
       clearTimeout(anchorTimer);
       anchorTimer = undefined;
     }
-    if (pendingAnchors) {
-      void anchorsPref(pendingProfileId).set(pendingAnchors);
-      pendingAnchors = null;
+    if (anchorMaxTimer !== undefined) {
+      clearTimeout(anchorMaxTimer);
+      anchorMaxTimer = undefined;
     }
+    if (pendingAnchors) {
+      const value = pendingAnchors;
+      const preference = anchorsPref(pendingProfileId);
+      const commit = commitAnchors!;
+      commitAnchors = undefined;
+      pendingAnchors = null;
+      anchorWrite = commit(() => preference.set(value)).catch(() => {
+        debugLog('settings', 'section anchor persistence failed');
+      });
+    }
+    return anchorWrite;
   }
   function persistAnchors() {
     pendingAnchors = anchors.value;
     pendingProfileId = profileId.value;
+    if (!commitAnchors) {
+      commitAnchors = reserveProfileWrite(pendingProfileId);
+      // Continuous dragging still releases the snapshot lock periodically.
+      anchorMaxTimer = setTimeout(() => { void flushAnchors(); }, 2_000);
+    }
     if (anchorTimer !== undefined) clearTimeout(anchorTimer);
     anchorTimer = setTimeout(flushAnchors, PLACEMENT_PERSIST_DELAY);
   }
@@ -200,6 +248,7 @@ export function useSectionLayout(
    * drag) skips this when the card already renders at that cell, so the seq only
    * bumps on a real move. */
   function placeCard(key: CardKey, cell: { page: number; col: number; row: number }) {
+    if (loadedProfileId !== profileId.value) return;
     anchors.value = {
       ...anchors.value,
       [key]: { page: cell.page, col: cell.col, row: cell.row, seq: nextSeq },
@@ -213,6 +262,7 @@ export function useSectionLayout(
    * share one `seq` — the compacted cells don't collide, so recency is moot, and
    * a later single drag still outranks them. */
   function compact(cells: Record<string, { page: number; col: number; row: number }>) {
+    if (loadedProfileId !== profileId.value) return;
     const seq = nextSeq;
     nextSeq += 1;
     const next: Record<string, { page: number; col: number; row: number; seq: number }> = {};
@@ -225,6 +275,7 @@ export function useSectionLayout(
 
   /** Drop a card's manual placement so it rejoins the normal flow. */
   function clearAnchor(key: CardKey) {
+    if (loadedProfileId !== profileId.value) return;
     if (!(key in anchors.value)) return;
     const next = { ...anchors.value };
     delete next[key];
@@ -235,12 +286,7 @@ export function useSectionLayout(
   /** Restore the default order, automatic visibility, and card layouts, then
    * clear all saved layout preferences. */
   function reset() {
-    // Drop any pending debounced save so it can't overwrite the reset.
-    if (anchorTimer !== undefined) {
-      clearTimeout(anchorTimer);
-      anchorTimer = undefined;
-    }
-    pendingAnchors = null;
+    if (loadedProfileId !== profileId.value) return;
     hiddenKeys.value = [];
     autoShownKeys.value = [];
     layoutIndices.value = {};
@@ -249,12 +295,20 @@ export function useSectionLayout(
     void hiddenPref().set([]);
     void autoShownPref().set([]);
     void layoutPref().set({});
-    void anchorsPref().set({});
+    persistAnchors();
+    void flushAnchors();
   }
+
+  const unregisterFlush = registerProfileFlush(async (id) => {
+    if (pendingProfileId === id) await flushAnchors();
+  });
 
   // Persist any pending placement before the composable tears down.
   onBeforeUnmount(() => {
-    flushAnchors();
+    generation += 1;
+    loadedProfileId = undefined;
+    unregisterFlush();
+    void flushAnchors();
   });
 
   return {

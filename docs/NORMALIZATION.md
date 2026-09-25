@@ -42,8 +42,8 @@ Raw D&D Beyond values must not leak into components. If a card needs a raw field
 - Ordering is deterministic: abilities, saves, skills, groups, and sections do not depend on object-key iteration from the source.
 - Text is display-ready Markdown/plain text. Raw API HTML never reaches Vue components.
 - Numeric game values are resolved rather than left as source expressions or placeholders.
-- Rules owned by another card use `reference` or `related` links instead of duplicating long mechanics.
-- Limited-use resources have a stable maximum and recovery description.
+- Features reference matching visible actions in their summary/parts instead of duplicating long mechanics.
+- Limited-use resources use `max` and `recharge`; a spell's feature-granted tracker is its `uses` field.
 - `sections` accurately describes normalized content and preserves required structural cards.
 - No field contains unresolved `{{...}}` expressions, HTML tags, source-only IDs, or authorization data.
 
@@ -56,13 +56,12 @@ Changing this contract is a product/model migration, not a payload migration. Ma
 1. **Identity and level**: summarize classes and total character level.
 2. **Core prerequisites**: resolve abilities, movement, and the placeholder resolver used by rules text.
 3. **Direct sections**: skills, senses, defences, proficiencies, inventory, and attacks.
-4. **Rule artifacts**: extract companion stat blocks and roll tables; record which feature IDs own them.
-5. **Actions**: resolve normal/custom actions and record action-owned resources and feature references.
-6. **Resources**: build feature resource pools, then remove pools already represented by actions.
-7. **Spells**: resolve spell metadata, damage, upcasting, feature-granted casts, and source ability.
-8. **Features**: group active features, selected options, grants, resources, spell grants, and related cards.
-9. **Section metadata**: derive card counts, titles, and auto-hide state from normalized output.
-10. **Optional identity**: attach size, creature type, race, background, portrait, and spellcasting only when available.
+4. **Actions**: resolve normal/custom actions, complete rules, and action-owned resources.
+5. **Resources**: build feature resource pools, then remove pools already represented by actions.
+6. **Spells**: resolve spell metadata, damage, higher-level rules, and feature-granted casts.
+7. **Features**: group active features, selected options, resources, and references to visible actions.
+8. **Section metadata**: derive card counts, titles, and auto-hide state from normalized output.
+9. **Optional identity**: attach race, background, portrait, and spellcasting only when available.
 
 When rebuilding, port and validate these phases in this order. Starting with features or spells before abilities, class levels, component ownership, and placeholder resolution usually creates misleading downstream failures.
 
@@ -78,13 +77,16 @@ When rebuilding, port and validate these phases in this order. Starting with fea
 | Proficiencies | source-grouped modifiers and custom proficiencies | `resolveProficiencies` | Skill modifiers are excluded from training lists. |
 | Attacks | inventory definitions, custom actions, modifiers, abilities | `resolveAttacks`, `weaponAttack`, `customAttack` | To-hit, ability choice, proficiency, magic bonus, and damage bonus are derived. |
 | Actions | source-grouped actions, custom actions, feature/resource IDs | `resolveActions` | Custom actions are adapted into the common action shape first. |
-| Spellcasting | class definitions/rules, modifiers, class levels | `resolveSpellcasting` | Multiclass slots and pact slots are derived separately. |
+| Spellcasting | class definitions/rules, modifiers, class levels | `resolveSpellcasting` | The model carries one ability/attack/DC summary and one slot array; see current limits below. |
 | Spells | `classSpells`, source-grouped `spells`, spell definitions/modifiers | `resolveSpells` | Duplicate grants merge; tiered upcasting remains full prose when shorthand is unsafe. |
 | Resources | action/feature `limitedUse`, modifiers, class level | `resolveResourceMap`, `limitedUseToPool` | Action-owned pools are removed from duplicate feature display. |
 | Features | class features, race traits, feats, selected options, background | `resolveFeatures` | Hidden, structural, duplicate, and unresolved-choice entries are filtered. |
-| Companions and tables | feature/spell HTML, creature rules, selected Extras | `resolveRuleArtifacts` | Feature/component IDs link extracted artifacts back to actions/features/spells. |
 | Inventory and wealth | inventory, custom items, currencies | `resolveInventory`, `resolveWealth` | Stable empty arrays/zero coin values are emitted. |
 | Sections | all normalized collections | final `toSection` phase | Core sections remain structural; optional sections depend on content. |
+
+### Current model limits
+
+The current model does not include dedicated companion or rules-table cards. Essential table rows remain readable in rules summaries. It also carries one spellcasting summary and one limited-use pool per spell, not multiple source-labelled casting profiles or independently recharging free-cast pools. Do not claim complete multiclass/pact-magic or multiple-grant fidelity without checking those cases against the official sheet. Expanding these representations requires an explicit model/UI change, not an implicit payload migration.
 
 ## Raw payload conventions that may change
 
@@ -109,10 +111,9 @@ Do not flatten this distinction blindly. A new source may inline definitions or 
 - selected options to the feature that offered them;
 - modifiers to their granting feature;
 - actions and resource pools to their owner;
-- feature-granted spells to their owner;
-- creature rules, companion blocks, and rule tables to related cards.
+- feature-granted spells to their owner.
 
-If the overhaul replaces numeric component IDs, find the new stable ownership key before porting features. Values may look correct while resources, granted spells, companions, and action references silently attach to the wrong feature.
+If the overhaul replaces numeric component IDs, find the new stable ownership key before porting features. Values may look correct while resources, granted spells, and action references silently attach to the wrong feature.
 
 ### Numeric dictionaries and magic numbers
 
@@ -137,15 +138,13 @@ Descriptions currently contain HTML, and normalization relies on structural conv
 - `<p>` blocks separate rules paragraphs;
 - `<strong>`/`<em>` mark named options and higher-level casting headings;
 - `<table>` contains roll tables or structured choices;
-- balanced `<div>` blocks and `Stat-Block-Title` classes identify companion stat blocks;
-- headings immediately before tables provide table names;
 - rules can contain dynamic `{{...}}` placeholders and formatting flags.
 
-These parsers are intentionally isolated in `plainText`, `richText`, placeholder helpers, spell structured-content helpers, and rule-artifact parsers. If D&D Beyond moves to structured rich text, consume the structure directly and retire regex parsing one parser at a time. If only CSS classes change, update fixture-driven parsers without touching the stable output model.
+These parsers are isolated in `plainText`, `richText`, placeholder helpers, and feature/spell summary helpers. Preserve complete action/spell rules and readable table rows rather than truncating essential mechanics. If D&D Beyond moves to structured rich text, consume the structure directly and retire regex parsing one parser at a time.
 
 ### Spell and class progression
 
-Spell slots can come from class spell-rule rows, multiclass divisors/rounding, or pact progression. Spell damage scaling may represent an increment per slot or an absolute threshold. Preserve full higher-level prose unless the source explicitly describes a reliable per-level increment.
+Source spell slots can come from class spell-rule rows, multiclass divisors/rounding, or pact progression. These are distinct mechanisms; the current model's single slot array must not be mistaken for separate pact and regular pools. Spell damage scaling may represent an increment per slot or an absolute threshold. Preserve full higher-level prose unless the source explicitly describes a reliable per-level increment.
 
 ## Acquisition strategy after an overhaul
 
@@ -213,8 +212,7 @@ The committed `noct.json` and `hest.json` fixtures cover a prepared divine caste
 - high-level cantrip and class scaling;
 - selected optional class/race/feat choices;
 - feature-granted spells and limited free casts;
-- companions/summons and selected Extras;
-- roll tables;
+- tables embedded in rules descriptions;
 - custom actions, custom proficiencies, custom speeds/senses, and custom items;
 - equipped armor, shields, finesse/ranged/thrown weapons, and magic bonuses;
 - missing choices, null collections, and a minimal low-level character.
@@ -249,22 +247,21 @@ Update `api-types.ts` or add a versioned source type. Keep source fields optiona
 
 ### 4. Port in dependency order
 
-Port identity/classes first, then abilities and core basics. Continue through saves/skills, inventory/attacks, spellcasting/spells, actions/resources, features, artifacts, and sections. Run focused tests after each phase.
+Port identity/classes first, then abilities and core basics. Continue through saves/skills, inventory/attacks, spellcasting/spells, actions/resources, features, and sections. Run focused tests after each phase.
 
 ### 5. Preserve semantic ownership
 
 Before declaring features complete, verify:
 
 - limited-use boxes appear once, on the correct action or feature;
-- granted spells name their source and use the right casting ability;
-- companions/tables link back to the owning feature or spell;
+- feature-granted spell trackers appear beside the spell in both list and expanded-card modes;
 - selected options replace prompts rather than appearing as duplicate features;
 - hidden/structural features and data-origin placeholders remain filtered;
-- duplicate source grants merge without losing prepared state or independent uses.
+- duplicate source grants merge without losing prepared state; independently recharging pools remain an explicit model limitation.
 
 ### 6. Compare normalized output
 
-For equivalent old/new test characters, compare stable subsets of `Character`, not raw payload paths. Differences should reflect real game data changes, not source layout changes. Review arrays, ordering, summaries, resources, `related` links, section counts, and spellcasting profiles.
+For equivalent old/new test characters, compare stable subsets of `Character`, not raw payload paths. Differences should reflect real game data changes, not source layout changes. Review arrays, ordering, summaries, resources, action references, section counts, and spellcasting values.
 
 Keep or add invariant tests that reject:
 
@@ -287,7 +284,7 @@ Once normalized tests pass, run component and Playwright coverage. Payload chang
 | Core identity loads but most sections are empty | Top-level collection names or array/map shape. |
 | Values are present but numerically wrong | Dictionary IDs, modifiers, class levels, or definition/instance split. |
 | Actions/features duplicate each other | Component ownership and resource deduplication. |
-| Granted spells or companions attach to the wrong feature | Component/option/creature join keys. |
+| Granted spells attach to the wrong feature | Component/option join keys. |
 | Raw tags or run-on prose appear | HTML/rich-text structure changed. |
 | `{{...}}` text appears | Placeholder grammar or context changed. |
 | Spell slots or upcasting are wrong | Class spell rules, scale type, or threshold versus increment semantics. |

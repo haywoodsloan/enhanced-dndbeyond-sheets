@@ -9,10 +9,9 @@ import { debugLog } from '@/utils/debug';
 
 const CONTEXT_MENU_ID = 'open-enhanced-sheet';
 
-/** Last captured `Authorization` value, used to skip redundant storage writes. */
-let lastCapturedAuthorization: string | null = null;
-
 export default defineBackground(() => {
+  let lastCapturedAuthorization: string | null = null;
+  const pendingAuthorizations = new Set<string>();
   debugLog('bg', 'background script loaded');
 
   browser.runtime.onInstalled.addListener(() => {
@@ -34,10 +33,19 @@ export default defineBackground(() => {
         url: details.url,
         hasAuthorization: authorization != null,
       });
-      if (authorization && authorization !== lastCapturedAuthorization) {
-        lastCapturedAuthorization = authorization;
+      if (
+        authorization &&
+        authorization !== lastCapturedAuthorization &&
+        !pendingAuthorizations.has(authorization)
+      ) {
+        pendingAuthorizations.add(authorization);
         debugLog('bg', 'captured authorization from character-service');
-        void setAuthToken(authorization);
+        void setAuthToken(authorization)
+          .catch(() => {
+            // Storage errors may include their input; never log that payload.
+            debugLog('bg', 'authorization capture failed');
+          })
+          .finally(() => pendingAuthorizations.delete(authorization));
       }
       return undefined;
     },
@@ -46,9 +54,8 @@ export default defineBackground(() => {
   );
   debugLog('bg', 'webRequest listener registered');
 
-  // The sheet clears rejected credentials from its own extension context. Keep
-  // this background-context dedupe cache aligned so the same header can be
-  // captured again after invalidation.
+  // Only committed storage changes update deduplication. Failed captures remain
+  // retryable, and clearing a credential permits the same header to be captured.
   browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'session' || !(AUTH_TOKEN_KEY in changes)) return;
     const next = changes[AUTH_TOKEN_KEY].newValue;

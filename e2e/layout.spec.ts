@@ -1,5 +1,5 @@
 import { expect, hestRaw, noctRaw, openSheet, test } from './fixtures';
-import { cardBox, settle } from './helpers';
+import { cardBox, settle, visibleSliceItems } from './helpers';
 
 test.describe('sheet layout controls', () => {
   test('hiding a section moves it to the tray, and showing it restores it', async ({
@@ -124,8 +124,8 @@ test.describe('sheet layout controls', () => {
     const basics = page.locator('.page [data-section-key="basics"]');
     const tiles = basics.locator('.basics__stat');
     await expect(tiles).toHaveCount(5);
-    await expect(basics.locator('.card__title-sep')).toHaveCount(2);
-    await expect(basics.locator('.card__meta')).toHaveText('Medium · Humanoid');
+    await expect(basics.locator('.card__heading')).toContainText('Noct');
+    await expect(basics.locator('.card__subtitle')).toContainText('Cleric');
 
     const result = await basics.evaluate((card) => {
       const cardRect = card.getBoundingClientRect();
@@ -181,21 +181,20 @@ test.describe('sheet layout controls', () => {
     expect(bounds!.ringLeft).toBeGreaterThanOrEqual(bounds!.clipLeft);
   });
 
-  test('greys unavailable weapon masteries and omits their rules', async ({
+  test('distinguishes weapon masteries and explains their prerequisite', async ({
     context,
     extensionId,
   }) => {
     const page = await openSheet(context, extensionId);
     const attacks = page.locator('.page [data-section-key="attacks"]');
-    const sap = attacks.locator('.attacks__note-item--unavailable', { hasText: 'Sap' });
+    const sap = attacks.locator('.attacks__note-item', { hasText: 'Sap' }).first();
 
     await expect(sap).toBeVisible();
-    await expect(sap).toHaveCSS('color', 'rgb(181, 181, 189)');
-    await expect(attacks.locator('.attacks__legend dt', { hasText: /^Sap$/ })).toHaveCount(0);
-    await expect(attacks.locator('[data-mastery-note]')).toHaveCount(0);
+    await expect(sap.locator('.attacks__mastery-mark')).toHaveText('*');
+    await expect(attacks.locator('[data-mastery-note]')).toContainText('Weapon Mastery');
   });
 
-  test('places feature-granted spell casts after the spell shorthand', async ({
+  test('keeps feature-granted casts beside their spell and separate from slots', async ({
     context,
     extensionId,
   }) => {
@@ -204,31 +203,25 @@ test.describe('sheet layout controls', () => {
       .locator('[data-spell]')
       .filter({ has: page.locator('.spells__name', { hasText: /^Darkness$/ }) })
       .first();
-    const use = darkness.locator('[data-spell-use]');
+    const use = darkness.locator('[data-spell-uses]');
 
-    await expect(use).toContainText('Fiendish Legacy Spells:');
     await expect(use).toContainText('Long rest');
     await expect(use.locator('.resource__box')).toHaveCount(1);
     const placement = await darkness.evaluate((spell) => {
-      const meta = spell.querySelector<HTMLElement>('.spells__meta');
-      const tracker = spell.querySelector<HTMLElement>('[data-spell-use]');
-      if (!meta || !tracker) return null;
-      const metaRect = meta.getBoundingClientRect();
-      const trackerRect = tracker.getBoundingClientRect();
-      const sameLine = Math.abs(metaRect.top - trackerRect.top) < 3;
+      const name = spell.querySelector<HTMLElement>('.spells__name');
+      const tracker = spell.querySelector<HTMLElement>('[data-spell-uses]');
+      if (!name || !tracker) return null;
       return {
         follows: Boolean(
-          meta.compareDocumentPosition(tracker) & Node.DOCUMENT_POSITION_FOLLOWING,
+          name.compareDocumentPosition(tracker) & Node.DOCUMENT_POSITION_FOLLOWING,
         ),
-        positionedAfter: sameLine
-          ? trackerRect.left >= metaRect.right - 1
-          : trackerRect.top >= metaRect.bottom - 1,
+        separateFromSlots: tracker.closest('[data-slots]') === null,
       };
     });
-    expect(placement).toEqual({ follows: true, positionedAfter: true });
+    expect(placement).toEqual({ follows: true, separateFromSlots: true });
   });
 
-  test('groups Magic Initiate spells beneath their matching feature parts', async ({
+  test('keeps a spell-granting feature overview and its selected spells', async ({
     context,
     extensionId,
   }) => {
@@ -265,18 +258,12 @@ test.describe('sheet layout controls', () => {
       .filter({
         has: page.locator('.features__name', { hasText: /^Magic Initiate \(Cleric\)$/ }),
       });
-    const cantrips = feature
-      .locator('[data-feature-part]')
-      .filter({ has: page.locator('.features__part-name', { hasText: /^Two Cantrips$/ }) });
-    const leveled = feature
-      .locator('[data-feature-part]')
-      .filter({ has: page.locator('.features__part-name', { hasText: /^Level 1 Spell$/ }) });
-
-    await expect(feature.locator('[data-feature-spells]')).toHaveCount(0);
-    await expect(cantrips.locator('[data-feature-part-spells]')).toHaveText(
-      'Cantrips: Spare the Dying, Word of Radiance',
-    );
-    await expect(leveled.locator('[data-feature-part-spells]')).toHaveText('Spell: Bless');
+    await expect(feature).toContainText('Two Cantrips');
+    await expect(feature).toContainText('Level 1 Spell');
+    for (const name of ['Spare the Dying', 'Word of Radiance', 'Bless']) {
+      await expect(page.locator('.spells__name', { hasText: new RegExp(`^${name}$`) }).first())
+        .toBeVisible();
+    }
   });
 
   test('switching to landscape swaps the sheet dimensions', async ({ context, extensionId }) => {
@@ -760,6 +747,70 @@ test.describe('sheet layout controls', () => {
     expect(await cont.locator('.card__toggle').count()).toBe(0);
   });
 
+  test('prints every feature once without cutting a multi-column item', async ({
+    context,
+    extensionId,
+  }) => {
+    const names = Array.from({ length: 4 }, (_, index) => `Audit Feature ${index + 1}`);
+    const page = await openSheet(context, extensionId, {
+      id: 9002,
+      name: 'Continuation audit',
+      stats: [],
+      classes: [],
+      feats: names.map((name, index) => ({
+        definition: {
+          id: 9100 + index,
+          name,
+          description: `<p>${'Keep this complete instruction readable on the printed page. '.repeat(index % 2 ? 2 : 8)}</p>`,
+        },
+      })),
+    });
+    // Uneven blocks leave no common cut in masonry columns, but every item fits a page.
+    await page.addStyleTag({
+      content: [500, 600, 700, 400].map(
+        (height, index) => `.features__item:nth-child(${index + 1}) { min-height: ${height}px; }`,
+      ).join('\n'),
+    });
+    const base = page.locator('.page [data-section-key="features"]');
+    await expect(base.locator('.features__list')).toHaveCSS('display', 'grid');
+    await expect(page.locator('[data-section-key="features~cont~1"]')).toBeVisible();
+    await settle(page);
+    await page.emulateMedia({ media: 'print' });
+
+    const visible = await visibleSliceItems(
+      page, '.page [data-section-key^="features"]', '[data-feature]', '.features__name',
+    );
+    expect(visible.map((item) => item.label).sort()).toEqual([...names].sort());
+    expect(visible.every((item) => item.complete)).toBe(true);
+  });
+
+  test('prints every line of an expanded spell description taller than a page', async ({
+    context,
+    extensionId,
+  }) => {
+    const lines = Array.from({ length: 100 }, (_, index) => `Audit rule ${index + 1}.`);
+    const page = await openSheet(context, extensionId, {
+      id: 9003, name: 'Long spell audit', stats: [], classes: [],
+      spells: {
+        race: [{
+          definition: {
+            id: 9500, name: 'Audit Spell', level: 1,
+            description: `<ul>${lines.map((line) => `<li>${line}</li>`).join('')}</ul>`,
+          },
+        }],
+      },
+    });
+    await page.locator('[data-section-key="spells"] .card__spell-toggle').click();
+    await expect(page.locator('[data-section-key="spell:audit-spell~cont~1"]')).toBeVisible();
+    await settle(page);
+    await page.emulateMedia({ media: 'print' });
+    const visible = await visibleSliceItems(
+      page, '.page [data-section-key^="spell:audit-spell"]', '[data-rich-text-bullet]',
+    );
+    expect(visible.map((item) => item.label)).toEqual(lines);
+    expect(visible.every((item) => item.complete)).toBe(true);
+  });
+
   test('prints exact page containers with configured margins', async ({
     context,
     extensionId,
@@ -774,9 +825,6 @@ test.describe('sheet layout controls', () => {
         const grid = paper.querySelector<HTMLElement>('.page__grid');
         if (!grid) throw new Error('Printed page has no grid');
         const gridRect = grid.getBoundingClientRect();
-        const count = paper.querySelector<HTMLElement>('.page__count');
-        if (!count) throw new Error('Printed page has no page count');
-        const countRect = count.getBoundingClientRect();
         const style = getComputedStyle(paper);
         const cards = Array.from(grid.querySelectorAll<HTMLElement>('[data-section-key]'));
         return {
@@ -805,33 +853,23 @@ test.describe('sheet layout controls', () => {
               rect.bottom <= gridRect.bottom + 1
             );
           }),
-          countText: count.textContent?.trim(),
-          countLabel: count.getAttribute('aria-label'),
-          countInBottomMargin:
-            countRect.top >= gridRect.bottom - 1 &&
-            countRect.bottom <= pageRect.bottom + 1 &&
-            countRect.left >= gridRect.left - 1 &&
-            countRect.right <= gridRect.right + 1,
         };
       }),
     );
 
     expect(geometry.length).toBeGreaterThan(1);
-    for (const [index, paper] of geometry.entries()) {
+    for (const paper of geometry) {
       expect(paper.inset.top).toBeCloseTo(paper.padding.top, 1);
       expect(paper.inset.right).toBeCloseTo(paper.padding.right, 1);
       expect(paper.inset.bottom).toBeCloseTo(paper.padding.bottom, 1);
       expect(paper.inset.left).toBeCloseTo(paper.padding.left, 1);
       expect(paper.cardsContained).toBe(true);
-      expect(paper.countText).toBe(`${index + 1} of ${geometry.length}`);
-      expect(paper.countLabel).toBe(`Page ${index + 1} of ${geometry.length}`);
-      expect(paper.countInBottomMargin).toBe(true);
     }
     for (let index = 1; index < geometry.length; index += 1) {
       expect(geometry[index].top).toBeCloseTo(geometry[index - 1].bottom, 1);
     }
 
-    const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
+    const pdf = await page.pdf({ printBackground: false, preferCSSPageSize: true });
     const source = pdf.toString('latin1');
     const pdfPages = source.match(/\/Type\s*\/Page\b/g) ?? [];
     expect(pdfPages).toHaveLength(geometry.length);

@@ -39,7 +39,7 @@ export async function loadCharacter(
       (error.status === 401 || error.status === 403)
     ) {
       debugLog('sheet', 'clearing rejected token', { status: error.status });
-      await clearAuthToken();
+      await clearAuthToken(authorization);
     }
     throw error;
   }

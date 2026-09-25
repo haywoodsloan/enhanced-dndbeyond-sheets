@@ -28,7 +28,7 @@ const orderedKeys = (character: Character) =>
   defaultSectionOrder(character).map((section) => section.key);
 
 describe('defaultSectionOrder', () => {
-  it('keeps caster companions after spells and Tables after Features', () => {
+  it('puts skills, saves, and proficiencies before spells for a full caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Cleric', level: 4 }]))).toEqual([
       'basics',
       'attributes',
@@ -38,18 +38,16 @@ describe('defaultSectionOrder', () => {
       'senses',
       'proficiencies',
       'spells',
-      'companions',
       'actions',
       'attacks',
       'features',
-      'tables',
       'inventory',
       'wealth',
       'notes',
     ]);
   });
 
-  it('keeps martial companions after actions and Tables after Features', () => {
+  it('leads with attacks then actions, spells after, for a martial class', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Fighter', level: 5 }]))).toEqual([
       'basics',
       'attributes',
@@ -60,17 +58,15 @@ describe('defaultSectionOrder', () => {
       'proficiencies',
       'attacks',
       'actions',
-      'companions',
       'spells',
       'features',
-      'tables',
       'inventory',
       'wealth',
       'notes',
     ]);
   });
 
-  it('keeps half-caster companions after spells and Tables after Features', () => {
+  it('leads with attacks then spells for a half-caster', () => {
     expect(orderedKeys(makeCharacter([{ name: 'Paladin', level: 6 }]))).toEqual([
       'basics',
       'attributes',
@@ -81,10 +77,8 @@ describe('defaultSectionOrder', () => {
       'proficiencies',
       'attacks',
       'spells',
-      'companions',
       'actions',
       'features',
-      'tables',
       'inventory',
       'wealth',
       'notes',
@@ -104,10 +98,8 @@ describe('defaultSectionOrder', () => {
       'senses',
       'proficiencies',
       'spells',
-      'companions',
       'attacks',
       'features',
-      'tables',
       'inventory',
       'wealth',
       'notes',
@@ -133,10 +125,8 @@ describe('defaultSectionOrder', () => {
       'proficiencies',
       'attacks',
       'actions',
-      'companions',
       'spells',
       'features',
-      'tables',
       'inventory',
       'wealth',
       'notes',

@@ -27,8 +27,6 @@ export function makeCharacter(overrides: Partial<Character> = {}): Character {
     attacks: [],
     actions: [],
     spells: [],
-    companions: [],
-    ruleTables: [],
     inventory: [],
     wealth: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     features: [],

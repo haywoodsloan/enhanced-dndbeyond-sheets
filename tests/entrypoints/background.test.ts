@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
 import { clearAuthToken, getAuthToken } from '@/services/dndbeyond/auth-token';
+import { flushPromises } from '@vue/test-utils';
+import { mockStorageLocks } from '../utils/settings/storage-locks';
 
 /**
  * The background registers browser event listeners; fakeBrowser doesn't provide
@@ -15,6 +17,7 @@ describe('background', () => {
 
   beforeEach(async () => {
     fakeBrowser.reset();
+    mockStorageLocks();
     created.length = 0;
 
     (fakeBrowser.runtime as unknown as { onInstalled: unknown }).onInstalled = {
@@ -79,6 +82,20 @@ describe('background', () => {
     onHeaders(details);
 
     await vi.waitFor(async () => expect(await getAuthToken()).toBe('Bearer restored'));
+  });
+
+  it('retries the same capture after a storage failure and reports no credential details', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(fakeBrowser.storage.session, 'set').mockRejectedValueOnce(new Error('storage unavailable'));
+    const details = { requestHeaders: [{ name: 'Authorization', value: 'retry-credential' }] };
+    onHeaders(details);
+    await flushPromises();
+    expect(await getAuthToken()).toBeNull();
+    onHeaders(details);
+    await flushPromises();
+    expect(await getAuthToken()).toBe('retry-credential');
+    expect(log.mock.calls.some(([message]) => /capture.*failed/i.test(String(message)))).toBe(true);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('retry-credential');
   });
 
   it('opens the enhanced sheet only for its own menu item', async () => {

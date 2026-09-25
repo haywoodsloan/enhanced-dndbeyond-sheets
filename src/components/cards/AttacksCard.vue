@@ -7,7 +7,8 @@ import { formatDamage } from '@/utils/character/format';
 const props = defineProps<{ attacks: Attack[] }>();
 
 // Weapon mastery properties (2024). Unlike ordinary properties (Finesse, Light,
-// …), each must be selected for a specific weapon before it can be used.
+// …), these can be used only with a feature such as Weapon Mastery, so they're
+// flagged with a "*" wherever they appear and explained in a footnote below.
 const MASTERY_PROPERTIES = new Set([
   'Cleave',
   'Graze',
@@ -20,10 +21,10 @@ const MASTERY_PROPERTIES = new Set([
 ]);
 const isMastery = (name: string) => MASTERY_PROPERTIES.has(name);
 
-/** One weapon property shown beneath an attack. */
+/** One weapon property shown beneath an attack; mastery ones are flagged. */
 interface AttackNote {
   name: string;
-  unavailableMastery: boolean;
+  mastery: boolean;
 }
 
 interface AttackRow {
@@ -44,7 +45,7 @@ const rows = computed<AttackRow[]>(() =>
     range: attack.range ?? '',
     notes: (attack.properties ?? []).map((property) => ({
       name: property.name,
-      unavailableMastery: isMastery(property.name) && property.mastered !== true,
+      mastery: isMastery(property.name),
     })),
   })),
 );
@@ -59,7 +60,6 @@ const legend = computed(() => {
   const seen = new Map<string, string>();
   for (const attack of props.attacks) {
     for (const property of attack.properties ?? []) {
-      if (isMastery(property.name) && property.mastered !== true) continue;
       if (property.description && !seen.has(property.name)) {
         seen.set(property.name, property.description);
       }
@@ -68,8 +68,13 @@ const legend = computed(() => {
   return [...seen].map(([name, description]) => ({
     name,
     description,
+    mastery: isMastery(name),
   }));
 });
+
+// A mastery-property footnote is shown whenever any mastery property appears in
+// the legend, explaining the "*" that marks them.
+const hasMastery = computed(() => legend.value.some((entry) => entry.mastery));
 </script>
 
 <template>
@@ -92,23 +97,24 @@ const legend = computed(() => {
             v-for="(note, noteIndex) in row.notes"
             :key="noteIndex"
             class="attacks__note-item"
-            :class="{ 'attacks__note-item--unavailable': note.unavailableMastery }"
-            :title="note.unavailableMastery ? 'Requires mastery with this weapon' : undefined"
           >
-            <span v-if="note.unavailableMastery" class="attacks__sr-only">
-              Unavailable mastery property:
-            </span>
-            {{ note.name }}
+            <span v-if="note.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ note.name }}
           </span>
         </span>
       </div>
     </div>
     <dl v-if="legend.length" class="attacks__legend">
       <div v-for="entry in legend" :key="entry.name" class="attacks__legend-item">
-        <dt>{{ entry.name }}</dt>
+        <dt>
+          <span v-if="entry.mastery" class="attacks__mastery-mark" aria-hidden="true">*</span>{{ entry.name }}
+        </dt>
         <dd>{{ entry.description }}</dd>
       </div>
     </dl>
+    <p v-if="hasMastery" class="attacks__mastery-note" data-mastery-note>
+      <span class="attacks__mastery-mark" aria-hidden="true">*</span> To use a weapon's mastery property, you must
+      have a feature, such as Weapon Mastery, that lets you use it.
+    </p>
   </div>
 </template>
 
@@ -183,22 +189,12 @@ const legend = computed(() => {
   content: ', ';
 }
 
-/* Keep an unavailable mastery visible on its weapon row, but clearly inactive. */
-.attacks__note-item--unavailable {
-  color: var(--p-text-disabled-color, #b5b5bd);
-}
-
-.attacks__sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
+/* The "*" flagging a weapon-mastery property — set apart from the property name
+   by weight and a hair of space, and keyed to the footnote below. */
+.attacks__mastery-mark {
+  margin-right: 2px;
+  font-weight: 700;
+  color: #1c1c1e;
 }
 
 /* Legend at the foot of the card defining only the properties that appear in the
@@ -229,4 +225,14 @@ const legend = computed(() => {
   margin: 0 0 0 4px;
 }
 
+/* A note that the mastery properties above (Sap, Vex, …) can't be used without a
+   Weapon Mastery feature. */
+.attacks__mastery-note {
+  margin: 0;
+  padding-top: 6px;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--p-text-muted-color, #888);
+}
 </style>

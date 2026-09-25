@@ -24,13 +24,10 @@ const HALF_CASTER_CLASSES = new Set(['paladin', 'ranger', 'artificer']);
  * the same lead — vitals (basics, attributes, portrait) then the at-a-glance
  * checks (skills, saves, senses, proficiencies) — and the same reference tail —
  * features, then gear (inventory, wealth), then the blank notes page. Only the
- * combat/magic block in the middle is class-specific. Companion stat blocks stay
- * beside their likely owning combat card, while Tables follows Features as its
- * supporting reference appendix.
+ * combat/magic block in the middle is class-specific.
  */
 const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
-  // Full casters: spells and their summons first, then class actions and a
-  // backup weapon.
+  // Full casters: spells first, then class actions, then a backup weapon.
   caster: [
     'basics',
     'attributes',
@@ -40,17 +37,14 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'senses',
     'proficiencies',
     'spells',
-    'companions',
     'actions',
     'attacks',
     'features',
-    'tables',
     'inventory',
     'wealth',
     'notes',
   ],
-  // Half casters lean martial: weapon attacks lead, spells and their summons
-  // support, then actions.
+  // Half casters lean martial: weapon attacks lead, spells support, then actions.
   half: [
     'basics',
     'attributes',
@@ -61,10 +55,8 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'proficiencies',
     'attacks',
     'spells',
-    'companions',
     'actions',
     'features',
-    'tables',
     'inventory',
     'wealth',
     'notes',
@@ -81,10 +73,8 @@ const STYLE_ORDER: Record<ClassStyle, SectionKey[]> = {
     'proficiencies',
     'attacks',
     'actions',
-    'companions',
     'spells',
     'features',
-    'tables',
     'inventory',
     'wealth',
     'notes',

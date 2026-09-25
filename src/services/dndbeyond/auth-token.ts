@@ -21,7 +21,9 @@ export function extractAuthorization(
 /** Store the captured `Authorization` header value. */
 export async function setAuthToken(authorization: string): Promise<void> {
   debugLog('auth', 'setAuthToken');
-  await browser.storage.session.set({ [AUTH_TOKEN_KEY]: authorization });
+  await navigator.locks.request(AUTH_TOKEN_KEY, async () => {
+    await browser.storage.session.set({ [AUTH_TOKEN_KEY]: authorization });
+  });
 }
 
 /** Read the captured `Authorization` header value, or null if none captured. */
@@ -34,8 +36,16 @@ export async function getAuthToken(): Promise<string | null> {
   return authorization;
 }
 
-/** Remove any stored `Authorization` header value (e.g. after it's rejected). */
-export async function clearAuthToken(): Promise<void> {
+/**
+ * Clear a rejected credential only if it is still current. Capture and removal
+ * share an extension-origin Web Lock, including across the sheet/background
+ * contexts, so a new capture cannot slip between comparison and removal.
+ * Omitting the expected value explicitly clears any current credential.
+ */
+export async function clearAuthToken(expectedAuthorization?: string): Promise<void> {
   debugLog('auth', 'clearAuthToken');
-  await browser.storage.session.remove(AUTH_TOKEN_KEY);
+  await navigator.locks.request(AUTH_TOKEN_KEY, async () => {
+    if (expectedAuthorization !== undefined && await getAuthToken() !== expectedAuthorization) return;
+    await browser.storage.session.remove(AUTH_TOKEN_KEY);
+  });
 }

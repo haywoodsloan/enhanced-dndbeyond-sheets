@@ -44,6 +44,36 @@ export async function settle(page: Page): Promise<void> {
   );
 }
 
+/** Read the actual clipped content, excluding duplicate DOM retained by continuations. */
+export async function visibleSliceItems(
+  page: Page,
+  cardSelector: string,
+  itemSelector: string,
+  labelSelector?: string,
+): Promise<{ label: string; complete: boolean }[]> {
+  return page.locator(cardSelector).evaluateAll((cards, selectors) =>
+    cards.flatMap((card) => {
+      const body = card.querySelector<HTMLElement>('.card__body');
+      if (!body) throw new Error('Card has no body');
+      const rect = body.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const clip = getComputedStyle(body).clipPath;
+      const topInset = Number(/^inset\(([\d.]+)px/.exec(clip)?.[1] ?? 0);
+      const end = /calc\(100% - ([\d.]+)px\)/.exec(clip)?.[1];
+      const top = Math.max(cardRect.top, rect.top + topInset);
+      const bottom = Math.min(cardRect.bottom, end ? rect.top + Number(end) : rect.bottom);
+      return Array.from(body.querySelectorAll<HTMLElement>(selectors.item)).flatMap((item) => {
+        const itemRect = item.getBoundingClientRect();
+        if (itemRect.bottom <= top + 0.5 || itemRect.top >= bottom - 0.5) return [];
+        const label = selectors.label ? item.querySelector(selectors.label) : item;
+        return [{
+          label: label?.textContent?.trim() ?? '',
+          complete: itemRect.top >= top - 1 && itemRect.bottom <= bottom + 1,
+        }];
+      });
+    }), { item: itemSelector, label: labelSelector });
+}
+
 /** Grab a card by its drag handle and drop it at a viewport point. */
 export async function dragCardTo(
   page: Page,

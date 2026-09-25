@@ -39,16 +39,58 @@ async function read<T>(key: string, fallback: T): Promise<T> {
   }
 }
 
-async function write<T>(key: string, value: T): Promise<void> {
-  try {
-    // Normalize away Vue reactive proxies (and other wrappers) so an array is
-    // stored as an array — a proxied array can otherwise serialize to an object.
-    const plain = JSON.parse(JSON.stringify(value)) as T;
-    await browser.storage.sync.set({ [key]: plain });
-  } catch (error) {
-    // Storage unavailable / sync quota hit — preferences remain best-effort.
-    debugLog('settings', 'preference write failed', { key, error });
-  }
+const pendingWrites = new Set<Promise<void>>();
+const profileFlushers = new Set<(profileId: string) => Promise<void>>();
+
+export const profileWriteLock = (profileId: string): string => `profile-write::${profileId}`;
+
+/**
+ * Reserve the profile snapshot lock immediately, before a debounced edit is
+ * written. Other extension contexts cannot snapshot past this pending edit.
+ * The caller must commit (or cancel with an empty callback) within its max wait.
+ */
+export function reserveProfileWrite(profileId: string): (write: () => Promise<void>) => Promise<void> {
+  let commit!: (write: () => Promise<void>) => void;
+  const ready = new Promise<() => Promise<void>>((resolve) => { commit = resolve; });
+  const writing = navigator.locks.request(
+    profileWriteLock(profileId),
+    { signal: AbortSignal.timeout(5_000) },
+    async () => { await (await ready)(); },
+  );
+  void writing.catch(() => {
+    debugLog('settings', 'profile write lock failed', { profileId });
+  });
+  return (write) => {
+    commit(write);
+    return writing;
+  };
+}
+
+/** Register a mounted editor's debounced writes for profile duplication. */
+export function registerProfileFlush(flush: (profileId: string) => Promise<void>): () => void {
+  profileFlushers.add(flush);
+  return () => { profileFlushers.delete(flush); };
+}
+
+/** Finish live edits before reading a profile's persisted snapshot. */
+export async function flushProfileWrites(profileId: string): Promise<void> {
+  await Promise.all([...profileFlushers].map((flush) => flush(profileId)));
+  await Promise.all([...pendingWrites]);
+}
+
+function write<T>(key: string, value: T): Promise<void> {
+  const writing = (async () => {
+    try {
+      // Storage must receive plain data rather than Vue reactive proxies.
+      const plain = JSON.parse(JSON.stringify(value)) as T;
+      await browser.storage.sync.set({ [key]: plain });
+    } catch (error) {
+      debugLog('settings', 'preference write failed', { key, error });
+    }
+  })();
+  pendingWrites.add(writing);
+  void writing.finally(() => pendingWrites.delete(writing));
+  return writing;
 }
 
 function definePreference<T>(key: string): Preference<T> {
@@ -104,7 +146,8 @@ export const sectionAnchorsPref = definePreference<
 
 /** The list of saved profiles + which one is active (a single, global key, NOT
  * per-profile). Its `ProfilesState` type lives in `./profiles`. */
+export const PROFILES_KEY = 'pref-profiles';
 export const profilesPref = definePreference<{
   activeId: string;
   profiles: { id: string; name: string }[];
-}>('pref-profiles');
+}>(PROFILES_KEY);

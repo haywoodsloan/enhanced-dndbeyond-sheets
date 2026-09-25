@@ -7,6 +7,36 @@ import { continuationKey } from '@/utils/layout/card-continuation';
 import { makeCharacter } from '../fixtures/character';
 
 describe('SectionCard', () => {
+  it('provides page-break boundaries between spell levels containing only slots', async () => {
+    const geometry = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('card__body')) return new DOMRect(0, 0, 300, 300);
+        if (this.classList.contains('spells__group-head')) {
+          const heads = Array.from(this.closest('.spells')!.querySelectorAll('.spells__group-head'));
+          return new DOMRect(0, heads.indexOf(this) * 100, 300, 100);
+        }
+        return new DOMRect(0, 0, 300, 0);
+      });
+    const wrapper = mount(SectionCard, {
+      props: {
+        section: { key: 'spells', title: 'Spells', count: 3, isEmpty: false },
+        span: { cols: 3, rows: 2 },
+        character: makeCharacter({
+          spellcasting: { ability: 'WIS', modifier: 4, attack: 7, saveDc: 15, slots: [4, 3, 3] },
+        }),
+      },
+    });
+    try {
+      await flushPromises();
+      expect(wrapper.emitted('measure')?.at(-1)?.[1]).toEqual({
+        chrome: 0, total: 300, breaks: [100, 200, 300],
+      });
+    } finally {
+      wrapper.unmount();
+      geometry.mockRestore();
+    }
+  });
+
   it('renders the title with a size class', () => {
     const wrapper = mount(SectionCard, {
       props: {
@@ -156,8 +186,6 @@ describe('SectionCard', () => {
         character: makeCharacter({
           name: 'Noct',
           race: 'Elf',
-          size: 'Medium',
-          creatureType: 'Humanoid',
           classes: [{ name: 'Cleric', level: 4, subclass: 'Grave Domain' }],
           basics: {
             armorClass: 20,
@@ -177,8 +205,8 @@ describe('SectionCard', () => {
     // Current HP is a writable blank; only the max is printed.
     expect(wrapper.find('[data-stat="hp"] .basics__blank').exists()).toBe(true);
     expect(wrapper.find('[data-stat="hp"]').text()).toContain('31');
-    expect(wrapper.findAll('.card__title-sep')).toHaveLength(2);
-    expect(wrapper.get('.card__meta').text()).toBe('Medium · Humanoid');
+    expect(wrapper.findAll('.card__title-sep')).toHaveLength(1);
+    expect(wrapper.get('.card__subtitle').text()).toContain('Elf');
     expect(
       wrapper.findAll('[data-stat="conditions"] input[type="checkbox"]'),
     ).toHaveLength(15);
@@ -207,42 +235,28 @@ describe('SectionCard', () => {
     expect(wrapper.text()).toContain('+6');
   });
 
-  it('dispatches companion and rules-table sections to their dedicated cards', () => {
+  it('dispatches complete action rules and per-spell cards without removed sections', () => {
     const character = makeCharacter({
-      companions: [
-        {
-          name: 'Steel Defender',
-          source: 'Steel Defender',
-          abilities: [],
-          details: [{ section: 'Actions', label: 'Rend', text: 'Melee Attack Roll.' }],
-        },
-      ],
-      ruleTables: [
-        {
-          title: 'Experimental Elixir',
-          source: 'Experimental Elixir',
-          columns: ['d6', 'Effect'],
-          rows: [['1', 'Healing']],
-        },
-      ],
+      actions: [{ name: 'Rend', category: 'action', summary: 'Melee Attack Roll.' }],
+      spells: [{ name: 'Healing', level: 1, uses: { max: 1, recharge: 'LR' } }],
     });
-    const companionCard = mount(SectionCard, {
+    const actionCard = mount(SectionCard, {
       props: {
-        section: { key: 'companions', title: 'Companions', count: 2, isEmpty: false },
+        section: { key: 'actions', title: 'Actions', count: 1, isEmpty: false },
         span: { cols: 3, rows: 2 },
         character,
       },
     });
-    const tableCard = mount(SectionCard, {
+    const spellCard = mount(SectionCard, {
       props: {
-        section: { key: 'tables', title: 'Tables', count: 1, isEmpty: false },
+        section: { key: 'spell:healing', title: 'Healing', count: 1, isEmpty: false },
         span: { cols: 3, rows: 2 },
         character,
       },
     });
 
-    expect(companionCard.get('[data-companion]').text()).toContain('Steel Defender');
-    expect(tableCard.get('[data-rule-table]').text()).toContain('Experimental Elixir');
+    expect(actionCard.get('[data-action]').text()).toContain('Melee Attack Roll.');
+    expect(spellCard.findAll('[data-spell-uses] .resource__box')).toHaveLength(1);
   });
 
   it('emits hide with the section key from the toggle button', async () => {

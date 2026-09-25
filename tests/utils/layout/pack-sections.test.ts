@@ -131,6 +131,21 @@ describe('cellAtPoint', () => {
 describe('packPositioned', () => {
   const home = (col: number, row: number) => ({ col, row });
 
+  it('keeps a saved home wholly on one page after a card grows', () => {
+    const { placements, pages } = packPositioned(
+      [
+        { cols: 3, rows: 1, home: home(0, 0), priority: 0 },
+        { cols: 1, rows: 2, home: home(1, 3), priority: 1 },
+      ],
+      3,
+      4,
+    );
+
+    expect(placements[1]).toEqual({ col: 1, row: 4, cols: 1, rows: 2 });
+    expect(pages).toBe(2);
+    expect(placements.every((place) => place.row % 4 + place.rows <= 4)).toBe(true);
+  });
+
   it('places each card at its home when they do not collide', () => {
     const { placements } = packPositioned(
       [

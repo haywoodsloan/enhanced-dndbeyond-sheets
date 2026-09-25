@@ -51,6 +51,7 @@ import {
 } from '@/utils/settings/preferences';
 import SectionCard from '@/components/SectionCard.vue';
 import { isSpellCardKey, ToggleSpellCardsKey } from '@/utils/layout/spell-cards';
+import { adjacentCardCell } from '@/utils/layout/move-card';
 import {
   continuationBaseKey,
   continuationKey,
@@ -59,7 +60,6 @@ import {
   sliceContent,
   type CardMeasurement,
 } from '@/utils/layout/card-continuation';
-import { adjacentCardCell, type CardMoveDirection } from '@/utils/layout/move-card';
 
 /** Desk-coloured gap shown between the page sheets on screen, in px. */
 const PAGE_GUTTER = 20;
@@ -82,9 +82,7 @@ interface PageEntry {
 
 const props = defineProps<{ characterId: number | null }>();
 
-const { character, status, error, reload: reloadCharacter } = useCharacter(
-  toRef(props, 'characterId'),
-);
+const { character, status, error, reload } = useCharacter(toRef(props, 'characterId'));
 
 // Layout profiles: named snapshots of all the layout settings. The active id is
 // threaded into every settings source below so switching profiles swaps in a
@@ -234,15 +232,10 @@ const margin = computed(
 // The paper's width/height in mm, swapped when landscape is selected.
 const pageSize = computed(() => orientedSize(format.value, orientationId.value));
 
-// The grid tracks. Portrait uses up to GRID_COLUMNS columns while preserving a
-// readable physical cell width; landscape transposes the portrait grid so cells
-// stay roughly square. Narrow formats such as A5 therefore use 2×3 / 3×2 rather
-// than squeezing the Letter-sized 3-column layout onto half-sized paper.
-const portraitColumns = computed(() => {
-  const marginPx = mmToPx(margin.value.mm);
-  const printWidth = mmToPx(format.value.width) - 2 * marginPx;
-  return gridColumnsForPage(printWidth);
-});
+// Keep columns readable on small paper, then transpose the portrait grid for landscape.
+const portraitColumns = computed(() =>
+  gridColumnsForPage(mmToPx(format.value.width - 2 * margin.value.mm)),
+);
 const portraitRows = computed(() => {
   const marginPx = mmToPx(margin.value.mm);
   const printWidth = mmToPx(format.value.width) - 2 * marginPx;
@@ -250,12 +243,8 @@ const portraitRows = computed(() => {
   return gridRowsPerPage(printWidth, printHeight, portraitColumns.value);
 });
 const isLandscape = computed(() => orientationId.value === 'landscape');
-const gridColumns = computed(() =>
-  isLandscape.value ? portraitRows.value : portraitColumns.value,
-);
-const rowsPerPage = computed(() =>
-  isLandscape.value ? portraitColumns.value : portraitRows.value,
-);
+const gridColumns = computed(() => (isLandscape.value ? portraitRows.value : portraitColumns.value));
+const rowsPerPage = computed(() => (isLandscape.value ? portraitColumns.value : portraitRows.value));
 
 // Row height chosen so the grid's rows:columns ratio matches the print area's
 // height:width (margins removed) — i.e. roughly square cells.
@@ -294,137 +283,83 @@ const pageStyle = computed(() => ({
 
 const sheetRef = ref<HTMLElement | null>(null);
 
-// A content-fit card (attacks/actions/spells/features or an expanded spell) measures its body
+// A content-fit card or expanded spell measures its body
 // geometry and reports it here; `plannedCards` sizes that card to its content
-// and slices an over-tall one onto continuation cards. Cards that fill their
-// height are ignored, so they keep their curated estimate.
+// and slices an over-tall one onto continuation cards. Fixed-fill cards keep
+// their curated footprint.
 const measuredHeights = ref<Record<string, CardMeasurement>>({});
 const rowAlignedSections = ref<Set<CardKey>>(new Set());
-
-interface LayoutFitProbe {
-  key: string;
-  section: CharacterSection;
-  layoutIndex: number;
-  span: SectionSpan;
-}
-
 const layoutFitResults = ref<Record<string, boolean>>({});
-const layoutProbeRevision = ref(0);
 
-watch(
-  character,
-  () => {
-    layoutProbeRevision.value += 1;
-    layoutFitResults.value = {};
-  },
-);
-
-function usesLayoutFitProbe(key: CardKey): boolean {
-  return (
-    !isContinuationKey(key) &&
-    !isSpellCardKey(key) &&
-    !CONTENT_FIT_SECTIONS.has(key as SectionKey) &&
-    sectionLayoutCount(key) > 1
+function fittedSpan(section: CharacterSection, layoutIndex: number): SectionSpan {
+  return fitSectionSpanToGrid(
+    section.key,
+    sectionSpan(section.key, section.count, layoutIndex, rowsPerPage.value),
+    gridColumns.value,
+    rowsPerPage.value,
+    rowUnit.value,
+    cellSize.value.width - GRID_GAP,
   );
 }
 
-function layoutFitKey(key: CardKey, layoutIndex: number): string {
+function usesLayoutFitProbe(key: CardKey): boolean {
+  return !isContinuationKey(key) && !isSpellCardKey(key) &&
+    !CONTENT_FIT_SECTIONS.has(key) && sectionLayoutCount(key) > 1;
+}
+
+function layoutFitKey(section: CharacterSection, layoutIndex: number): string {
   return [
-    layoutProbeRevision.value,
-    formatId.value,
-    orientationId.value,
-    marginId.value,
-    key,
-    layoutIndex,
+    character.value?.id, formatId.value, orientationId.value, marginId.value,
+    section.key, section.count, layoutIndex,
   ].join(':');
 }
 
-const layoutFitProbes = computed<LayoutFitProbe[]>(() => {
-  if (!character.value) return [];
-  const probes: LayoutFitProbe[] = [];
-  for (const section of orderedSections.value) {
-    if (!usesLayoutFitProbe(section.key)) continue;
-    for (let layoutIndex = 0; layoutIndex < sectionLayoutCount(section.key); layoutIndex += 1) {
-      const rawSpan = sectionSpan(
-        section.key,
-        section.count,
-        layoutIndex,
-        rowsPerPage.value,
-      );
-      if (rawSpan.rows > rowsPerPage.value) continue;
-      probes.push({
-        key: layoutFitKey(section.key, layoutIndex),
-        section,
-        layoutIndex,
-        span: fitSectionSpanToGrid(
-          section.key,
-          rawSpan,
-          gridColumns.value,
-          rowsPerPage.value,
-          rowUnit.value,
-          cellSize.value.width - GRID_GAP,
-        ),
-      });
-    }
-  }
-  return probes;
-});
+const layoutFitProbes = computed(() =>
+  orderedSections.value.flatMap((section) => {
+    if (!usesLayoutFitProbe(section.key)) return [];
+    return Array.from({ length: sectionLayoutCount(section.key) }, (_, layoutIndex) => ({
+      key: layoutFitKey(section, layoutIndex),
+      section,
+      span: fittedSpan(section, layoutIndex),
+    }));
+  }),
+);
 
-function onLayoutFit(probe: LayoutFitProbe, fits: boolean) {
-  if (layoutFitResults.value[probe.key] === fits) return;
-  layoutFitResults.value = { ...layoutFitResults.value, [probe.key]: fits };
+function onLayoutFit(key: string, fits: boolean) {
+  if (layoutFitResults.value[key] === fits) return;
+  layoutFitResults.value = { ...layoutFitResults.value, [key]: fits };
 }
 
+watch(character, () => {
+  measuredHeights.value = {};
+  layoutFitResults.value = {};
+});
+watch(
+  () => [character.value, activeProfileId.value, formatId.value, orientationId.value,
+    marginId.value, layoutIndices.value.features, layoutIndices.value.actions],
+  () => { rowAlignedSections.value = new Set(); },
+);
+
 function onMeasure(key: CardKey, measurement: CardMeasurement) {
-  // Only content-fit base cards size to their text: ignore continuation cards
-  // (they mirror their base) and fill cards.
-  if (
-    isContinuationKey(key) ||
-    (!isSpellCardKey(key) && !CONTENT_FIT_SECTIONS.has(key as SectionKey))
-  ) {
-    return;
-  }
-  if (
-    (key === 'features' || key === 'actions') &&
-    !rowAlignedSections.value.has(key)
-  ) {
-    const maximum = Math.max(1, pageBodyHeight(measurement.chrome));
-    const needsFallback = needsRowAlignedContinuation(
-      measurement.breaks,
-      measurement.total,
-      maximum,
-    );
-    if (needsFallback) {
-      rowAlignedSections.value = new Set([
-        ...rowAlignedSections.value,
-        key,
-      ]);
-    }
+  if (isContinuationKey(key) || (!isSpellCardKey(key) && !CONTENT_FIT_SECTIONS.has(key))) return;
+  if ((key === 'features' || key === 'actions') && !rowAlignedSections.value.has(key) &&
+    needsRowAlignedContinuation(
+      measurement.breaks, measurement.total, Math.max(1, pageBodyHeight(measurement.chrome)),
+    )) {
+    rowAlignedSections.value = new Set([...rowAlignedSections.value, key]);
   }
   const prev = measuredHeights.value[key];
   if (
     prev &&
     Math.abs(prev.total - measurement.total) < 1 &&
-    Math.abs(prev.chrome - measurement.chrome) < 1
+    Math.abs(prev.chrome - measurement.chrome) < 1 &&
+    prev.breaks.length === measurement.breaks.length &&
+    prev.breaks.every((value, index) => Math.abs(value - measurement.breaks[index]) < 1)
   ) {
     return;
   }
   measuredHeights.value = { ...measuredHeights.value, [key]: measurement };
 }
-
-watch(
-  () => [
-    character.value?.id,
-    activeProfileId.value,
-    formatId.value,
-    orientationId.value,
-    marginId.value,
-    layoutIndices.value.features,
-  ],
-  () => {
-    rowAlignedSections.value = new Set();
-  },
-);
 
 // Extra body room (px) beyond the measured content when sizing a card, so its
 // last line isn't cut flush at the card edge (mirrors the old measurement pad).
@@ -468,14 +403,7 @@ const plannedCards = computed<PlannedCard[]>(() => {
   const cards: PlannedCard[] = [];
   for (const section of orderedSections.value) {
     const layoutIndex = layoutIndices.value[section.key] ?? 0;
-    const estimate = fitSectionSpanToGrid(
-      section.key,
-      sectionSpan(section.key, section.count, layoutIndex, perPage),
-      gridColumns.value,
-      perPage,
-      rowUnit.value,
-      cellSize.value.width - GRID_GAP,
-    );
+    const estimate = fittedSpan(section, layoutIndex);
     const measured = measuredHeights.value[section.key];
     // No measurement (fill cards, pre-measure, and tests without
     // a layout engine): keep the curated count-based estimate as a single card.
@@ -569,9 +497,8 @@ const positionedFootprints = computed<PositionedFootprint[]>(() => {
     // Every card carries a recency: one the user moved uses its saved `seq` (≥ 1);
     // one left alone keeps a negative reading-order baseline, so a freshly-dragged
     // card always outranks the stationary ones — it takes its cell and they flow
-    // aside. Stationary cards rank in reading order so an earlier card seats its
-    // continuation run before a later card can take the page it needs.
-    const priority = moved ? moved.seq : -index;
+    // aside.
+    const priority = moved ? moved.seq : index - count;
     return {
       cols: card.cols,
       rows: card.rows,
@@ -636,28 +563,39 @@ function dragGeometry() {
   };
 }
 
-function moveCard(key: CardKey, direction: CardMoveDirection) {
-  const index = plannedCards.value.findIndex((card) => card.key === key);
-  const placement = packed.value.placements[index];
-  const footprint = footprints.value[index];
-  if (!placement || !footprint) return;
-  const cell = adjacentCardCell(
-    placement,
-    footprint,
-    direction,
-    gridColumns.value,
-    rowsPerPage.value,
-    pageCount.value,
-  );
-  if (cell) placeCard(key, cell);
-}
-
 useCardDrag(sheetRef, {
   // Move the dragged card's cell to wherever the pointer is and stamp it newest,
   // so the packer seats it first: it takes that cell and any card already there
   // flows aside. Any spot on the grid is a valid drop.
   onPlace: (key, cell) => placeCard(key as CardKey, cell),
-  onMove: (key, direction) => moveCard(key as CardKey, direction),
+  onMove: (key, direction) => {
+    const index = plannedCards.value.findIndex((card) => card.key === key);
+    const card = plannedCards.value[index];
+    const placement = packed.value.placements[index];
+    if (!card || !placement) return;
+    const cell = adjacentCardCell(
+      placement,
+      card,
+      direction,
+      gridColumns.value,
+      rowsPerPage.value,
+      pageCount.value,
+    );
+    if (!cell || dropSplitsContinuation(
+      plannedCards.value.map((entry) => entry.key),
+      packed.value.placements,
+      key,
+      { row: cell.page * rowsPerPage.value + cell.row, col: cell.col },
+      gridColumns.value,
+    )) return;
+    placeCard(card.key, cell);
+    void nextTick(() => {
+      const handle = Array.from(
+        sheetRef.value?.querySelectorAll<HTMLElement>('.card__drag-handle') ?? [],
+      ).find((element) => element.closest<HTMLElement>('[data-section-key]')?.dataset.sectionKey === key);
+      handle?.focus({ preventScroll: true });
+    });
+  },
   // Resolve the cell under the pointer, clamped so the card stays whole and
   // within the existing pages (no blank page from dropping past the last sheet).
   // Returns null when the card already sits there, so we don't churn its recency.
@@ -710,25 +648,20 @@ const layoutChanging = ref(false);
 function overflowsAtCols(section: CharacterSection, cols: number): boolean {
   const measured = measuredHeights.value[section.key];
   if (!measured || cols <= 0) return false;
-  const currentCols = Math.min(
-    sectionSpan(
-      section.key,
-      section.count,
-      layoutIndices.value[section.key] ?? 0,
-      rowsPerPage.value,
-    ).cols,
-    gridColumns.value,
-  );
-  const effectiveCols = Math.min(cols, gridColumns.value);
-  const estContent = (measured.total * currentCols) / effectiveCols;
+  const currentCols = Math.min(sectionSpan(
+    section.key,
+    section.count,
+    layoutIndices.value[section.key] ?? 0,
+    rowsPerPage.value,
+  ).cols, gridColumns.value);
+  const estContent = (measured.total * currentCols) / Math.min(cols, gridColumns.value);
   return estContent > Math.max(1, pageBodyHeight(measured.chrome));
 }
 
 // The layout index the toggle advances to. For a measured content-fit card it's
 // overflow-aware: the next option (cycle order) whose content still fits a page,
 // treating overflow as a last resort — if no other option avoids it, stay put.
-// Fixed-height cards use off-screen candidates at the real print dimensions;
-// unmeasured cards fall back to their curated page-span limits.
+// Other cards (fill cards, unmeasured) use the estimate-based page-fit rule.
 function cardNextLayout(section: CharacterSection): number {
   const key = section.key;
   const current = layoutIndices.value[key] ?? 0;
@@ -737,10 +670,7 @@ function cardNextLayout(section: CharacterSection): number {
     const total = sectionLayoutCount(key);
     for (let step = 1; step < total; step += 1) {
       const candidate = (current + step) % total;
-      const cols = Math.min(
-        sectionSpan(key, section.count, candidate, rowsPerPage.value).cols,
-        gridColumns.value,
-      );
+      const cols = sectionSpan(key, section.count, candidate, rowsPerPage.value).cols;
       if (!overflowsAtCols(section, cols)) return candidate;
     }
     return current;
@@ -748,12 +678,10 @@ function cardNextLayout(section: CharacterSection): number {
   const total = sectionLayoutCount(key);
   for (let step = 1; step < total; step += 1) {
     const candidate = (current + step) % total;
-    const span = sectionSpan(key, section.count, candidate, rowsPerPage.value);
-    if (span.rows > rowsPerPage.value) continue;
-    if (
-      usesLayoutFitProbe(key) &&
-      layoutFitResults.value[layoutFitKey(key, candidate)] !== true
-    ) {
+    if (sectionSpan(key, section.count, candidate, rowsPerPage.value).rows > rowsPerPage.value) {
+      continue;
+    }
+    if (usesLayoutFitProbe(key) && layoutFitResults.value[layoutFitKey(section, candidate)] !== true) {
       continue;
     }
     return candidate;
@@ -1134,22 +1062,13 @@ onUnmounted(() => {
           No character selected. Open this from a D&amp;D Beyond character page.
         </p>
 
-        <p
-          v-else-if="status === 'idle' || status === 'loading'"
-          class="sheet__message"
-          role="status"
-          aria-live="polite"
-        >
+        <p v-else-if="status === 'idle' || status === 'loading'" class="sheet__message">
           Loading character…
         </p>
 
         <div v-else-if="status === 'error'" class="sheet__message" role="alert">
-          <p>Could not load character. {{ error }}</p>
-          <button
-            type="button"
-            class="settings__button sheet__retry"
-            @click="reloadCharacter"
-          >
+          <p>Could not load character: {{ error }}</p>
+          <button type="button" class="settings__button sheet__retry" @click="reload">
             Try again
           </button>
         </div>
@@ -1175,6 +1094,7 @@ onUnmounted(() => {
                 :slice-end="entry.sliceEnd"
                 :row-aligned-features="rowAlignedSections.has(continuationBaseKey(entry.section.key))"
                 :row-aligned-actions="rowAlignedSections.has(continuationBaseKey(entry.section.key))"
+                :max-body-height="pageBodyHeight(measuredHeights[continuationBaseKey(entry.section.key)]?.chrome ?? 0)"
                 :character="character"
                 :layout-count="sectionLayoutCount(entry.section.key)"
                 :layout-label="sectionLayoutLabel(entry.section.key, layoutIndices[entry.section.key] ?? 0)"
@@ -1184,13 +1104,33 @@ onUnmounted(() => {
                 @measure="onMeasure"
               />
             </div>
-            <span
-              class="page__count"
-              :aria-label="`Page ${p + 1} of ${pages.length}`"
-            >
-              {{ p + 1 }} of {{ pages.length }}
-            </span>
           </section>
+          <div
+            v-if="character && layoutFitProbes.length"
+            class="layout-probes"
+            :style="pageStyle"
+            aria-hidden="true"
+            inert
+          >
+            <div
+              class="layout-probes__grid"
+              :style="{ gridTemplateColumns: pageGridColumns, gridTemplateRows: pageGridRows }"
+            >
+              <SectionCard
+                v-for="probe in layoutFitProbes"
+                :key="probe.key"
+                :section="probe.section"
+                :span="probe.span"
+                :place="{
+                  gridColumn: `1 / span ${probe.span.cols}`,
+                  gridRow: `1 / span ${probe.span.rows}`,
+                }"
+                :character="character"
+                fit-probe
+                @layout-fit="onLayoutFit(probe.key, $event)"
+              />
+            </div>
+          </div>
         </template>
       </main>
 
@@ -1213,33 +1153,6 @@ onUnmounted(() => {
           />
         </div>
       </section>
-
-      <div
-        v-if="character && layoutFitProbes.length"
-        class="layout-probes"
-        :style="pageStyle"
-        aria-hidden="true"
-        inert
-      >
-        <div
-          class="layout-probes__grid"
-          :style="{ gridTemplateColumns: pageGridColumns, gridTemplateRows: pageGridRows }"
-        >
-          <SectionCard
-            v-for="probe in layoutFitProbes"
-            :key="probe.key"
-            :section="probe.section"
-            :span="probe.span"
-            :place="{
-              gridColumn: `1 / span ${probe.span.cols}`,
-              gridRow: `1 / span ${probe.span.rows}`,
-            }"
-            :character="character"
-            fit-probe
-            @layout-fit="onLayoutFit(probe, $event)"
-          />
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -1547,30 +1460,6 @@ body {
   padding: 24px;
 }
 
-/* Alternate fixed-card layouts are rendered off-screen at the exact printable
-   dimensions. Their real scroll geometry decides whether the layout control may
-   offer them; overlapping probes do not participate in visible page packing. */
-.layout-probes {
-  position: fixed;
-  left: -10000px;
-  top: 0;
-  box-sizing: border-box;
-  width: var(--page-width);
-  height: var(--page-height);
-  padding: var(--page-margin);
-  visibility: hidden;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.layout-probes__grid {
-  display: grid;
-  column-gap: var(--grid-gap, 12px);
-  row-gap: var(--grid-gap, 12px);
-  align-items: stretch;
-  height: 100%;
-}
-
 /* Parking area for hidden sections: sits on the desk below the pages so it
    reads as "off the page" (no paper rectangle/shadow) and never takes up print
    space. Hidden from the actual print output. */
@@ -1617,37 +1506,32 @@ body {
   padding: var(--page-margin);
 }
 
-.sheet__message p {
-  margin: 0;
+.layout-probes {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: calc(var(--page-width) - 2 * var(--page-margin));
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.sheet__retry {
-  width: fit-content;
-  margin-top: 12px;
-  background: var(--paper);
-  color: var(--p-text-color, #1c1c1e);
+.layout-probes__grid {
+  display: grid;
+  gap: var(--grid-gap);
+  height: calc(var(--page-height) - 2 * var(--page-margin));
+  font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 /* One WYSIWYG paper sheet per printed page: a real, self-contained container
    with its own one-page grid. Its padding IS the page margin, so the printed
    margin is exact and identical on every page (no fragmented-grid drift). */
 .page {
-  position: relative;
   box-sizing: border-box;
   width: 100%;
   height: var(--page-height);
   padding: var(--page-margin);
   background: var(--paper);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.22);
-}
-
-.page__count {
-  position: absolute;
-  right: var(--page-margin);
-  bottom: calc(var(--page-margin) / 2 - 5px);
-  font: 12px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: var(--p-text-muted-color, #888);
-  font-variant-numeric: tabular-nums;
 }
 
 .page:not(:last-child) {
@@ -1697,6 +1581,10 @@ body {
     display: none;
   }
 
+  .layout-probes {
+    display: none;
+  }
+
   .sheet-area {
     /* Drop the on-screen flex centering so the sheet sits at the page origin. */
     display: block;
@@ -1706,10 +1594,6 @@ body {
   .sheet {
     width: var(--page-width);
     margin: 0;
-  }
-
-  .page:not(:last-child) {
-    margin-bottom: 0;
   }
 
   .page {
@@ -1728,6 +1612,10 @@ body {
 
   .page:last-child {
     break-after: auto;
+  }
+
+  .page:not(:last-child) {
+    margin-bottom: 0;
   }
 }
 </style>

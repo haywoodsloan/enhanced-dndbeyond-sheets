@@ -2,18 +2,15 @@
 import { computed } from 'vue';
 import type { ActionCategory, CharacterAction } from '@/services/dndbeyond/model';
 import { formatDamage } from '@/utils/character/format';
-import { sectionLabel } from '@/utils/character/section-label';
 import ResourceBoxes from '@/components/cards/ResourceBoxes.vue';
 import RichText from '@/components/RichText.vue';
-import StructuredList from '@/components/StructuredList.vue';
 
 const props = withDefaults(
   defineProps<{
     actions: CharacterAction[];
-    companionTitle?: string;
     rowAligned?: boolean;
   }>(),
-  { companionTitle: 'Companions', rowAligned: false },
+  { rowAligned: false },
 );
 
 const CATEGORY_ORDER: { category: ActionCategory; label: string }[] = [
@@ -33,7 +30,7 @@ const groups = computed(() =>
 
 /** Compact meta line for an action: "1d8+4 · DC 14 CON · 30 ft.". */
 function metaOf(action: CharacterAction): string {
-  return [formatDamage(action.damage), action.roll, action.save, action.range]
+  return [formatDamage(action.damage), action.save, action.range]
     .filter(Boolean)
     .join(' · ');
 }
@@ -64,21 +61,8 @@ function metaOf(action: CharacterAction): string {
             <span class="actions__name">{{ action.name }}</span>
             <ResourceBoxes v-if="action.resource" :resource="action.resource" />
             <span v-if="metaOf(action)" class="actions__meta">{{ metaOf(action) }}</span>
-            <span
-              v-for="related in action.related"
-              :key="related"
-              class="actions__reference"
-            >
-              (see {{ sectionLabel(related, companionTitle) }})
-            </span>
           </span>
           <RichText v-if="action.summary" :text="action.summary" class="actions__summary" />
-          <StructuredList
-            v-if="action.list?.items.length"
-            :list="action.list"
-            class="actions__list-detail"
-            data-action-list
-          />
         </li>
       </ul>
     </div>
@@ -164,23 +148,9 @@ function metaOf(action: CharacterAction): string {
   white-space: nowrap;
 }
 
-.actions__reference {
-  display: block;
-  flex-basis: 100%;
-  font-size: 12px;
-  color: var(--p-text-muted-color, #888);
-}
-
 /* One-line blurb of what the action does, beneath its name. */
 .actions__summary {
   display: block;
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--p-text-muted-color, #888);
-}
-
-.actions__list-detail {
-  margin-top: 1px;
   font-size: 12px;
   line-height: 1.3;
   color: var(--p-text-muted-color, #888);

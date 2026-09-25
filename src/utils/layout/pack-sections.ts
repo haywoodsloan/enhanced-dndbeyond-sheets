@@ -340,7 +340,11 @@ export function packPositioned(
     const w = Math.min(Math.max(1, Math.floor(card.cols)), grid.cols);
     const h = Math.min(Math.max(1, Math.floor(card.rows)), perPage);
     const col = Math.min(Math.max(0, Math.floor(card.home.col)), grid.cols - w);
-    const row = Math.max(0, Math.floor(card.home.row));
+    const requestedRow = Math.max(0, Math.floor(card.home.row));
+    const pageStart = Math.floor(requestedRow / perPage) * perPage;
+    const row = requestedRow + h > pageStart + perPage
+      ? pageStart + perPage
+      : requestedRow;
     if (grid.isFree(row, col, w, h)) {
       grid.occupy(row, col, w, h);
       placements[index] = { col, row, cols: w, rows: h };

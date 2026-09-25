@@ -1,4 +1,4 @@
-import { onMounted, ref, watch, type Ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 import { DEFAULT_PROFILE_ID, scopedPreference } from '@/utils/settings/preferences';
 
 /**
@@ -20,27 +20,39 @@ export function useStoredRef<T>(
   // Suppress the write-back while a load is assigning the ref, so loading a
   // value (initially or on a profile switch) never persists it straight back.
   let suppress = true;
+  let generation = 0;
+  let loadedProfileId: string | undefined;
 
   async function load() {
+    const currentGeneration = ++generation;
+    const id = profileId.value;
+    loadedProfileId = undefined;
     suppress = true;
-    try {
-      state.value = await scopedPreference<T>(base, profileId.value).get(fallback);
-    } finally {
-      suppress = false;
-    }
+    const value = await scopedPreference<T>(base, id).get(fallback);
+    if (generation !== currentGeneration || id !== profileId.value) return;
+    state.value = value;
+    loadedProfileId = id;
+    suppress = false;
   }
 
   watch(
     state,
     (value) => {
-      if (!suppress) void scopedPreference<T>(base, profileId.value).set(value);
+      if (!suppress && loadedProfileId === profileId.value) {
+        void scopedPreference<T>(base, loadedProfileId).set(value);
+      }
     },
     { flush: 'sync' },
   );
 
   onMounted(load);
   // Reload from the newly-active profile when it changes.
-  watch(profileId, load);
+  watch(profileId, load, { flush: 'sync' });
+  onBeforeUnmount(() => {
+    generation += 1;
+    loadedProfileId = undefined;
+    suppress = true;
+  });
 
   return state;
 }

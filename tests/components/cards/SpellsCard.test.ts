@@ -22,56 +22,11 @@ describe('SpellsCard', () => {
     expect(first.text()).toContain('Bless');
   });
 
-  it('points summon spells to extracted companion details', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        companionTitle: 'Summons',
-        spells: [
-          {
-            name: 'Summon Beast',
-            level: 2,
-            summary: 'You call forth a bestial spirit.',
-            related: ['companions'],
-          },
-        ],
-      },
-    });
-
-    const row = wrapper.get('[data-spell] .spells__row');
-    expect(row.get('.spells__identity').text()).toContain('Summon Beast');
-    expect(row.get('.spells__reference').text()).toBe('(see Summons)');
-    expect(row.element.lastElementChild?.classList.contains('spells__reference')).toBe(true);
-  });
-
-  it('shows costly or consumed spell materials', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        spells: [
-          { name: 'Chromatic Orb', level: 1, material: 'a diamond worth 50+ GP' },
-        ],
-      },
-    });
-
-    expect(wrapper.get('.spells__material').text()).toContain('a diamond worth 50+ GP');
-  });
-
   it('shows the spellcasting header and per-level slot checkboxes', () => {
     const wrapper = mount(SpellsCard, {
       props: {
         spells: [{ name: 'Guidance', level: 0 }],
-        spellcasting: {
-          profiles: [
-            {
-              source: 'Cleric',
-              ability: 'WIS',
-              modifier: 4,
-              attack: 6,
-              saveDc: 14,
-              focus: 'Holy Symbol',
-            },
-          ],
-          slots: [4, 3],
-        },
+        spellcasting: { ability: 'WIS', modifier: 4, attack: 6, saveDc: 14, slots: [4, 3] },
       },
     });
 
@@ -79,7 +34,6 @@ describe('SpellsCard', () => {
     expect(header.text()).toContain('+6');
     expect(header.text()).toContain('DC 14');
     expect(header.text()).toContain('WIS');
-    expect(header.text()).toContain('Focus Holy Symbol');
     // Slots sit at the start of their level: 1st (4) + 2nd (3) = 7 boxes total.
     expect(wrapper.findAll('[data-slots]')).toHaveLength(2);
     expect(wrapper.findAll('.resource__box')).toHaveLength(7);
@@ -91,56 +45,6 @@ describe('SpellsCard', () => {
     });
     expect(wrapper.find('[data-spellcasting]').exists()).toBe(false);
     expect(wrapper.find('[data-slots]').exists()).toBe(false);
-  });
-
-  it('shows Pact Magic as a separate short-rest pool at its slot level', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        spells: [{ name: 'Hunger of Hadar', level: 3 }],
-        spellcasting: {
-          profiles: [
-            { source: 'Warlock', ability: 'CHA', modifier: 4, attack: 7, saveDc: 15 },
-          ],
-          slots: [],
-          pactSlots: [{ source: 'Warlock', level: 3, max: 2 }],
-        },
-      },
-    });
-
-    const third = wrapper.get('[data-level="3"]');
-    const pact = third.get('[data-pact-slots]');
-    expect(pact.text()).toContain('Pact');
-    expect(pact.text()).toContain('short rest');
-    expect(pact.findAll('.resource__box')).toHaveLength(2);
-    expect(third.find('[data-slots]').exists()).toBe(false);
-  });
-
-  it('shows separate multiclass casting profiles and each spell ability', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        spells: [
-          { name: 'Sacred Flame', level: 0, ability: 'WIS' },
-          { name: 'Fire Bolt', level: 0, ability: 'INT' },
-        ],
-        spellcasting: {
-          profiles: [
-            { source: 'Cleric', ability: 'WIS', modifier: 3, attack: 6, saveDc: 14 },
-            { source: 'Wizard', ability: 'INT', modifier: 4, attack: 7, saveDc: 15 },
-          ],
-          slots: [4, 3],
-        },
-      },
-    });
-
-    const profiles = wrapper.findAll('[data-spellcasting-profile]');
-    expect(profiles).toHaveLength(2);
-    expect(profiles[0].text()).toContain('Cleric');
-    expect(profiles[0].text()).toContain('WIS');
-    expect(profiles[1].text()).toContain('Wizard');
-    expect(profiles[1].text()).toContain('INT');
-    expect(wrapper.findAll('[data-spell]').map((spell) => spell.text())).toEqual(
-      expect.arrayContaining([expect.stringContaining('WIS'), expect.stringContaining('INT')]),
-    );
   });
 
   it('renders per-spell shorthand, damage, and a concentration tag', () => {
@@ -162,70 +66,20 @@ describe('SpellsCard', () => {
             castingTime: 'A',
             range: '30 ft.',
             concentration: true,
-            duration: '1 minute',
-            upcast:
-              '**Using a Higher-Level Spell Slot.** The damage increases by 1d8 for each spell slot level above 1.',
-            damage: {
-              dice: '2d8',
-              type: 'Thunder',
-              scaling: '+1d8 per slot level above 1st',
-            },
-          },
-          {
-            name: 'Sacred Flame',
-            level: 0,
-            castingTime: 'A',
-            range: '60 ft.',
-            save: 'DEX',
+            duration: 'Conc, 1 min',
           },
         ],
       },
     });
 
     const spells = wrapper.findAll('[data-spell]');
-    expect(spells).toHaveLength(3);
+    expect(spells).toHaveLength(2);
     expect(spells[0].text()).toContain('Fire Bolt');
     expect(spells[0].text()).toContain('1d10 Fire');
     expect(spells[0].text()).toContain('Spell attack');
-    expect(spells[1].text()).toContain('DEX save');
     // The concentration spell shows a "C" tag.
-    expect(spells[2].text()).toContain('C');
-    expect(spells[2].text()).toContain('1 minute');
-    expect(spells[2].text()).not.toContain('Concentration');
-    expect(spells[2].text()).toContain('2d8 Thunder (+1d8 per ↑ level)');
-    expect(spells[2].get('.inline-scaling-text__arrow').text()).toBe('↑');
-    expect(spells[2].find('.spells__upcast').text()).toBe(
-      'Using a Higher-Level Spell Slot. The damage increases by 1d8 for each spell slot level above 1.',
-    );
-  });
-
-  it('renders a cantrip damage-upgrade note after its effect summary', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        spells: [
-          {
-            name: 'Poison Spray',
-            level: 0,
-            damage: { dice: '2d12', type: 'Poison' },
-            summary:
-              'You spray toxic mist at a creature within range. On a hit, the target takes 1d12 Poison damage.',
-            upcast:
-              '**Cantrip Upgrade.** The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).',
-          },
-        ],
-      },
-    });
-
-    const spell = wrapper.get('[data-spell]');
-    const summary = spell.get('.spells__summary');
-    const upgrade = spell.get('.spells__upcast');
-    expect(spell.text()).toContain('2d12 Poison');
-    expect(upgrade.text()).toBe(
-      'Cantrip Upgrade. The damage increases by 1d12 when you reach levels 5 (2d12), 11 (3d12), and 17 (4d12).',
-    );
-    expect(summary.element.compareDocumentPosition(upgrade.element)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(spells[1].text()).toContain('C');
+    expect(spells[1].text()).toContain('1 min');
   });
 
   it('shows concentration and ritual as separate boxes', () => {
@@ -255,77 +109,22 @@ describe('SpellsCard', () => {
     expect(spells[1].find('.spells__summary').exists()).toBe(false);
   });
 
-  it('renders structured spell options as an actual list', () => {
+  it('shows a free-cast tracker next to a feature-granted spell', () => {
     const wrapper = mount(SpellsCard, {
       props: {
         spells: [
-          {
-            name: 'Command',
-            level: 1,
-            summary: 'Choose a command.',
-            list: {
-              items: [
-                { label: 'Approach.', text: 'The target moves toward you.' },
-                { label: 'Drop.', text: 'The target drops what it holds.' },
-              ],
-            },
-          },
-        ],
-      },
-    });
-
-    const list = wrapper.get('[data-spell-list]');
-    expect(list.get('ul').element.tagName).toBe('UL');
-    expect(list.get('ul').classes()).toContain('structured-list__items--plain');
-    expect(list.findAll('li').every((item) => item.classes().includes('structured-list__item'))).toBe(
-      true,
-    );
-    expect(list.findAll('li')).toHaveLength(2);
-    expect(list.findAll('[data-structured-list-item]').map((item) => item.text())).toEqual([
-      'Approach.The target moves toward you.',
-      'Drop.The target drops what it holds.',
-    ]);
-  });
-
-  it('shows each sourced feature-cast tracker next to its spell', () => {
-    const wrapper = mount(SpellsCard, {
-      props: {
-        spells: [
-          {
-            name: 'Augury',
-            level: 1,
-            castingTime: '1m',
-            range: 'Self',
-            featureUses: [
-              {
-                source: 'Gathered Whispers',
-                pool: { max: 1, recovery: { kind: 'rest', rest: 'long' } },
-              },
-              {
-                source: 'Second Sight',
-                pool: { max: 2, recovery: { kind: 'rest', rest: 'short' } },
-              },
-            ],
-          },
+          { name: 'Augury', level: 1, uses: { max: 1, recharge: 'LR' } },
           { name: 'Bless', level: 1 },
         ],
       },
     });
     const spells = wrapper.findAll('[data-spell]');
-    const uses = spells[0].findAll('[data-spell-use]');
-    expect(uses).toHaveLength(2);
-    expect(uses[0].text()).toContain('Gathered Whispers:');
-    expect(uses[0].findAll('.resource__box')).toHaveLength(1);
-    expect(uses[0].text()).toContain('Long rest');
-    expect(uses[1].text()).toContain('Second Sight:');
-    expect(uses[1].findAll('.resource__box')).toHaveLength(2);
-    expect(uses[1].text()).toContain('short rest');
-    const meta = spells[0].get('.spells__meta');
-    expect(meta.text()).toContain('1m · Self');
-    expect(meta.element.compareDocumentPosition(uses[0].element)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    // The granted spell carries its own limited-use checkbox + recharge tag.
+    const uses = spells[0].find('[data-spell-uses]');
+    expect(uses.exists()).toBe(true);
+    expect(uses.findAll('.resource__box')).toHaveLength(1);
+    expect(uses.text()).toContain('Long rest');
     // A spell without a feature grant shows no tracker.
-    expect(spells[1].find('[data-spell-use]').exists()).toBe(false);
+    expect(spells[1].find('[data-spell-uses]').exists()).toBe(false);
   });
 });

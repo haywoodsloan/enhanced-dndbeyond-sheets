@@ -17,15 +17,13 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(character.name).toBe('Hest');
     expect(character.race).toBe('Tiefling');
     expect(character.background).toBe('Charlatan');
-    expect(character.size).toBe('Medium');
-    expect(character.creatureType).toBe('Humanoid');
     expect(character.level).toBe(6);
     expect(character.classes).toEqual([
       { name: 'Sorcerer', level: 6, subclass: 'Draconic Sorcery' },
     ]);
   });
 
-  it('omits generated sections when no feature requires them', () => {
+  it('produces all fourteen sections in the stable order', () => {
     const character = normalizeCharacter(raw);
     expect(character.sections.map((section) => section.key)).toEqual([
       'portrait',
@@ -51,27 +49,13 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     expect(scoreByKey).toEqual({ str: 9, dex: 14, con: 12, int: 14, wis: 10, cha: 18 });
   });
 
-  it('applies Draconic Resilience to AC and maximum hit points', () => {
-    const { basics } = normalizeCharacter(raw);
-    // 10 + Dex (+2) + Cha (+4), while unarmored.
-    expect(basics.armorClass).toBe(16);
-    // Base 26 + Con (+1) × 6 + Draconic Resilience (1 × 6 Sorcerer levels).
-    expect(basics.hitPoints).toEqual({ current: 38, max: 38, temp: 0 });
-  });
-
   it('summarizes Charisma-based spellcasting with level-6 slots', () => {
     const { spellcasting } = normalizeCharacter(raw);
     expect(spellcasting).toEqual({
-      profiles: [
-        {
-          source: 'Sorcerer',
-          ability: 'CHA',
-          modifier: 4,
-          attack: 8,
-          saveDc: 16,
-          focus: 'Arcane Focus',
-        },
-      ],
+      ability: 'CHA',
+      modifier: 4,
+      attack: 8, // CHA +4, proficiency +3, attuned Wand of the War Mage +1.
+      saveDc: 15,
       slots: [4, 3, 3],
     });
   });
@@ -86,12 +70,6 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
       expect.arrayContaining(['Font of Magic', 'Metamagic', 'Sorcerous Restoration']),
     );
     expect(namesOf('Racial Traits')).toContain('Infernal Legacy');
-    expect(namesOf('Racial Traits')).not.toEqual(
-      expect.arrayContaining(['Speed', 'Darkvision', 'Size', 'Creature Type']),
-    );
-    expect(namesOf('Racial Traits')).toContain('Otherworldly Presence (Charisma)');
-    expect(namesOf('Racial Traits')).not.toContain('Charisma');
-    expect(namesOf('Racial Traits')).not.toContain('Ability Score Increases');
     // Infernal Legacy keeps its info even though its lone sentence pointed at a
     // "Fiendish Legacies table" — the pointer is trimmed, not the whole sentence.
     const infernal = itemsOf('Racial Traits').find(
@@ -102,47 +80,6 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The base feature is shown; its option-form duplicate is not listed too.
     expect(namesOf('Class Features')).toContain('Innate Sorcery');
     expect(namesOf('Class Features')).not.toContain('Activate Innate Sorcery');
-
-    expect(
-      itemsOf('Class Features').find((item) => item.name === 'Draconic Spells')
-        ?.grantedSpells,
-    ).toEqual([
-      'Alter Self',
-      'Chromatic Orb',
-      'Command',
-      "Dragon's Breath",
-      'Fear',
-      'Fly',
-    ]);
-    const fiendishSpells = itemsOf('Racial Traits').find(
-      (item) => item.name === 'Fiendish Legacy Spells',
-    );
-    expect(fiendishSpells?.grantedSpells).toEqual([
-      'Fire Bolt',
-      'Hellish Rebuke',
-      'Darkness',
-    ]);
-    expect(fiendishSpells?.summary).toBe(
-      'Your Fiendish Legacy grants the spells listed below. You always have them ' +
-        'prepared. Each leveled spell can be cast once without a spell slot, and you ' +
-        'regain that casting after a Long Rest. You can also cast it using an ' +
-        'appropriate spell slot.',
-    );
-
-    // Multi-choice systems keep every selected option under their owning
-    // feature instead of silently retaining only the first selection.
-    const metamagicOptions = itemsOf('Class Features').find(
-      (item) => item.name === 'Metamagic Options',
-    );
-    expect(metamagicOptions?.parts?.map((part) => part.label)).toEqual([
-      'Empowered Spell',
-      'Careful Spell',
-    ]);
-    expect(
-      metamagicOptions?.parts?.every(
-        (part) => part.reference === 'actions' && part.text === '',
-      ),
-    ).toBe(true);
 
     // The Ability Score Improvement feat shows just the bumps it granted…
     const asi = itemsOf('Feats').find((item) => item.name === 'Ability Score Improvement');
@@ -161,10 +98,7 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // {{classlevel}} -> 6, {{modifier:cha}} -> +4, {{modifier:cha@min:1#unsigned}} -> 4.
     expect(summaryOf('Draconic Resilience')).toContain('increases by 6');
     expect(summaryOf('Elemental Affinity (Fire)')).toContain('add +4 to one damage roll');
-    expect(
-      normalizeCharacter(raw).actions.find((action) => action.name.endsWith('Empowered Spell'))
-        ?.summary,
-    ).toContain('reroll up to 4 damage dice');
+    expect(summaryOf('Empowered Spell')).toContain('reroll up to 4 damage dice');
     // No unresolved placeholder braces remain in any feature text.
     expect(items.every((item) => !(item.summary ?? '').includes('{{'))).toBe(true);
   });
@@ -191,7 +125,6 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const skilled = items.find((item) => item.name === 'Skilled');
     // The generic "any combination of your choice" blurb is replaced by the picks.
     expect(skilled?.summary).toBe('Stealth, Perception, Insight');
-    expect(skilled?.related).toBeUndefined();
     expect(skilled?.summary).not.toMatch(/of your choice/i);
     // The repeatable-feat boilerplate note is dropped.
     expect((skilled?.parts ?? []).some((part) => part.label === 'Repeatable')).toBe(
@@ -206,13 +139,12 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     const fom = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Font of Magic');
-    const partReference = (label: string) =>
-      fom?.parts?.find((part) => part.label === label)?.reference;
+    const partText = (label: string) => fom?.parts?.find((part) => part.label === label)?.text;
     // These options are fully defined as actions ("Convert Spell Slots" / "Create
     // Spell Slot Level N"), so the feature just points there despite the wording
     // difference ("Creating Spell Slots" vs "Create Spell Slot Level 1").
-    expect(partReference('Converting Spell Slots to Sorcery Points')).toBe('actions');
-    expect(partReference('Creating Spell Slots')).toBe('actions');
+    expect(partText('Converting Spell Slots to Sorcery Points')).toBe('(see Actions)');
+    expect(partText('Creating Spell Slots')).toBe('(see Actions)');
     // The trailing rider only restates that a created slot vanishes on a Long Rest,
     // which the Create Spell Slot actions already show, so it's dropped as redundant.
     expect(
@@ -228,105 +160,48 @@ describe('normalizeCharacter — Hest (level 6 draconic sorcerer)', () => {
     // The feature IS a Bonus Action detailed on the Actions card, so it just
     // references it rather than repeating the text.
     const feature = featureNamed('Innate Sorcery');
-    expect(feature?.reference).toBe('actions');
-    expect(feature?.summary).toBeUndefined();
+    expect(feature?.summary).toBe('(see Actions)');
     expect(feature?.parts).toBeUndefined();
 
-    // The Bonus Action carries the full effect — the HTML benefits the snippet
-    // dropped — trimmed of its lead-in flavor and rendered as a semantic list.
+    // The Bonus Action carries the complete effect and both benefit-list entries,
+    // rather than the short snippet that omits the actual mechanics.
     const action = character.actions.find(
       (entry) => entry.name === 'Innate Sorcery' && entry.category === 'bonus',
     );
-    expect(action?.summary).toBe(
-      'As a Bonus Action, you can unleash that magic for 1 minute, during which you gain ' +
-        'the following benefits:',
-    );
-    expect(action?.list).toEqual({
-      items: [
-        { text: 'The spell save DC of your Sorcerer spells increases by 1.' },
-        { text: 'You have Advantage on the attack rolls of Sorcerer spells you cast.' },
-      ],
-    });
-    expect(action?.summary).not.toMatch(/an event in your past|regain all expended uses/i);
+    expect(action?.summary).toContain('As a Bonus Action, you can unleash that magic for 1 minute');
+    expect(action?.summary).toContain('• The spell save DC of your Sorcerer spells increases by 1.');
+    expect(action?.summary).toContain('• You have Advantage on the attack rolls of Sorcerer spells you cast.');
+    expect(action?.resource).toEqual({ max: 2, recharge: 'LR' });
 
     // A passive "other" option that merely shares a name with an action is NOT
     // collapsed — it keeps its own description in the feature list.
     expect(featureNamed('Sorcerous Restoration')?.summary).toContain(
-      'regain up to 3 Sorcery Points',
+      'regain expended Sorcery Points',
     );
-    expect(
-      featureNamed('Metamagic Options')?.parts?.find(
-        (part) => part.label === 'Empowered Spell',
-      )?.reference,
-    ).toBe('actions');
+    expect(featureNamed('Empowered Spell')?.summary).toContain('reroll up to 4 damage dice');
   });
 
   it('tracks a racial trait that grants limited-use spells', () => {
     const { spells } = normalizeCharacter(raw);
     // Tiefling's Fiendish Legacy grants Hellish Rebuke and Darkness once per long
     // rest — the free-cast tracker now rides on each granted spell.
-    const withUses = spells.filter((spell) => spell.featureUses?.length);
+    const withUses = spells.filter((spell) => spell.uses);
     expect(withUses.map((spell) => spell.name)).toEqual(
       expect.arrayContaining(['Hellish Rebuke', 'Darkness']),
     );
-    expect(spells.find((spell) => spell.name === 'Hellish Rebuke')?.featureUses).toEqual([
-      {
-        source: 'Fiendish Legacy Spells',
-        pool: { max: 1, recovery: { kind: 'rest', rest: 'long' } },
-      },
-    ]);
-  });
-
-  it('keeps costly spell materials but omits ordinary focus components', () => {
-    const { spells } = normalizeCharacter(raw);
-    expect(spells.find((spell) => spell.name === 'Chromatic Orb')?.material).toBe(
-      'a diamond worth 50+ GP',
-    );
-    expect(spells.find((spell) => spell.name === 'Fireball')?.material).toBeUndefined();
-  });
-
-  it('does not mislabel choose-your-damage-type spells as Acid', () => {
-    const { spells } = normalizeCharacter(raw);
-    expect(spells.find((spell) => spell.name === 'Sorcerous Burst')?.damage).toMatchObject({
-      dice: '2d8',
-      type: 'chosen type',
-    });
-    expect(spells.find((spell) => spell.name === 'Chromatic Orb')?.damage).toMatchObject({
-      dice: '3d8',
-      type: 'chosen type',
-    });
-    expect(spells.find((spell) => spell.name === "Dragon's Breath")?.damage).toMatchObject({
-      dice: '3d6',
-      type: 'chosen type',
+    expect(spells.find((spell) => spell.name === 'Hellish Rebuke')?.uses).toEqual({
+      max: 1,
+      recharge: 'LR',
     });
   });
 
-  it('does not repeat damage scaling already shown in spell metadata', () => {
-    const { spells } = normalizeCharacter(raw);
-    const fireBolt = spells.find((spell) => spell.name === 'Fire Bolt');
-    expect(fireBolt?.damage?.dice).toBe('2d10');
-    expect(fireBolt?.summary).not.toMatch(/Cantrip Upgrade|increases by 1d10/i);
-    expect(fireBolt?.upcast).toBe(
-      '**Cantrip Upgrade.** The damage increases by 1d10 when you reach levels 5 (2d10), 11 (3d10), and 17 (4d10).',
-    );
-
-    const burningHands = spells.find((spell) => spell.name === 'Burning Hands');
-    expect(burningHands?.damage?.scaling).toBe('+1d6 per slot level above 1st');
-    expect(burningHands?.summary).not.toMatch(/Higher-Level Spell Slot|increases by 1d6/i);
-
-    // Non-damage upcast mechanics remain in the dedicated body content.
-    const command = spells.find((spell) => spell.name === 'Command');
-    expect(command?.upcast).toBe(
-      '**Using a Higher-Level Spell Slot.** You can affect one additional creature for each spell slot level above 1.',
-    );
-    expect(JSON.stringify(command?.list)).not.toContain('Using a Higher-Level Spell Slot');
-  });
-
-  it('uses the active level-scaled class feature snippet', () => {
+  it('decodes HTML entities in feature text', () => {
     const metamagic = normalizeCharacter(raw)
       .features.flatMap((group) => group.items)
       .find((item) => item.name === 'Metamagic');
-    expect(metamagic?.summary).toContain('you know 2 Metamagic options');
-    expect(metamagic?.summary).not.toContain('{{scalevalue}}');
+    // The Metamagic description references &ldquo;Metamagic Options&rdquo; — the
+    // curly-quote entities should be decoded, not rendered raw.
+    expect(metamagic?.summary).toContain('"Metamagic Options"');
+    expect(metamagic?.summary).not.toMatch(/&(?:ldquo|rdquo|amp|#\d+);/);
   });
 });

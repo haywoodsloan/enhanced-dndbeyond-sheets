@@ -17,6 +17,10 @@ import {
   SECTION_LAYOUT_KEY,
   SPELLS_EXPANDED_KEY,
   THEME_COLOR_KEY,
+  PROFILES_KEY,
+  flushProfileWrites,
+  profilesPref,
+  profileWriteLock,
   scopedKey,
 } from './preferences';
 import { debugLog } from '@/utils/debug';
@@ -35,6 +39,52 @@ export interface ProfilesState {
 
 /** The default profile that always exists (its settings are the unscoped keys). */
 export const DEFAULT_PROFILE: ProfileMeta = { id: DEFAULT_PROFILE_ID, name: 'Default' };
+
+/** Validate persisted metadata before it reaches the profile picker. */
+export function normalizeProfilesState(value: unknown): ProfilesState {
+  const state = value && typeof value === 'object' ? value as Partial<ProfilesState> : {};
+  const entries = Array.isArray(state.profiles) ? state.profiles : [];
+  const ids = new Set<string>();
+  const profiles = entries.filter((profile): profile is ProfileMeta => {
+    if (
+      !profile || typeof profile !== 'object' ||
+      typeof profile.id !== 'string' || !profile.id.trim() ||
+      typeof profile.name !== 'string' || !profile.name.trim() ||
+      ids.has(profile.id)
+    ) return false;
+    ids.add(profile.id);
+    return true;
+  });
+  if (!Array.isArray(state.profiles) || profiles.length !== entries.length) {
+    debugLog('settings', 'invalid stored profile metadata');
+  }
+  if (!profiles.length) profiles.push({ ...DEFAULT_PROFILE });
+  return {
+    profiles,
+    activeId: profiles.some((profile) => profile.id === state.activeId)
+      ? state.activeId!
+      : profiles[0].id,
+  };
+}
+
+/** Rebase a metadata edit under a lock shared by all open extension sheets. */
+export async function updateProfilesState(
+  update: (state: ProfilesState) => ProfilesState,
+): Promise<ProfilesState> {
+  return navigator.locks.request(PROFILES_KEY, async () => {
+    // A failed read is not an empty store: never overwrite metadata with the
+    // fallback used by best-effort display preferences.
+    let stored = (await browser.storage.sync.get(PROFILES_KEY))[PROFILES_KEY];
+    if (stored == null) stored = (await browser.storage.local.get(PROFILES_KEY))[PROFILES_KEY];
+    const current = normalizeProfilesState(stored ?? {
+      activeId: DEFAULT_PROFILE.id,
+      profiles: [],
+    });
+    const next = update(current);
+    await profilesPref.set(next);
+    return next;
+  });
+}
 
 /** The base keys whose values are per-profile — removed when a profile is deleted. */
 const PROFILE_SCOPED_BASES = [
@@ -88,22 +138,47 @@ export async function deleteProfileData(id: string): Promise<void> {
 }
 
 /**
- * Copy every stored setting from one profile to another (best-effort) — used to
- * duplicate a profile so the copy starts identical to its source.
+ * Copy a profile after pending placements in every open sheet have settled.
+ * Failure (including a stalled source) rejects so no empty duplicate is added.
  */
 export async function copyProfileData(fromId: string, toId: string): Promise<void> {
   if (fromId === toId) return;
+  const controller = new AbortController();
+  let deadline!: ReturnType<typeof setTimeout>;
+  const timedOut = new Promise<never>((_, reject) => {
+    deadline = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Profile copy timed out'));
+    }, 5_000);
+  });
   try {
-    const stored = await browser.storage.sync.get(
-      PROFILE_SCOPED_BASES.map((base) => scopedKey(base, fromId)),
-    );
-    const writes: Record<string, unknown> = {};
-    for (const base of PROFILE_SCOPED_BASES) {
-      const value = stored[scopedKey(base, fromId)];
-      if (value !== undefined) writes[scopedKey(base, toId)] = value;
-    }
-    if (Object.keys(writes).length) await browser.storage.sync.set(writes);
+    await Promise.race([
+      timedOut,
+      (async () => {
+        await flushProfileWrites(fromId);
+        controller.signal.throwIfAborted();
+        await navigator.locks.request(
+          profileWriteLock(fromId),
+          { signal: controller.signal },
+          async () => {
+            const stored = await browser.storage.sync.get(
+              PROFILE_SCOPED_BASES.map((base) => scopedKey(base, fromId)),
+            );
+            controller.signal.throwIfAborted();
+            const writes: Record<string, unknown> = {};
+            for (const base of PROFILE_SCOPED_BASES) {
+              const value = stored[scopedKey(base, fromId)];
+              if (value !== undefined) writes[scopedKey(base, toId)] = value;
+            }
+            if (Object.keys(writes).length) await browser.storage.sync.set(writes);
+          },
+        );
+      })(),
+    ]);
   } catch (error) {
     debugLog('settings', 'profile copy failed', { fromId, toId, error });
+    throw error;
+  } finally {
+    clearTimeout(deadline);
   }
 }

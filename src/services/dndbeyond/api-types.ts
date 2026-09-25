@@ -229,6 +229,10 @@ export interface RawLimitedUse {
   useProficiencyBonus?: boolean | null;
   /** Ability whose modifier sets the pool size (1-6 = STR..CHA). */
   statModifierUsesId?: number | null;
+  /** 1 adds the ability modifier to maxUses; 2 multiplies by it. */
+  operator?: number | null;
+  /** 1 adds proficiency to the pool; 2 multiplies by it. */
+  proficiencyBonusOperator?: number | null;
 }
 
 /** Range / area block on an action. */

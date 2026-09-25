@@ -11,9 +11,7 @@ describe('AttacksCard', () => {
         toHit: 4,
         damage: { dice: '1d8', bonus: 2, type: 'Piercing' },
         range: '5 ft.',
-        properties: [
-          { name: 'Sap', description: 'Disadvantage on its next attack.', mastered: true },
-        ],
+        properties: [{ name: 'Sap', description: 'Disadvantage on its next attack.' }],
       },
     ];
     const wrapper = mount(AttacksCard, { props: { attacks } });
@@ -79,7 +77,7 @@ describe('AttacksCard', () => {
     expect(wrapper.text()).toContain('Allows two-weapon fighting.');
   });
 
-  it('greys unavailable masteries and omits their rules from the legend', () => {
+  it('marks mastery properties with a "*" to set them apart from ordinary ones', () => {
     const attacks: Attack[] = [
       {
         name: 'Scimitar',
@@ -88,49 +86,25 @@ describe('AttacksCard', () => {
         range: '5 ft.',
         properties: [
           { name: 'Finesse', description: 'Use Strength or Dexterity.' },
-          {
-            name: 'Nick',
-            description: 'Make the extra Light attack as part of the Attack action.',
-            mastered: false,
-          },
+          { name: 'Nick', description: 'Make the extra Light attack as part of the Attack action.' },
         ],
       },
     ];
     const wrapper = mount(AttacksCard, { props: { attacks } });
 
+    // The per-row property list stars only the mastery property.
     const notes = wrapper.find('.attacks__notes').text();
-    expect(notes).toContain('Nick');
+    expect(notes).toContain('*Nick');
     expect(notes).toContain('Finesse');
-    expect(notes).not.toContain('*');
-    expect(wrapper.get('.attacks__note-item--unavailable').text()).toContain('Nick');
-    expect(wrapper.get('.attacks__note-item--unavailable').attributes('title')).toBe(
-      'Requires mastery with this weapon',
-    );
+    expect(notes).not.toContain('*Finesse');
 
+    // The legend term is starred for the mastery property, plain for the ordinary one.
     const terms = wrapper.findAll('.attacks__legend dt').map((dt) => dt.text());
-    expect(terms).toEqual(['Finesse']);
-    expect(wrapper.text()).not.toContain('Make the extra Light attack');
-    expect(wrapper.find('[data-mastery-note]').exists()).toBe(false);
-  });
+    expect(terms).toContain('*Nick');
+    expect(terms).toContain('Finesse');
+    expect(terms).not.toContain('*Finesse');
 
-  it('defines a selected mastery normally in the property legend', () => {
-    const attacks: Attack[] = [
-      {
-        name: 'Dagger',
-        properties: [
-          {
-            name: 'Nick',
-            description: 'Make the extra Light attack as part of the Attack action.',
-            mastered: true,
-          },
-        ],
-      },
-    ];
-    const wrapper = mount(AttacksCard, { props: { attacks } });
-
-    expect(wrapper.find('.attacks__note-item--unavailable').exists()).toBe(false);
-    expect(wrapper.get('.attacks__legend dt').text()).toBe('Nick');
-    expect(wrapper.text()).toContain('Make the extra Light attack');
-    expect(wrapper.text()).not.toContain('*');
+    // The footnote is keyed to the "*".
+    expect(wrapper.find('[data-mastery-note]').text().startsWith('*')).toBe(true);
   });
 });

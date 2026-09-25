@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { fakeBrowser } from 'wxt/testing';
 import { useProfiles } from '@/composables/useProfiles';
@@ -7,12 +7,20 @@ import {
   SECTION_ANCHORS_KEY,
   profilesPref,
   scopedKey,
+  registerProfileFlush,
 } from '@/utils/settings/preferences';
 import { mountComposable } from '../fixtures/mount-composable';
+import { mockStorageLocks, settleStorageLocks } from '../utils/settings/storage-locks';
 
 describe('useProfiles', () => {
   beforeEach(() => {
     fakeBrowser.reset();
+    mockStorageLocks();
+  });
+
+  afterEach(async () => {
+    await settleStorageLocks();
+    vi.restoreAllMocks();
   });
 
   it('starts with a single Default profile', async () => {
@@ -114,6 +122,30 @@ describe('useProfiles', () => {
     expect(result.profiles.value).toHaveLength(2);
   });
 
+  it('abandons duplication after a bounded wait for a stalled source flush', async () => {
+    const { result, wrapper } = mountComposable(useProfiles);
+    await flushPromises();
+    let release!: () => void;
+    const stalled = new Promise<void>((resolve) => { release = resolve; });
+    const unregister = registerProfileFlush(() => stalled);
+    vi.useFakeTimers();
+    try {
+      const copying = result.duplicate('default');
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(5_000);
+      await copying;
+      expect(result.profiles.value).toEqual([{ id: 'default', name: 'Default' }]);
+      release();
+      await flushPromises();
+      expect(await fakeBrowser.storage.sync.get(null)).toEqual({});
+    } finally {
+      release();
+      unregister();
+      vi.useRealTimers();
+      wrapper.unmount();
+    }
+  });
+
   it('renames a profile, trimming and ignoring blank names', async () => {
     const { result } = mountComposable(() => useProfiles());
     await flushPromises();
@@ -129,6 +161,7 @@ describe('useProfiles', () => {
     expect(result.profiles.value.find((profile) => profile.id === id)?.name).toBe('Tablet');
 
     // The rename is persisted.
+    await settleStorageLocks();
     const saved = await profilesPref.get({ activeId: 'default', profiles: [] });
     expect(saved.profiles.find((profile) => profile.id === id)?.name).toBe('Tablet');
   });
@@ -230,12 +263,80 @@ describe('useProfiles', () => {
     expect(result.profiles.value.map((profile) => profile.name)).toEqual(['Second']);
   });
 
-  it('does not persist changes made before initial storage has loaded', async () => {
+  it('persists user changes made before initial storage has loaded', async () => {
     const { result } = mountComposable(() => useProfiles());
-    result.create('Early');
-    await flushPromises();
+    const id = result.create('Early');
+    await settleStorageLocks();
 
     const saved = await profilesPref.get({ activeId: 'default', profiles: [] });
-    expect(saved.profiles).toEqual([]);
+    expect(saved.profiles).toContainEqual({ id, name: 'Early' });
+  });
+
+  it('replays an early create and rename after a deferred metadata read without losing saved profiles', async () => {
+    const stored = {
+      activeId: 'existing',
+      profiles: [
+        { id: 'default', name: 'Default' },
+        { id: 'existing', name: 'Saved layout' },
+      ],
+    };
+    await profilesPref.set(stored);
+    let release!: (state: typeof stored) => void;
+    vi.spyOn(profilesPref, 'get').mockImplementationOnce(() =>
+      new Promise((resolve) => { release = resolve; }),
+    );
+    const { result, wrapper } = mountComposable(() => useProfiles());
+    try {
+      const id = result.create('Early');
+      result.rename(id, 'Early renamed');
+      expect(result.profiles.value).toContainEqual({ id, name: 'Early renamed' });
+      await flushPromises();
+      expect(await profilesPref.get({ activeId: '', profiles: [] })).toEqual(stored);
+
+      release(stored);
+      await settleStorageLocks();
+      const saved = await profilesPref.get({ activeId: '', profiles: [] });
+      expect(saved).toEqual({
+        activeId: id,
+        profiles: [...stored.profiles, { id, name: 'Early renamed' }],
+      });
+      expect(result.profiles.value).toEqual(saved.profiles);
+    } finally {
+      release(stored);
+      wrapper.unmount();
+    }
+  });
+
+  it('preserves an early rename of the default profile when persisted metadata finishes loading', async () => {
+    const stored = {
+      activeId: 'existing',
+      profiles: [
+        { id: 'default', name: 'Old name' },
+        { id: 'existing', name: 'Saved layout' },
+      ],
+    };
+    await profilesPref.set(stored);
+    let release!: (state: typeof stored) => void;
+    vi.spyOn(profilesPref, 'get').mockImplementationOnce(() =>
+      new Promise((resolve) => { release = resolve; }),
+    );
+    const { result, wrapper } = mountComposable(() => useProfiles());
+    try {
+      result.rename('default', 'Early rename');
+      release(stored);
+      await settleStorageLocks();
+      const saved = await profilesPref.get({ activeId: '', profiles: [] });
+      expect(saved).toEqual({
+        activeId: 'existing',
+        profiles: [
+          { id: 'default', name: 'Early rename' },
+          { id: 'existing', name: 'Saved layout' },
+        ],
+      });
+      expect(result.profiles.value).toEqual(saved.profiles);
+    } finally {
+      release(stored);
+      wrapper.unmount();
+    }
   });
 });

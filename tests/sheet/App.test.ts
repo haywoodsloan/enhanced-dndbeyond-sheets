@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { fakeBrowser } from 'wxt/testing';
 import App from '@/entrypoints/sheet/App.vue';
+import SectionCard from '@/components/SectionCard.vue';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import type { Character } from '@/services/dndbeyond/model';
-import { pageFormatPref, pageOrientationPref, sectionAnchorsPref } from '@/utils/settings/preferences';
+import { pageFormatPref, pageOrientationPref, profilesPref, sectionAnchorsPref } from '@/utils/settings/preferences';
 import { DEFAULT_FORMAT_ID, DEFAULT_ORIENTATION_ID } from '@/utils/layout/page-format';
 import { makeCharacter } from '../fixtures/character';
+import { mockStorageLocks, settleStorageLocks } from '../utils/settings/storage-locks';
+
+enableAutoUnmount(afterEach);
 
 vi.mock('@/services/dndbeyond/load-character', () => ({
   loadCharacter: vi.fn(),
@@ -51,11 +55,13 @@ const sampleCharacter = makeCharacter({
 describe('sheet App', () => {
   beforeEach(() => {
     fakeBrowser.reset();
+    mockStorageLocks();
     mockedLoad.mockReset();
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
+  afterEach(async () => {
+    await settleStorageLocks();
+    vi.restoreAllMocks();
   });
 
   it('shows a fallback when no character id is provided', () => {
@@ -72,41 +78,6 @@ describe('sheet App', () => {
     expect(wrapper.text()).toContain('Theme color');
   });
 
-  it('creates and names a layout profile inline', async () => {
-    const wrapper = mount(App, { props: { characterId: null } });
-    await flushPromises();
-
-    await wrapper.get('.profiles__new').trigger('click');
-    await flushPromises();
-    const input = wrapper.get('.profiles__rename-input');
-    await input.setValue('Print layout');
-    await input.trigger('keyup', { key: 'Enter' });
-    await flushPromises();
-
-    expect(wrapper.find('.profiles__rename-input').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Print layout');
-  });
-
-  it('cancels profile renaming and profile deletion', async () => {
-    const wrapper = mount(App, { props: { characterId: null } });
-    await flushPromises();
-    await wrapper.get('.profiles__new').trigger('click');
-    await flushPromises();
-    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Escape' });
-
-    const rename = wrapper.findAll('.profiles__rename').at(-1);
-    await rename!.trigger('click');
-    await wrapper.get('.profiles__rename-input').setValue('Discard me');
-    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Escape' });
-    expect(wrapper.text()).not.toContain('Discard me');
-
-    const remove = wrapper.findAll('.profiles__delete').at(-1);
-    await remove!.trigger('click');
-    expect(wrapper.text()).toContain('Delete');
-    await wrapper.get('.profiles__confirm-no').trigger('click');
-    expect(wrapper.findAll('.profiles__item')).toHaveLength(2);
-  });
-
   it('shows a loading state while the character loads', () => {
     mockedLoad.mockReturnValue(new Promise<Character>(() => {}));
     const wrapper = mount(App, { props: { characterId: 166869100 } });
@@ -118,10 +89,9 @@ describe('sheet App', () => {
     const wrapper = mount(App, { props: { characterId: 166869100 } });
     await flushPromises();
 
-    expect(mockedLoad).toHaveBeenCalledWith(
-      166869100,
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
+    expect(mockedLoad).toHaveBeenCalledWith(166869100, {
+      signal: expect.any(AbortSignal),
+    });
     expect(wrapper.text()).toContain('Noct');
     expect(wrapper.text()).toContain('Cleric 4 (Grave Domain)');
     const items = wrapper.findAll('[data-section-key]');
@@ -156,19 +126,109 @@ describe('sheet App', () => {
 
     expect(wrapper.text()).toContain('Could not load character');
     expect(wrapper.text()).toContain('boom');
-    expect(wrapper.get('.sheet__retry').text()).toBe('Try again');
   });
 
-  it('retries a failed character load', async () => {
-    mockedLoad.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(sampleCharacter);
-    const wrapper = mount(App, { props: { characterId: 5 } });
+  it('retries a failed character load without reopening the sheet', async () => {
+    mockedLoad.mockRejectedValueOnce(new TypeError('Network unavailable'))
+      .mockResolvedValueOnce(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
     await flushPromises();
 
+    expect(wrapper.get('[role="alert"]').text()).toContain('Check your connection');
     await wrapper.get('.sheet__retry').trigger('click');
     await flushPromises();
 
     expect(mockedLoad).toHaveBeenCalledTimes(2);
-    expect(wrapper.text()).toContain('Noct');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.get('[data-section-key="basics"]').text()).toContain('Noct');
+  });
+
+  it('creates a named profile and persists an inline rename', async () => {
+    const wrapper = mount(App, { props: { characterId: null }, attachTo: document.body });
+    await flushPromises();
+    await wrapper.get('.profiles__new').trigger('click');
+    await flushPromises();
+    await wrapper.get('.profiles__rename-input').setValue('Travel');
+    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Enter' });
+    await settleStorageLocks();
+
+    const state = await profilesPref.get({ activeId: '', profiles: [] });
+    expect(state.profiles.map((profile) => profile.name)).toEqual(['Default', 'Travel']);
+    expect(wrapper.get('.profiles__item--active .profiles__switch').text()).toBe('Travel');
+  });
+
+  it('discards a canceled profile rename', async () => {
+    const wrapper = mount(App, { props: { characterId: null } });
+    await flushPromises();
+    await wrapper.get('.profiles__rename').trigger('click');
+    await wrapper.get('.profiles__rename-input').setValue('Discarded name');
+    await wrapper.get('.profiles__rename-input').trigger('keyup', { key: 'Escape' });
+    await settleStorageLocks();
+
+    expect(wrapper.get('.profiles__switch').text()).toBe('Default');
+    expect(wrapper.find('.profiles__rename-input').exists()).toBe(false);
+  });
+
+  it('copies a profile and requires confirmation before deleting the copy', async () => {
+    const wrapper = mount(App, { props: { characterId: null } });
+    await flushPromises();
+    await wrapper.get('.profiles__dupe').trigger('click');
+    await settleStorageLocks();
+    await flushPromises();
+    expect(wrapper.findAll('.profiles__item')).toHaveLength(2);
+    expect(wrapper.get('.profiles__item--active .profiles__switch').text()).toBe('Default copy');
+
+    await wrapper.get('.profiles__item--active .profiles__delete').trigger('click');
+    await wrapper.get('.profiles__confirm-no').trigger('click');
+    expect(wrapper.findAll('.profiles__item')).toHaveLength(2);
+    await wrapper.get('.profiles__item--active .profiles__delete').trigger('click');
+    await wrapper.get('.profiles__confirm-yes').trigger('click');
+    await settleStorageLocks();
+
+    const state = await profilesPref.get({ activeId: '', profiles: [] });
+    expect(state.profiles.map((profile) => profile.name)).toEqual(['Default']);
+    expect(wrapper.get<HTMLButtonElement>('.profiles__delete').element.disabled).toBe(true);
+  });
+
+  it('reorders profiles by their handles and saves the resulting order', async () => {
+    await profilesPref.set({
+      activeId: 'default',
+      profiles: [{ id: 'default', name: 'Default' }, { id: 'travel', name: 'Travel' }],
+    });
+    const wrapper = mount(App, { props: { characterId: null } });
+    await flushPromises();
+    const dataTransfer = {
+      effectAllowed: 'none', dropEffect: 'none',
+      setData: vi.fn(), setDragImage: vi.fn(),
+    };
+    await wrapper.get('[data-profile-id="default"] .profiles__grip')
+      .trigger('dragstart', { dataTransfer });
+    await wrapper.get('.profiles').trigger('dragover', { clientY: 100, dataTransfer });
+    await wrapper.get('[data-profile-id="default"] .profiles__grip').trigger('dragend');
+    await settleStorageLocks();
+
+    const state = await profilesPref.get({ activeId: '', profiles: [] });
+    expect(state.profiles.map((profile) => profile.id)).toEqual(['travel', 'default']);
+    expect(wrapper.find('.profiles__item--dragging').exists()).toBe(false);
+    await wrapper.get('[data-profile-id="travel"] .profiles__switch').trigger('click');
+    await settleStorageLocks();
+    expect(wrapper.get('.profiles__item--active').attributes('data-profile-id')).toBe('travel');
+  });
+
+  it('expands and collapses spells through the card controls', async () => {
+    mockedLoad.mockResolvedValue({
+      ...sampleCharacter,
+      spells: [{ name: 'Light', level: 0 }, { name: 'Fog Cloud', level: 1 }],
+    });
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    await wrapper.get('[data-section-key="spells"] .card__spell-toggle').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.page [data-section-key^="spell:"]')).toHaveLength(2);
+    await wrapper.get('.page [data-section-key^="spell:"] .card__spell-toggle').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.page [data-section-key="spells"]').exists()).toBe(true);
+    expect(wrapper.findAll('.page [data-section-key^="spell:"]')).toHaveLength(0);
   });
 
   it('prints the sheet from the Print button', () => {
@@ -192,20 +252,6 @@ describe('sheet App', () => {
     await wrapper.get('.settings__button--reset').trigger('click');
     await flushPromises();
     expect(wrapper.find('.hidden-tray').exists()).toBe(false);
-  });
-
-  it('auto-hides a missing portrait and allows restoring its placeholder', async () => {
-    mockedLoad.mockResolvedValue({ ...sampleCharacter, avatarUrl: undefined });
-    const wrapper = mount(App, { props: { characterId: 166869100 } });
-    await flushPromises();
-
-    expect(wrapper.find('.page [data-section-key="portrait"]').exists()).toBe(false);
-    const hiddenPortrait = wrapper.get('.hidden-tray [data-section-key="portrait"]');
-    await hiddenPortrait.get('.card__toggle').trigger('click');
-    await flushPromises();
-
-    expect(wrapper.find('.page [data-section-key="portrait"]').exists()).toBe(true);
-    expect(wrapper.find('.hidden-tray [data-section-key="portrait"]').exists()).toBe(false);
   });
 
   it('cycles a card layout from its button, keeping its top-left cell', async () => {
@@ -234,6 +280,20 @@ describe('sheet App', () => {
     expect(topLeftCell()).toBe(cellBefore);
   });
 
+  it('moves a card with the arrow keys on its drag handle', async () => {
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+
+    const before = wrapper.get('[data-section-key="portrait"]').attributes('style');
+    await wrapper.get('[data-section-key="portrait"] .card__drag-handle')
+      .trigger('keydown', { key: 'ArrowDown' });
+    await flushPromises();
+
+    expect(wrapper.get('[data-section-key="portrait"]').attributes('style')).not.toBe(before);
+    wrapper.unmount();
+  });
+
   it('disables the layout toggle when no other layout fits the page', async () => {
     // 40 actions at Letter's 4 rows/page: only the Wide layout fits (Medium and
     // List would overflow), so the actions toggle has nothing viable to switch to
@@ -255,94 +315,6 @@ describe('sheet App', () => {
       .element as HTMLButtonElement;
     expect(actionsToggle.disabled).toBe(true);
     expect(inventoryToggle.disabled).toBe(false);
-  });
-
-  it('disables a fixed-card layout option when its measured content overflows', async () => {
-    const clientWidth = vi
-      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 200 : 0;
-      });
-    const scrollWidth = vi
-      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 200 : 0;
-      });
-    const clientHeight = vi
-      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 100 : 0;
-      });
-    const scrollHeight = vi
-      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        if (!this.classList.contains('card__body')) return 0;
-        const probe = this.closest<HTMLElement>('[data-layout-probe="proficiencies"]');
-        return probe?.getAttribute('style')?.includes('span 1') ? 108 : 100;
-      });
-
-    try {
-      mockedLoad.mockResolvedValue(sampleCharacter);
-      const wrapper = mount(App, { props: { characterId: 166869100 } });
-      await flushPromises();
-      await nextTick();
-
-      const toggle = wrapper.get(
-        '.page [data-section-key="proficiencies"] .card__layout',
-      ).element as HTMLButtonElement;
-      expect(toggle.disabled).toBe(true);
-      expect(toggle.getAttribute('aria-label')).toContain(
-        'no other layout fits without overflow',
-      );
-    } finally {
-      clientWidth.mockRestore();
-      scrollWidth.mockRestore();
-      clientHeight.mockRestore();
-      scrollHeight.mockRestore();
-    }
-  });
-
-  it('does not automatically switch layouts based on fit-probe results', async () => {
-    const clientWidth = vi
-      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 200 : 0;
-      });
-    const scrollWidth = vi
-      .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 200 : 0;
-      });
-    const clientHeight = vi
-      .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        return this.classList.contains('card__body') ? 100 : 0;
-      });
-    const scrollHeight = vi
-      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
-      .mockImplementation(function (this: HTMLElement) {
-        if (!this.classList.contains('card__body')) return 0;
-        const probe = this.closest<HTMLElement>('[data-layout-probe="proficiencies"]');
-        return probe?.getAttribute('style')?.includes('span 2') ? 108 : 100;
-      });
-
-    try {
-      mockedLoad.mockResolvedValue(sampleCharacter);
-      const wrapper = mount(App, { props: { characterId: 166869100 } });
-      await flushPromises();
-      await nextTick();
-
-      const card = wrapper.get('.page [data-section-key="proficiencies"]');
-      expect(card.attributes('style')).toContain('span 2');
-      expect(card.get('.card__layout').attributes('aria-label')).toBe(
-        'Change layout (currently Wide)',
-      );
-    } finally {
-      clientWidth.mockRestore();
-      scrollWidth.mockRestore();
-      clientHeight.mockRestore();
-      scrollHeight.mockRestore();
-    }
   });
 
   it('shrinks a content-fit card to its measured content height', async () => {
@@ -386,150 +358,6 @@ describe('sheet App', () => {
     const notesStyle = wrapper.get('[data-section-key="notes"]').attributes('style') ?? '';
     expect(notesStyle).toMatch(/grid-row:\s*\d+\s*\/\s*span 2/);
 
-    wrapper.unmount();
-    gbcr.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it('grows an expanded spell card to its measured content height', async () => {
-    const spellCharacter: Character = {
-      ...sampleCharacter,
-      spells: [
-        {
-          name: 'Encyclopedic Invocation',
-          level: 3,
-          school: 'Abjuration',
-          castingTime: 'A',
-          range: '60 ft.',
-          components: 'V, S, M',
-          concentration: true,
-          duration: '1 minute',
-          summary: 'A detailed spell summary that needs more than the fixed tile estimate.',
-        },
-      ],
-      sections: sampleCharacter.sections.map((section) =>
-        section.key === 'spells' ? { ...section, count: 1 } : section,
-      ),
-    };
-    const rect = (height: number) =>
-      ({
-        top: 0,
-        bottom: height,
-        left: 0,
-        right: 0,
-        width: 0,
-        height,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
-    const gbcr = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function (this: HTMLElement) {
-        const spellCard = this.closest?.('[data-section-key^="spell:"]');
-        if (spellCard && this.classList?.contains('card__body')) return rect(650);
-        return rect(0);
-      });
-    class FakeResizeObserver {
-      constructor(_callback: () => void) {}
-      observe() {}
-      disconnect() {}
-    }
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-
-    mockedLoad.mockResolvedValue(spellCharacter);
-    const wrapper = mount(App, { props: { characterId: 166869100 } });
-    await flushPromises();
-    await wrapper.get('[data-section-key="spells"] .card__spell-toggle').trigger('click');
-    await flushPromises();
-    await nextTick();
-    await flushPromises();
-
-    const style = wrapper.get('[data-section-key="spell:encyclopedic-invocation"]')
-      .attributes('style') ?? '';
-    expect(style).toMatch(/grid-row:\s*\d+\s*\/\s*span 3/);
-
-    await wrapper
-      .get('[data-section-key="spell:encyclopedic-invocation"] .card__spell-toggle')
-      .trigger('click');
-    await flushPromises();
-    wrapper.unmount();
-    gbcr.mockRestore();
-    vi.unstubAllGlobals();
-  });
-
-  it('continues an expanded spell card at whole detail boundaries', async () => {
-    const spellCharacter: Character = {
-      ...sampleCharacter,
-      spells: [
-        {
-          name: 'Many-Part Working',
-          level: 5,
-          school: 'Conjuration',
-          castingTime: 'A',
-          range: '120 ft.',
-          components: 'V, S, M',
-          material: 'A precisely prepared focus worth 1,000 gp',
-          concentration: true,
-          duration: '10 minutes',
-          save: 'WIS',
-          summary: 'Each complete detail remains on one page rather than being cut in half.',
-        },
-      ],
-      sections: sampleCharacter.sections.map((section) =>
-        section.key === 'spells' ? { ...section, count: 1 } : section,
-      ),
-    };
-    const rect = (top: number, height: number) =>
-      ({
-        top,
-        bottom: top + height,
-        left: 0,
-        right: 0,
-        width: 0,
-        height,
-        x: 0,
-        y: top,
-        toJSON: () => ({}),
-      }) as DOMRect;
-    const gbcr = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function (this: HTMLElement) {
-        const card = this.closest?.('[data-section-key="spell:many-part-working"]');
-        if (!card) return rect(0, 0);
-        const parts = Array.from(card.querySelectorAll('[data-spell-card-part]'));
-        if (this.classList?.contains('card__body')) return rect(0, parts.length * 350);
-        if (this.matches?.('[data-spell-card-part]')) {
-          const index = Math.max(0, parts.indexOf(this));
-          return rect(index * 350, 350);
-        }
-        return rect(0, 0);
-      });
-    class FakeResizeObserver {
-      constructor(_callback: () => void) {}
-      observe() {}
-      disconnect() {}
-    }
-    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
-
-    mockedLoad.mockResolvedValue(spellCharacter);
-    const wrapper = mount(App, { props: { characterId: 166869100 } });
-    await flushPromises();
-    await wrapper.get('[data-section-key="spells"] .card__spell-toggle').trigger('click');
-    await flushPromises();
-    await nextTick();
-    await flushPromises();
-
-    const continuation = wrapper.find('[data-section-key="spell:many-part-working~cont~1"]');
-    expect(continuation.exists()).toBe(true);
-    expect(continuation.text()).toContain('Many-Part Working (cont.)');
-    expect(wrapper.get('[data-section-key="spell:many-part-working"] .card__body')
-      .attributes('style')).toContain('clip-path');
-
-    await wrapper
-      .get('[data-section-key="spell:many-part-working"] .card__spell-toggle')
-      .trigger('click');
-    await flushPromises();
     wrapper.unmount();
     gbcr.mockRestore();
     vi.unstubAllGlobals();
@@ -600,6 +428,32 @@ describe('sheet App', () => {
     wrapper.unmount();
     gbcr.mockRestore();
     vi.unstubAllGlobals();
+  });
+
+  it('replans continuations when item boundaries change without changing total height', async () => {
+    mockedLoad.mockResolvedValue(sampleCharacter);
+    const wrapper = mount(App, { props: { characterId: 166869100 } });
+    await flushPromises();
+    const actions = () => wrapper.findAllComponents(SectionCard).find(
+      (card) => card.props('section').key === 'actions',
+    )!;
+
+    actions().vm.$emit('measure', 'actions', {
+      chrome: 40,
+      total: 1200,
+      breaks: [400, 800, 1200],
+    });
+    await nextTick();
+    expect(actions().props('sliceEnd')).toBe(2);
+
+    actions().vm.$emit('measure', 'actions', {
+      chrome: 40,
+      total: 1200,
+      breaks: [600, 1000, 1200],
+    });
+    await nextTick();
+    expect(actions().props('sliceEnd')).toBe(1);
+    wrapper.unmount();
   });
 
   it('applies a stored non-default page format to the sheet', async () => {

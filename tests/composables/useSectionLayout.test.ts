@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { fakeBrowser } from 'wxt/testing';
@@ -13,6 +13,7 @@ import {
 import { SECTION_KEYS, type Character } from '@/services/dndbeyond/model';
 import { makeCharacter } from '../fixtures/character';
 import { mountComposable } from '../fixtures/mount-composable';
+import { mockStorageLocks, settleStorageLocks } from '../utils/settings/storage-locks';
 
 /** A Fighter (martial layout) with every section present and non-empty. */
 function fighter(): Character {
@@ -29,6 +30,11 @@ const keys = (sections: { key: string }[]) => sections.map((section) => section.
 describe('useSectionLayout', () => {
   beforeEach(() => {
     fakeBrowser.reset();
+    mockStorageLocks();
+  });
+  afterEach(async () => {
+    await settleStorageLocks();
+    vi.restoreAllMocks();
   });
 
   it('is empty until a character loads, then builds the default order', async () => {
@@ -194,6 +200,25 @@ describe('useSectionLayout', () => {
       await vi.advanceTimersByTimeAsync(500);
       expect((await sectionAnchorsPref.get({})).portrait).toMatchObject({ col: 1, row: 1 });
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('forces a debounced placement save within two seconds of continuous edits', async () => {
+    const { result, wrapper } = mountComposable(() => useSectionLayout(ref(fighter())));
+    await flushPromises();
+    vi.useFakeTimers();
+    try {
+      result.placeCard('basics', { page: 0, col: 0, row: 0 });
+      for (let row = 1; row <= 4; row += 1) {
+        await vi.advanceTimersByTimeAsync(400);
+        result.placeCard('basics', { page: 0, col: 0, row });
+      }
+      expect(await sectionAnchorsPref.get({})).toEqual({});
+      await vi.advanceTimersByTimeAsync(400);
+      expect((await sectionAnchorsPref.get({})).basics.row).toBe(4);
+    } finally {
+      wrapper.unmount();
       vi.useRealTimers();
     }
   });

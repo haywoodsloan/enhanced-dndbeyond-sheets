@@ -3,6 +3,8 @@ import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadCharacter } from '@/services/dndbeyond/load-character';
 import { getAuthToken, setAuthToken } from '@/services/dndbeyond/auth-token';
+import { flushPromises } from '@vue/test-utils';
+import { mockStorageLocks } from '../utils/settings/storage-locks';
 
 const noctData = JSON.parse(readFileSync('tests/fixtures/noct.json', 'utf-8'));
 
@@ -20,6 +22,7 @@ function jsonResponse(
 describe('loadCharacter', () => {
   beforeEach(() => {
     fakeBrowser.reset();
+    mockStorageLocks();
   });
 
   afterEach(() => {
@@ -90,5 +93,18 @@ describe('loadCharacter', () => {
 
     await expect(loadCharacter(166869100)).rejects.toThrow();
     expect(await getAuthToken()).toBeNull();
+  });
+
+  it.each([401, 403])('keeps a newer credential when an old request returns %s', async (status) => {
+    await setAuthToken('old-credential');
+    let respond!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { respond = resolve; })));
+    const loading = loadCharacter(166869100);
+    const failure = expect(loading).rejects.toThrow();
+    await flushPromises();
+    await setAuthToken('new-credential');
+    respond(jsonResponse(null, { ok: false, status }));
+    await failure;
+    expect(await getAuthToken()).toBe('new-credential');
   });
 });

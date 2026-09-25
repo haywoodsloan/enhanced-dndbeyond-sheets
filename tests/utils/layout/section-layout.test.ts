@@ -16,8 +16,6 @@ import {
 describe('sectionSpan', () => {
   it('gives content-heavy sections a larger footprint', () => {
     expect(sectionSpan('features')).toEqual({ cols: 3, rows: 2 });
-    expect(sectionSpan('companions')).toEqual({ cols: 3, rows: 2 });
-    expect(sectionSpan('tables')).toEqual({ cols: 3, rows: 2 });
     expect(sectionSpan('portrait')).toEqual({ cols: 1, rows: 1 });
     expect(sectionSpan('basics')).toEqual({ cols: 3, rows: 1 });
     expect(sectionSpan('attributes')).toEqual({ cols: 2, rows: 1 });
@@ -89,8 +87,6 @@ describe('sectionSpan dynamic height', () => {
     expect(sectionSpan('savingThrows', 7).rows).toBe(2);
     expect(sectionSpan('actions', 40).rows).toBe(4); // ceil(40/12)
     expect(sectionSpan('spells', 40).rows).toBe(4); // ceil(40/12)
-    expect(sectionSpan('companions', 30).rows).toBe(3); // ceil(30/10)
-    expect(sectionSpan('tables', 25).rows).toBe(3); // ceil(25/12)
     expect(sectionSpan('inventory', 60).rows).toBe(3); // ceil(60/20)
     expect(sectionSpan('features', 39).rows).toBe(3); // ceil(39/13)
   });
@@ -124,8 +120,6 @@ describe('sectionSpan dynamic height', () => {
 describe('section layout options', () => {
   it('reports how many curated layouts a section offers', () => {
     expect(sectionLayoutCount('inventory')).toBe(3);
-    expect(sectionLayoutCount('companions')).toBe(3);
-    expect(sectionLayoutCount('tables')).toBe(3);
     expect(sectionLayoutCount('skills')).toBe(2);
     expect(sectionLayoutCount('attributes')).toBe(2);
     expect(sectionLayoutCount('proficiencies')).toBe(2);
@@ -138,9 +132,11 @@ describe('section layout options', () => {
     expect(sectionLayoutCount('senses')).toBe(1);
   });
 
-  it('marks companion and rules-table cards as measured content', () => {
-    expect(CONTENT_FIT_SECTIONS.has('companions')).toBe(true);
-    expect(CONTENT_FIT_SECTIONS.has('tables')).toBe(true);
+  it('measures rules content without shrinking blank notes or inventory write-in space', () => {
+    expect(CONTENT_FIT_SECTIONS.has('actions')).toBe(true);
+    expect(CONTENT_FIT_SECTIONS.has('features')).toBe(true);
+    expect(CONTENT_FIT_SECTIONS.has('notes')).toBe(false);
+    expect(CONTENT_FIT_SECTIONS.has('inventory')).toBe(false);
   });
 
   it('labels each layout option', () => {

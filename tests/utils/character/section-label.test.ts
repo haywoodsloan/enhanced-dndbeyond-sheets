@@ -6,8 +6,4 @@ describe('sectionLabel', () => {
     expect(sectionLabel('savingThrows')).toBe('Saves & Defences');
     expect(sectionLabel('features')).toBe('Features & Traits');
   });
-
-  it('uses the character-specific companion title', () => {
-    expect(sectionLabel('companions', 'Summons')).toBe('Summons');
-  });
 });

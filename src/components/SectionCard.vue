@@ -10,8 +10,6 @@ import ProficienciesCard from '@/components/cards/ProficienciesCard.vue';
 import AttacksCard from '@/components/cards/AttacksCard.vue';
 import ActionsCard from '@/components/cards/ActionsCard.vue';
 import SpellsCard from '@/components/cards/SpellsCard.vue';
-import CompanionsCard from '@/components/cards/CompanionsCard.vue';
-import RuleTablesCard from '@/components/cards/RuleTablesCard.vue';
 import SpellCard from '@/components/cards/SpellCard.vue';
 import InventoryCard from '@/components/cards/InventoryCard.vue';
 import WealthCard from '@/components/cards/WealthCard.vue';
@@ -67,6 +65,8 @@ const props = withDefaults(
     rowAlignedFeatures?: boolean;
     /** Use row-aligned action items when masonry has no safe page break. */
     rowAlignedActions?: boolean;
+    /** Printable body limit shared by the base and its continuation cards. */
+    maxBodyHeight?: number;
   }>(),
   { canCycleLayout: true, sliceOffset: 0 },
 );
@@ -104,16 +104,6 @@ const cardSubtitle = computed(() =>
   props.section.key === 'basics' && props.character
     ? characterSubtitle(props.character)
     : '',
-);
-const cardMeta = computed(() =>
-  props.section.key === 'basics' && props.character
-    ? [props.character.size, props.character.creatureType].filter(Boolean).join(' · ')
-    : '',
-);
-const companionTitle = computed(
-  () =>
-    props.character?.sections.find((section) => section.key === 'companions')?.title ??
-    'Companions',
 );
 
 // A continuation card renders the SAME body as its base card, shifted up to show
@@ -211,7 +201,7 @@ function contentFits(body: HTMLElement): boolean {
 // A spell level heading counts: an empty level is a heading with no spells under
 // it, so without it a run of empty levels has no boundary to cut at.
 const BREAK_ITEMS =
-  '[data-spell],[data-spell-level],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part],[data-companion-part],[data-rule-row]';
+  '[data-spell],[data-spell-level],[data-spell-card-part],[data-action],[data-attack],[data-feature],[data-feature-part]';
 
 function measure() {
   if (props.hidden) return;
@@ -225,14 +215,38 @@ function measure() {
   const bodyRect = body.getBoundingClientRect();
   const total = bodyRect.height;
   if (total <= 0) return;
-  // Each break item's top/bottom edge, body-relative. A feature never spans the
-  // grid, so it breaks as a whole and its sub-parts are not break candidates.
+  // Feature parts stay with their owner; only oversized items need internal breaks.
   const breakItems = Array.from(body.querySelectorAll(BREAK_ITEMS)).filter(
     (element) => !element.hasAttribute('data-feature-part'),
   );
-  const rects = breakItems.map((el) => {
+  const rects = breakItems.flatMap((el) => {
     const r = el.getBoundingClientRect();
-    return { top: r.top - bodyRect.top, bottom: r.bottom - bodyRect.top };
+    const relative = (rect: DOMRect) => ({
+      top: rect.top - bodyRect.top, bottom: rect.bottom - bodyRect.top,
+    });
+    const limit = props.maxBodyHeight ?? Infinity;
+    if (r.height <= limit) return [relative(r)];
+
+    // Only an item that cannot fit on any page may break internally. Keep short
+    // bullets whole; otherwise use real text lines rather than clipping rules.
+    const lines: { top: number; bottom: number }[] = [];
+    const bullets = new Set<Element>();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent?.trim()) continue;
+      const bullet = node.parentElement?.closest('[data-rich-text-bullet]');
+      if (bullet && el.contains(bullet) && bullet.getBoundingClientRect().height <= limit) {
+        if (!bullets.has(bullet)) lines.push(relative(bullet.getBoundingClientRect()));
+        bullets.add(bullet);
+        continue;
+      }
+      range.selectNodeContents(node);
+      for (const line of range.getClientRects()) {
+        if (line.width > 0 && line.height > 0) lines.push(relative(line));
+      }
+    }
+    return lines.length ? lines : [relative(r)];
   });
   const EDGE = 0.5;
   const breaks = rects
@@ -308,7 +322,11 @@ onBeforeUnmount(() => {
 });
 // A layout toggle or count change alters the card's width or content, so re-fit.
 watch(
-  () => [props.span.cols, props.span.rows, props.section.count],
+  () => [
+    props.span.cols, props.span.rows, props.section.count,
+    props.rowAlignedFeatures, props.rowAlignedActions,
+    props.maxBodyHeight,
+  ],
   () => void nextTick(measure),
 );
 </script>
@@ -336,10 +354,6 @@ watch(
           <template v-if="cardSubtitle">
             <span class="card__title-sep" aria-hidden="true">|</span>
             <span class="card__subtitle">{{ cardSubtitle }}</span>
-          </template>
-          <template v-if="cardMeta">
-            <span class="card__title-sep" aria-hidden="true">|</span>
-            <span class="card__meta">{{ cardMeta }}</span>
           </template>
         </span>
         <div
@@ -518,23 +532,12 @@ watch(
         <ActionsCard
           v-else-if="bodyKey === 'actions' && character"
           :actions="character.actions"
-          :companion-title="companionTitle"
           :row-aligned="rowAlignedActions"
         />
         <SpellsCard
           v-else-if="bodyKey === 'spells' && character"
           :spells="character.spells"
           :spellcasting="character.spellcasting"
-          :companion-title="companionTitle"
-        />
-        <CompanionsCard
-          v-else-if="bodyKey === 'companions' && character"
-          :companions="character.companions"
-          :columns="span.cols"
-        />
-        <RuleTablesCard
-          v-else-if="bodyKey === 'tables' && character"
-          :tables="character.ruleTables"
         />
         <InventoryCard
           v-else-if="bodyKey === 'inventory' && character"
@@ -548,11 +551,10 @@ watch(
         <FeaturesCard
           v-else-if="bodyKey === 'features' && character"
           :features="character.features"
-          :companion-title="companionTitle"
           :row-aligned="rowAlignedFeatures"
         />
         <NotesCard v-else-if="bodyKey === 'notes'" />
-        <SpellCard v-else-if="spell" :spell="spell" :companion-title="companionTitle" />
+        <SpellCard v-else-if="spell" :spell="spell" />
         <p v-else-if="section.isEmpty" class="card__note">Nothing here yet.</p>
         <p v-else class="card__note">Details coming soon.</p>
       </div>
